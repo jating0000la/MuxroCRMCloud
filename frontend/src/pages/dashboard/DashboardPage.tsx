@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { dashboardService } from '../../services/dashboard';
+import { dashboardService, SalesFunnelData, UserConversionData } from '../../services/dashboard';
 import { campaignService } from '../../services/campaigns';
 import { DashboardStats, Campaign, Followup } from '../../types';
 import Layout from '../../components/layout/Layout';
+import SalesFunnel from '../../components/dashboard/SalesFunnel';
+import UserConversion from '../../components/dashboard/UserConversion';
 import { format } from 'date-fns';
 
 export default function DashboardPage() {
@@ -12,6 +14,8 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [recentFollowups, setRecentFollowups] = useState<Followup[]>([]);
+  const [salesFunnel, setSalesFunnel] = useState<SalesFunnelData | null>(null);
+  const [userConversion, setUserConversion] = useState<UserConversionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,14 +26,18 @@ export default function DashboardPage() {
   const loadData = async () => {
     setError(null);
     try {
-      const [statsData, campaignsData, followupsData] = await Promise.all([
+      const [statsData, campaignsData, followupsData, funnelData, conversionData] = await Promise.all([
         dashboardService.getOverview(),
         campaignService.getAll(),
         dashboardService.getFollowupDashboard(),
+        dashboardService.getSalesFunnel(),
+        dashboardService.getUserConversion(),
       ]);
       setStats(statsData);
       setCampaigns(campaignsData);
       setRecentFollowups(followupsData.slice(0, 5));
+      setSalesFunnel(funnelData);
+      setUserConversion(conversionData);
     } catch (error) {
       console.error('Failed to load stats', error);
       setError('Failed to load dashboard data. Please try again.');
@@ -156,6 +164,72 @@ export default function DashboardPage() {
             </Link>
           ))}
         </div>
+
+        {/* Sales Funnel & Conversion Stats */}
+        {salesFunnel && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {/* Sales Funnel */}
+            <div className="lg:col-span-2">
+              <SalesFunnel data={salesFunnel} />
+            </div>
+
+            {/* Conversion Stats */}
+            <div className="bg-white rounded-xl shadow-sm border p-6">
+              <h3 className="font-semibold text-gray-900 mb-4">Conversion Overview</h3>
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-blue-700">Total Leads</span>
+                    <span className="text-2xl font-bold text-blue-900">{salesFunnel.totalLeads}</span>
+                  </div>
+                </div>
+                <div className="p-4 bg-purple-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-purple-700">Contacted</span>
+                    <div className="text-right">
+                      <span className="text-2xl font-bold text-purple-900">{salesFunnel.contactedLeads}</span>
+                      <span className="text-sm text-purple-600 ml-2">({salesFunnel.contactRate}%)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 w-full bg-purple-200 rounded-full h-2">
+                    <div
+                      className="bg-purple-600 h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${salesFunnel.contactRate}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="p-4 bg-amber-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-amber-700">Qualified</span>
+                    <div className="text-right">
+                      <span className="text-2xl font-bold text-amber-900">{salesFunnel.leadsWithStatus}</span>
+                      <span className="text-sm text-amber-600 ml-2">({salesFunnel.conversionRate}%)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 w-full bg-amber-200 rounded-full h-2">
+                    <div
+                      className="bg-amber-600 h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${salesFunnel.conversionRate}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="p-4 bg-red-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-red-700">DND</span>
+                    <span className="text-2xl font-bold text-red-900">{salesFunnel.dndLeads}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* User-wise Conversion */}
+        {userConversion.length > 0 && (
+          <div className="mb-8">
+            <UserConversion data={userConversion} />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Quick Actions */}

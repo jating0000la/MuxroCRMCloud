@@ -35,4 +35,18 @@ export class DashboardController {
   getAllLeadsDashboard(@Request() req, @Query('campaignId') campaignId?: string) {
     return this.dashboardService.getAllLeadsDashboard(req.user.id, req.user.role, campaignId);
   }
+
+  @Get('sales-funnel')
+  @ApiOperation({ summary: 'Get sales funnel data' })
+  @ApiQuery({ name: 'campaignId', required: false })
+  getSalesFunnel(@Request() req, @Query('campaignId') campaignId?: string) {
+    return this.dashboardService.getSalesFunnel(req.user.id, req.user.role, campaignId);
+  }
+
+  @Get('user-conversion')
+  @ApiOperation({ summary: 'Get user-wise conversion ratio' })
+  @ApiQuery({ name: 'campaignId', required: false })
+  getUserConversion(@Request() req, @Query('campaignId') campaignId?: string) {
+    return this.dashboardService.getUserConversion(req.user.id, req.user.role, campaignId);
+  }
 }
