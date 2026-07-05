@@ -434,6 +434,41 @@ export default function FollowupDashboardPage() {
                               </svg>
                             </a>
                           )}
+                          {lead.email && (
+                            <a
+                               href={`https://mail.google.com/mail/u/0/?to=${encodeURIComponent(lead.email)}&body=${encodeURIComponent(`Dear ${lead.name}`)}&fs=1&tf=cm`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center w-7 h-7 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                              title="Email"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                            </a>
+                          )}
+                          <button
+                            onClick={() => handleStartFlow(lead)}
+                            disabled={startingFlow === lead.id}
+                            className={`inline-flex items-center justify-center w-7 h-7 rounded transition-colors ${
+                              startingFlow === lead.id
+                                ? 'bg-purple-200 text-purple-400 cursor-wait'
+                                : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                            }`}
+                            title="Start Process Sutra Flow"
+                            aria-label="Start flow"
+                          >
+                            {startingFlow === lead.id ? (
+                              <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                              </svg>
+                            )}
+                          </button>
                           <button
                             onClick={() => handleViewLead(lead)}
                             className="inline-flex items-center justify-center w-7 h-7 bg-primary-100 text-primary-700 rounded hover:bg-primary-200 transition-colors"
