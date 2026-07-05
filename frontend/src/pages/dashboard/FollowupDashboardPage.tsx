@@ -180,13 +180,12 @@ export default function FollowupDashboardPage() {
   };
 
   const exportToCSV = () => {
-    const headers = ['Lead ID', 'Campaign', 'Name', 'Phone', 'Form Data', 'Due Date', 'Last Updated', 'Status', 'Remark'];
+    const headers = ['Lead ID', 'Campaign', 'Name', 'Phone', 'Due Date', 'Last Updated', 'Status', 'Remark'];
     const rows = filteredLeads.map((l) => [
       l.id.slice(0, 8),
       l.campaign?.name || '',
       l.name,
       l.phone || '',
-      l.customData ? Object.entries(l.customData).map(([k, v]) => `${k}: ${v}`).join(' | ') : '',
       l.followups?.[0]?.nextCallDate ? format(new Date(l.followups[0].nextCallDate), 'MMM d, yyyy h:mm a') : '',
       format(new Date(l.updatedAt), 'MMM d, yyyy'),
       l.status?.label || '',
@@ -332,7 +331,6 @@ export default function FollowupDashboardPage() {
                       Name <SortIcon field="name" />
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Form Data</th>
                     <th
                       onClick={() => handleSort('dueDate')}
                       className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
@@ -378,16 +376,6 @@ export default function FollowupDashboardPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">{lead.phone || '-'}</td>
-                      <td className="px-4 py-3">
-                        {lead.customData && Object.keys(lead.customData).length > 0 ? (
-                          <div className="text-xs text-gray-500 max-w-[180px] truncate" title={Object.entries(lead.customData).map(([k, v]) => `${k}: ${v}`).join(', ')}>
-                            {Object.entries(lead.customData).slice(0, 2).map(([k, v]) => `${k}: ${v}`).join(' | ')}
-                            {Object.keys(lead.customData).length > 2 && ' ...'}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-xs">-</span>
-                        )}
-                      </td>
                       <td className="px-4 py-3">
                         {lead.followups?.[0]?.nextCallDate ? (
                           <span className={`text-xs font-medium ${
