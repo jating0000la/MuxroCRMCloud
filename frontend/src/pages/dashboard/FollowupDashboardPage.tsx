@@ -180,7 +180,7 @@ export default function FollowupDashboardPage() {
   };
 
   const exportToCSV = () => {
-    const headers = ['Lead ID', 'Campaign', 'Name', 'Phone', 'Due Date', 'Last Updated', 'Status', 'Remark'];
+    const headers = ['Lead ID', 'Campaign', 'Name', 'Phone', 'Due Date', 'Last Updated', 'Status'];
     const rows = filteredLeads.map((l) => [
       l.id.slice(0, 8),
       l.campaign?.name || '',
@@ -189,7 +189,6 @@ export default function FollowupDashboardPage() {
       l.followups?.[0]?.nextCallDate ? format(new Date(l.followups[0].nextCallDate), 'MMM d, yyyy h:mm a') : '',
       format(new Date(l.updatedAt), 'MMM d, yyyy'),
       l.status?.label || '',
-      l.followups?.[0]?.remarks || '',
     ]);
 
     const csvContent = [headers, ...rows].map((row) => row.join(',')).join('\n');
@@ -349,7 +348,6 @@ export default function FollowupDashboardPage() {
                     >
                       Status <SortIcon field="status" />
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remark</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
@@ -403,9 +401,6 @@ export default function FollowupDashboardPage() {
                         ) : (
                           <span className="text-gray-400 text-xs">-</span>
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500 max-w-[120px] truncate" title={lead.followups?.[0]?.remarks || ''}>
-                        {lead.followups?.[0]?.remarks || '-'}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
