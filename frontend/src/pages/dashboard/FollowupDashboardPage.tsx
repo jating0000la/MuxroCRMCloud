@@ -10,7 +10,7 @@ import LeadDetailDialog from '../../components/leads/LeadDetailDialog';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
-type SortField = 'name' | 'campaign' | 'status' | 'doer' | 'source' | 'updatedAt';
+type SortField = 'name' | 'campaign' | 'status' | 'doer' | 'dueDate' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
 
 export default function FollowupDashboardPage() {
@@ -138,8 +138,13 @@ export default function FollowupDashboardPage() {
         case 'doer':
           comparison = (a.doer?.name || '').localeCompare(b.doer?.name || '');
           break;
-        case 'source':
-          comparison = a.source.localeCompare(b.source);
+        case 'dueDate':
+          const aDate = a.followups?.[0]?.nextCallDate;
+          const bDate = b.followups?.[0]?.nextCallDate;
+          if (!aDate && !bDate) comparison = 0;
+          else if (!aDate) comparison = 1;
+          else if (!bDate) comparison = -1;
+          else comparison = new Date(aDate).getTime() - new Date(bDate).getTime();
           break;
         case 'updatedAt':
           comparison = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
@@ -175,16 +180,12 @@ export default function FollowupDashboardPage() {
   };
 
   const exportToCSV = () => {
-    const headers = ['Name', 'Email', 'Phone', 'Campaign', 'Doer', 'Status', 'Source', 'DND', 'Last Updated'];
+    const headers = ['Name', 'Campaign', 'Status', 'Due Date', 'Last Updated'];
     const rows = filteredLeads.map((l) => [
       l.name,
-      l.email || '',
-      l.phone || '',
       l.campaign?.name || '',
-      l.doer?.name || 'Unassigned',
       l.status?.label || 'No status',
-      l.source,
-      l.dnd ? 'Yes' : 'No',
+      l.followups?.[0]?.nextCallDate ? format(new Date(l.followups[0].nextCallDate), 'MMM d, yyyy h:mm a') : '',
       format(new Date(l.updatedAt), 'MMM d, yyyy'),
     ]);
 
@@ -319,18 +320,11 @@ export default function FollowupDashboardPage() {
                     >
                       Name <SortIcon field="name" />
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
                     <th
                       onClick={() => handleSort('campaign')}
                       className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                     >
                       Campaign <SortIcon field="campaign" />
-                    </th>
-                    <th
-                      onClick={() => handleSort('doer')}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                    >
-                      Doer <SortIcon field="doer" />
                     </th>
                     <th
                       onClick={() => handleSort('status')}
@@ -339,10 +333,10 @@ export default function FollowupDashboardPage() {
                       Status <SortIcon field="status" />
                     </th>
                     <th
-                      onClick={() => handleSort('source')}
+                      onClick={() => handleSort('dueDate')}
                       className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                     >
-                      Source <SortIcon field="source" />
+                      Due Date <SortIcon field="dueDate" />
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
@@ -367,14 +361,7 @@ export default function FollowupDashboardPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-gray-900 truncate max-w-[160px]">{lead.email || '-'}</div>
-                        <div className="text-sm text-gray-500 truncate max-w-[160px]">{lead.phone || '-'}</div>
-                      </td>
                       <td className="px-4 py-3 text-sm text-gray-500 truncate max-w-[140px]">{lead.campaign?.name}</td>
-                      <td className="px-4 py-3 text-sm text-gray-500 truncate max-w-[120px]">
-                        {lead.doer?.name || <span className="text-gray-400 italic">Unassigned</span>}
-                      </td>
                       <td className="px-4 py-3">
                         {lead.status ? (
                           <span
@@ -388,13 +375,19 @@ export default function FollowupDashboardPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${
-                          lead.source === 'form' ? 'bg-blue-100 text-blue-700' :
-                          lead.source === 'bulk' ? 'bg-purple-100 text-purple-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {lead.source}
-                        </span>
+                        {lead.followups?.[0]?.nextCallDate ? (
+                          <span className={`text-sm font-medium ${
+                            new Date(lead.followups[0].nextCallDate) < new Date()
+                              ? 'text-red-600'
+                              : new Date(lead.followups[0].nextCallDate).toDateString() === new Date().toDateString()
+                                ? 'text-amber-600'
+                                : 'text-gray-900'
+                          }`}>
+                            {format(new Date(lead.followups[0].nextCallDate), 'MMM d, h:mm a')}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-sm">No followup</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1.5">
