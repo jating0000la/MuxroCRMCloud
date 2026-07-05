@@ -1,0 +1,1358 @@
+import React, { useEffect, useState, useRef } from 'react';
+import { useParams } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { campaignService } from '../../services/campaigns';
+import { leadService } from '../../services/leads';
+import { formService } from '../../services/forms';
+import { bulkImportService } from '../../services/bulkImport';
+import { statusService } from '../../services/statuses';
+import { Campaign, Lead, Form, User, CampaignStatus } from '../../types';
+import Layout from '../../components/layout/Layout';
+import toast from 'react-hot-toast';
+import StatusUpdateDialog from '../../components/leads/StatusUpdateDialog';
+import LeadDetailDialog from '../../components/leads/LeadDetailDialog';
+
+const STATUS_COLORS = [
+  '#3B82F6', '#F59E0B', '#10B981', '#059669', '#EF4444',
+  '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#F97316',
+];
+
+export default function CampaignDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [forms, setForms] = useState<Form[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'leads' | 'forms' | 'users' | 'settings'>('leads');
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showFormBuilder, setShowFormBuilder] = useState(false);
+  const [showAssignUsers, setShowAssignUsers] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [leadSearch, setLeadSearch] = useState('');
+  const [leadStatusFilter, setLeadStatusFilter] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Status management
+  const [newStatusLabel, setNewLabelStatus] = useState('');
+  const [newStatusColor, setNewStatusColor] = useState(STATUS_COLORS[0]);
+  const [addingStatus, setAddingStatus] = useState(false);
+
+  // Campaign edit
+  const [editingCampaign, setEditingCampaign] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [savingCampaign, setSavingCampaign] = useState(false);
+
+  const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+
+  useEffect(() => {
+    if (id) loadData();
+  }, [id]);
+
+  const loadData = async () => {
+    try {
+      const [campaignData, leadsData, formsData, assignedUsers] = await Promise.all([
+        campaignService.getOne(id!),
+        leadService.getByCampaign(id!),
+        formService.getByCampaign(id!),
+        campaignService.getAssignedUsers(id!),
+      ]);
+      setCampaign(campaignData);
+      setLeads(leadsData);
+      setForms(formsData);
+      setUsers(assignedUsers.map((au) => au.user!).filter(Boolean));
+
+      if (canManage) {
+        const allUsersData = await import('../../services/users').then((m) => m.userService.getAll());
+        setAllUsers(allUsersData);
+      }
+    } catch (error: any) {
+      if (error.response?.status === 403) {
+        toast.error('You do not have access to this campaign');
+      } else {
+        toast.error('Failed to load campaign data');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveCampaign = async () => {
+    if (!editName.trim()) {
+      toast.error('Campaign name is required');
+      return;
+    }
+    setSavingCampaign(true);
+    try {
+      const updated = await campaignService.update(id!, {
+        name: editName.trim(),
+        description: editDescription.trim() || undefined,
+        isActive: editIsActive,
+      });
+      setCampaign(updated);
+      setEditingCampaign(false);
+      toast.success('Campaign updated');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to update campaign');
+    } finally {
+      setSavingCampaign(false);
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleBulkImport = async () => {
+    if (!file) return;
+    setImporting(true);
+    try {
+      const result = await bulkImportService.importCSV(id!, file);
+      toast.success(`Successfully imported ${result.imported} leads`);
+      setShowBulkImport(false);
+      setFile(null);
+      loadData();
+    } catch (error: any) {
+      if (error.response?.status === 403) {
+        toast.error('You do not have permission to import leads');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to import leads');
+      }
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleAssignUsers = async (userIds: string[]) => {
+    try {
+      await campaignService.assignUsers(id!, userIds);
+      toast.success('Users assigned successfully');
+      setShowAssignUsers(false);
+      loadData();
+    } catch (error: any) {
+      if (error.response?.status === 403) {
+        toast.error('You do not have permission to assign users');
+      } else {
+        toast.error('Failed to assign users');
+      }
+    }
+  };
+
+  const handleCreateForm = async (title: string, fields: any[]) => {
+    try {
+      const form = await formService.create(id!, { title, fields });
+      await formService.publish(id!, form.id);
+      toast.success('Form created and published');
+      setShowFormBuilder(false);
+      loadData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to create form');
+    }
+  };
+
+  const filteredLeads = leads.filter((lead) => {
+    const matchSearch =
+      !leadSearch ||
+      lead.name.toLowerCase().includes(leadSearch.toLowerCase()) ||
+      lead.email?.toLowerCase().includes(leadSearch.toLowerCase()) ||
+      lead.phone?.includes(leadSearch);
+    const matchStatus = !leadStatusFilter || lead.statusId === leadStatusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="p-8 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!campaign) {
+    return (
+      <Layout>
+        <div className="p-8 text-center">
+          <h2 className="text-xl font-semibold text-gray-900">Campaign not found</h2>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <div className="p-6 lg:p-8">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center space-x-2 text-sm text-gray-500 mb-2">
+            <span>Campaigns</span>
+            <span>/</span>
+            <span className="text-gray-900">{campaign.name}</span>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">{campaign.name}</h1>
+              {campaign.description && (
+                <p className="text-gray-500 mt-1">{campaign.description}</p>
+              )}
+            </div>
+            {canManage && (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    setEditName(campaign.name);
+                    setEditDescription(campaign.description || '');
+                    setEditIsActive(campaign.isActive);
+                    setEditingCampaign(true);
+                  }}
+                  className="inline-flex items-center px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                >
+                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Edit
+                </button>
+                <button
+                  onClick={() => setShowBulkImport(true)}
+                  className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                >
+                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Import CSV
+                </button>
+                {forms.length === 0 && (
+                  <button
+                    onClick={() => setShowFormBuilder(true)}
+                    className="inline-flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+                  >
+                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    New Form
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowAssignUsers(true)}
+                  className="inline-flex items-center px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
+                >
+                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                  </svg>
+                  Assign Users
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="border-b border-gray-200 mb-6">
+          <nav className="flex space-x-8">
+            {([
+              { key: 'leads' as const, label: 'Leads', count: leads.length },
+              { key: 'forms' as const, label: 'Forms', count: forms.length },
+              { key: 'users' as const, label: 'Team Members', count: users.length },
+              ...(canManage ? [{ key: 'settings' as const, label: 'Settings', count: 0 }] : []),
+            ]).map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === tab.key
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                {tab.label}
+                {tab.key !== 'settings' && (
+                  <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
+                    activeTab === tab.key ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* Leads Tab */}
+        {activeTab === 'leads' && (
+          <div>
+            {/* Lead Filters */}
+            <div className="bg-white rounded-xl shadow-sm border p-4 mb-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1 relative">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search leads by name, email, or phone..."
+                    value={leadSearch}
+                    onChange={(e) => setLeadSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <select
+                  value={leadStatusFilter}
+                  onChange={(e) => setLeadStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">All Status</option>
+                  {campaign.statuses?.map((s) => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Leads Table */}
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Doer</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredLeads.map((lead) => (
+                      <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                              <span className="text-sm font-medium text-primary-700">{lead.name.charAt(0)}</span>
+                            </div>
+                            <span className="ml-3 font-medium text-gray-900">{lead.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">{lead.email || '-'}</div>
+                          <div className="text-sm text-gray-500">{lead.phone || '-'}</div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {lead.doer?.name || <span className="text-gray-400 italic">Unassigned</span>}
+                        </td>
+                        <td className="px-6 py-4">
+                          {lead.status ? (
+                            <span
+                              className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
+                              style={{ backgroundColor: lead.status.color + '20', color: lead.status.color }}
+                            >
+                              {lead.status.label}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-sm">No status</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                            lead.source === 'form' ? 'bg-blue-100 text-blue-700' :
+                            lead.source === 'bulk' ? 'bg-purple-100 text-purple-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {lead.source}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => setSelectedLead(lead)}
+                            className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                          >
+                            View Details
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {filteredLeads.length === 0 && (
+                <div className="text-center py-12">
+                  <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <h3 className="text-lg font-medium text-gray-900">No leads found</h3>
+                  <p className="text-gray-500 mt-1">
+                    {leadSearch || leadStatusFilter ? 'Try adjusting your filters' : 'Import leads or create a form to get started'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Forms Tab */}
+        {activeTab === 'forms' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {forms.map((form) => (
+              <div key={form.id} className="bg-white rounded-xl shadow-sm border p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
+                    form.isPublished ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {form.isPublished ? 'Published' : 'Draft'}
+                  </span>
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-1">{form.title}</h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  {form._count?.submissions || 0} submissions
+                </p>
+                {form.isPublished && (
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <label className="text-xs font-medium text-gray-500 block mb-1">Public Link</label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={`${window.location.origin}/form/${form.publicSlug}`}
+                        className="flex-1 text-xs text-primary-600 bg-transparent border-none p-0"
+                      />
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}/form/${form.publicSlug}`);
+                          toast.success('Link copied!');
+                        }}
+                        className="p-1.5 hover:bg-gray-200 rounded"
+                      >
+                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {forms.length === 0 && (
+              <div className="col-span-full text-center py-12 bg-white rounded-xl border">
+                <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 className="text-lg font-medium text-gray-900">No form yet</h3>
+                <p className="text-gray-500 mt-1 mb-4">Create a form to collect enquiries. Each campaign can have one form.</p>
+            {canManage && (
+                  <button
+                    onClick={() => setShowFormBuilder(true)}
+                    className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  >
+                    Create Form
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+              {users.map((u) => (
+                <div key={u.id} className="flex items-center p-4 bg-gray-50 rounded-xl">
+                  <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-medium text-primary-700">{u.name.charAt(0)}</span>
+                  </div>
+                  <div className="ml-3">
+                    <p className="font-medium text-gray-900">{u.name}</p>
+                    <p className="text-sm text-gray-500">{u.username}</p>
+                  </div>
+                  <span className={`ml-auto px-2 py-1 text-xs rounded-full ${
+                    u.role === 'ADMIN' ? 'bg-red-100 text-red-700' :
+                    u.role === 'MANAGER' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-green-100 text-green-700'
+                  }`}>
+                    {u.role}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {users.length === 0 && (
+              <div className="text-center py-12">
+                <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <h3 className="text-lg font-medium text-gray-900">No team members</h3>
+                <p className="text-gray-500 mt-1">Assign users to this campaign</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && canManage && (
+          <div className="space-y-6">
+            {/* Status Management */}
+            <div className="bg-white rounded-xl shadow-sm border p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Lead Statuses</h3>
+                  <p className="text-sm text-gray-500">Customize the status options for leads in this campaign</p>
+                </div>
+              </div>
+
+              {/* Add New Status */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Add New Status</h4>
+                <div className="flex items-end gap-3">
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 mb-1">Status Label</label>
+                    <input
+                      type="text"
+                      value={newStatusLabel}
+                      onChange={(e) => setNewLabelStatus(e.target.value)}
+                      placeholder="e.g., Qualified, Proposal Sent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={newStatusColor}
+                        onChange={(e) => setNewStatusColor(e.target.value)}
+                        className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer"
+                      />
+                      <div className="flex flex-wrap gap-1">
+                        {STATUS_COLORS.slice(0, 5).map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => setNewStatusColor(color)}
+                            className={`w-6 h-6 rounded-full border-2 ${
+                              newStatusColor === color ? 'border-gray-600' : 'border-transparent'
+                            }`}
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!newStatusLabel.trim()) {
+                        toast.error('Please enter a status label');
+                        return;
+                      }
+                      setAddingStatus(true);
+                      try {
+                        await statusService.create(id!, {
+                          label: newStatusLabel.trim(),
+                          color: newStatusColor,
+                        });
+                        toast.success('Status added');
+                        setNewLabelStatus('');
+                        setNewStatusColor(STATUS_COLORS[0]);
+                        loadData();
+                      } catch (error) {
+                        toast.error('Failed to add status');
+                      } finally {
+                        setAddingStatus(false);
+                      }
+                    }}
+                    disabled={addingStatus || !newStatusLabel.trim()}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {addingStatus ? 'Adding...' : 'Add Status'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Current Statuses */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Current Statuses</h4>
+                <div className="space-y-2">
+                  {campaign.statuses?.map((status) => {
+                    const leadCount = leads.filter((l) => l.statusId === status.id).length;
+                    return (
+                      <div
+                        key={status.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-4 h-4 rounded-full"
+                            style={{ backgroundColor: status.color }}
+                          />
+                          <span className="font-medium text-gray-900">{status.label}</span>
+                          <span className="text-sm text-gray-500">({leadCount} leads)</span>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            if (leadCount > 0) {
+                              toast.error(`Cannot delete "${status.label}" - ${leadCount} lead(s) are using it`);
+                              return;
+                            }
+                            if (!confirm(`Delete status "${status.label}"?`)) return;
+                            try {
+                              await statusService.remove(id!, status.id);
+                              toast.success('Status deleted');
+                              loadData();
+                            } catch (error: any) {
+                              toast.error(error.response?.data?.message || 'Failed to delete status');
+                            }
+                          }}
+                          className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {(!campaign.statuses || campaign.statuses.length === 0) && (
+                    <p className="text-gray-500 text-sm py-4">No statuses defined</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Import Modal */}
+        {editingCampaign && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-900">Edit Campaign</h2>
+                  <button onClick={() => setEditingCampaign(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Campaign Name *</label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="Enter campaign name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="Enter campaign description (optional)"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Active Status</p>
+                      <p className="text-xs text-gray-500">Inactive campaigns hide leads from telecallers</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditIsActive(!editIsActive)}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        editIsActive ? 'bg-primary-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          editIsActive ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => setEditingCampaign(false)}
+                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveCampaign}
+                    disabled={savingCampaign || !editName.trim()}
+                    className="px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {savingCampaign ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Import Modal */}
+        {showBulkImport && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-900">Import Leads</h2>
+                  <button onClick={() => { setShowBulkImport(false); setFile(null); }} className="p-2 hover:bg-gray-100 rounded-lg">
+                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                  className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+                    dragActive ? 'border-primary-500 bg-primary-50' : 'border-gray-300'
+                  }`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                    className="hidden"
+                  />
+                  <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  {file ? (
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                      <p className="text-xs text-gray-500 mt-1">{(file.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-sm text-gray-600">Drag & drop a CSV file here, or</p>
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
+                      >
+                        browse files
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-xs text-gray-500 mt-3">
+                  CSV should have columns: name, email, phone
+                </p>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => { setShowBulkImport(false); setFile(null); }}
+                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBulkImport}
+                    disabled={!file || importing}
+                    className="px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {importing ? 'Importing...' : 'Import Leads'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Form Builder Modal */}
+        {showFormBuilder && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl">
+              <FormBuilder onSubmit={handleCreateForm} onCancel={() => setShowFormBuilder(false)} />
+            </div>
+          </div>
+        )}
+
+        {/* Assign Users Modal */}
+        {showAssignUsers && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-900">Assign Users</h2>
+                  <button onClick={() => setShowAssignUsers(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {allUsers.filter((u) => u.isActive).map((u) => {
+                    const isAssigned = users.some((au) => au.id === u.id);
+                    return (
+                      <label
+                        key={u.id}
+                        className={`flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                          isAssigned ? 'bg-primary-50' : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          defaultChecked={isAssigned}
+                          value={u.id}
+                          className="user-checkbox w-4 h-4 text-primary-600 rounded"
+                        />
+                        <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-medium text-gray-600">{u.name.charAt(0)}</span>
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">{u.name}</p>
+                          <p className="text-xs text-gray-500">{u.role}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => setShowAssignUsers(false)}
+                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      const checked = document.querySelectorAll('.user-checkbox:checked');
+                      const ids = Array.from(checked).map((el: any) => el.value);
+                      handleAssignUsers(ids);
+                    }}
+                    className="px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Lead Detail Dialog */}
+        {selectedLead && campaign && (
+          <LeadDetailDialog
+            leadId={selectedLead.id}
+            statuses={campaign.statuses || []}
+            onClose={() => setSelectedLead(null)}
+            onUpdate={() => {
+              setSelectedLead(null);
+              loadData();
+            }}
+          />
+        )}
+      </div>
+    </Layout>
+  );
+}
+
+const FIELD_TYPES = [
+  { value: 'text', label: 'Short answer', icon: '☰' },
+  { value: 'textarea', label: 'Paragraph', icon: '≡' },
+  { value: 'radio', label: 'Multiple choice', icon: '◉' },
+  { value: 'checkbox', label: 'Checkboxes', icon: '☑' },
+  { value: 'select', label: 'Drop-down', icon: '▾' },
+  { value: 'file', label: 'File upload', icon: '☁' },
+  { value: 'linear_scale', label: 'Linear scale', icon: '●—●' },
+  { value: 'rating', label: 'Rating', icon: '☆' },
+  { value: 'multiple_choice_grid', label: 'Multiple-choice grid', icon: '⊞' },
+  { value: 'checkbox_grid', label: 'Tick box grid', icon: '⊠' },
+  { value: 'date', label: 'Date', icon: '📅' },
+  { value: 'time', label: 'Time', icon: '◷' },
+];
+
+function FormBuilder({ onSubmit, onCancel }: { onSubmit: (title: string, fields: any[]) => void; onCancel: () => void }) {
+  const [title, setTitle] = useState('');
+  const [fields, setFields] = useState<any[]>([
+    { name: 'name', label: 'Full Name', type: 'text', required: true },
+    { name: 'email', label: 'Email Address', type: 'text', required: false },
+    { name: 'phone', label: 'Phone Number', type: 'text', required: false },
+  ]);
+  const [showTypePicker, setShowTypePicker] = useState<number | null>(null);
+
+  const slugify = (text: string) => {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_|_$/g, '')
+      || 'field';
+  };
+
+  const addField = (type: string = 'text') => {
+    const newField: any = {
+      name: '',
+      label: '',
+      type,
+      required: false,
+      options: ['radio', 'checkbox', 'select', 'multiple_choice_grid', 'checkbox_grid'].includes(type) ? ['Option 1', 'Option 2', 'Option 3'] : undefined,
+      min: type === 'linear_scale' ? 1 : type === 'rating' ? 1 : undefined,
+      max: type === 'linear_scale' ? 5 : type === 'rating' ? 5 : undefined,
+      rows: type === 'multiple_choice_grid' || type === 'checkbox_grid' ? ['Row 1', 'Row 2'] : undefined,
+      columns: type === 'multiple_choice_grid' || type === 'checkbox_grid' ? ['Column 1', 'Column 2', 'Column 3'] : undefined,
+    };
+    setFields([...fields, newField]);
+    setShowTypePicker(null);
+  };
+
+  const updateField = (index: number, key: string, value: any) => {
+    const updated = [...fields];
+    updated[index] = { ...updated[index], [key]: value };
+
+    if (key === 'label') {
+      updated[index].name = slugify(value);
+    }
+
+    if (key === 'type') {
+      const field = updated[index];
+      delete field.options;
+      delete field.min;
+      delete field.max;
+      delete field.rows;
+      delete field.columns;
+      if (['radio', 'checkbox', 'select', 'multiple_choice_grid', 'checkbox_grid'].includes(value)) {
+        field.options = ['Option 1', 'Option 2', 'Option 3'];
+      }
+      if (value === 'linear_scale') {
+        field.min = 1;
+        field.max = 5;
+      }
+      if (value === 'rating') {
+        field.min = 1;
+        field.max = 5;
+      }
+      if (value === 'multiple_choice_grid' || value === 'checkbox_grid') {
+        field.rows = ['Row 1', 'Row 2'];
+        field.columns = ['Column 1', 'Column 2', 'Column 3'];
+      }
+    }
+    setFields(updated);
+  };
+
+  const removeField = (index: number) => {
+    if (fields.length <= 1) return;
+    setFields(fields.filter((_, i) => i !== index));
+  };
+
+  const moveField = (index: number, direction: 'up' | 'down') => {
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= fields.length) return;
+    const updated = [...fields];
+    [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
+    setFields(updated);
+  };
+
+  const updateListField = (fieldIndex: number, key: 'options' | 'rows' | 'columns', listIndex: number, value: string) => {
+    const updated = [...fields];
+    const list = [...(updated[fieldIndex][key] || [])];
+    list[listIndex] = value;
+    updated[fieldIndex] = { ...updated[fieldIndex], [key]: list };
+    setFields(updated);
+  };
+
+  const addListItem = (fieldIndex: number, key: 'options' | 'rows' | 'columns') => {
+    const updated = [...fields];
+    const list = [...(updated[fieldIndex][key] || [])];
+    list.push(`${key.charAt(0).toUpperCase() + key.slice(1)} ${list.length + 1}`);
+    updated[fieldIndex] = { ...updated[fieldIndex], [key]: list };
+    setFields(updated);
+  };
+
+  const removeListItem = (fieldIndex: number, key: 'options' | 'rows' | 'columns', listIndex: number) => {
+    const updated = [...fields];
+    const list = (updated[fieldIndex][key] || []).filter((_: any, i: number) => i !== listIndex);
+    updated[fieldIndex] = { ...updated[fieldIndex], [key]: list };
+    setFields(updated);
+  };
+
+  const needsOptions = (type: string) => ['radio', 'checkbox', 'select'].includes(type);
+  const needsGrid = (type: string) => ['multiple_choice_grid', 'checkbox_grid'].includes(type);
+  const needsScale = (type: string) => type === 'linear_scale';
+  const needsRating = (type: string) => type === 'rating';
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-bold text-gray-900">Create Form</h2>
+        <button onClick={onCancel} className="p-2 hover:bg-gray-100 rounded-lg">
+          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Form Title *</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+            placeholder="e.g., Contact Us Form"
+            required
+          />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-medium text-gray-700">Form Fields</label>
+          </div>
+
+          <div className="space-y-3">
+            {fields.map((field, index) => (
+              <div key={index} className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{FIELD_TYPES.find((ft) => ft.value === field.type)?.icon || '☰'}</span>
+                    <span className="text-sm font-medium text-gray-500">Field {index + 1}</span>
+                    <span className="text-xs text-gray-400">({FIELD_TYPES.find((ft) => ft.value === field.type)?.label})</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => moveField(index, 'up')}
+                      disabled={index === 0}
+                      className="p-1 hover:bg-gray-200 rounded disabled:opacity-30"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => moveField(index, 'down')}
+                      disabled={index === fields.length - 1}
+                      className="p-1 hover:bg-gray-200 rounded disabled:opacity-30"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => removeField(index)}
+                      disabled={fields.length <= 1}
+                      className="p-1 hover:bg-red-100 text-red-600 rounded disabled:opacity-30"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <input
+                    placeholder="Question label (e.g., Full Name)"
+                    value={field.label}
+                    onChange={(e) => updateField(index, 'label', e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowTypePicker(showTypePicker === index ? null : index)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-left flex items-center justify-between"
+                    >
+                      <span>{FIELD_TYPES.find((ft) => ft.value === field.type)?.icon} {FIELD_TYPES.find((ft) => ft.value === field.type)?.label}</span>
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {showTypePicker === index && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                        {FIELD_TYPES.map((ft) => (
+                          <button
+                            key={ft.value}
+                            onClick={() => {
+                              updateField(index, 'type', ft.value);
+                              setShowTypePicker(null);
+                            }}
+                            className={`w-full px-3 py-2.5 text-left text-sm flex items-center gap-2 hover:bg-gray-50 ${
+                              field.type === ft.value ? 'bg-primary-50 text-primary-700' : ''
+                            }`}
+                          >
+                            <span className="text-base">{ft.icon}</span>
+                            <span>{ft.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <label className="flex items-center space-x-2 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={field.required}
+                      onChange={(e) => updateField(index, 'required', e.target.checked)}
+                      className="w-4 h-4 text-primary-600 rounded"
+                    />
+                    <span className="text-sm text-gray-700">Required</span>
+                  </label>
+                </div>
+
+                {/* Options editor for radio, checkbox, select */}
+                {needsOptions(field.type) && field.options && (
+                  <div className="bg-white rounded-lg p-3 border border-gray-200">
+                    <label className="text-xs font-medium text-gray-500 mb-2 block">Options</label>
+                    <div className="space-y-2">
+                      {field.options.map((opt: string, optIdx: number) => (
+                        <div key={optIdx} className="flex items-center gap-2">
+                          <span className="text-gray-400 text-sm">{field.type === 'radio' ? '◉' : field.type === 'checkbox' ? '☑' : '▾'}</span>
+                          <input
+                            value={opt}
+                            onChange={(e) => updateListField(index, 'options', optIdx, e.target.value)}
+                            className="flex-1 px-2 py-1 border border-gray-200 rounded text-sm"
+                            placeholder="Option label"
+                          />
+                          <button
+                            onClick={() => removeListItem(index, 'options', optIdx)}
+                            disabled={field.options.length <= 1}
+                            className="p-1 text-red-400 hover:text-red-600 disabled:opacity-30"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => addListItem(index, 'options')}
+                      className="mt-2 text-xs text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                      + Add option
+                    </button>
+                  </div>
+                )}
+
+                {/* Linear scale editor */}
+                {needsScale(field.type) && (
+                  <div className="bg-white rounded-lg p-3 border border-gray-200">
+                    <label className="text-xs font-medium text-gray-500 mb-2 block">Scale Range</label>
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <label className="text-xs text-gray-400">Min</label>
+                        <input
+                          type="number"
+                          value={field.min || 1}
+                          onChange={(e) => updateField(index, 'min', parseInt(e.target.value) || 1)}
+                          className="w-16 px-2 py-1 border border-gray-200 rounded text-sm ml-1"
+                          min={0}
+                          max={10}
+                        />
+                      </div>
+                      <span className="text-gray-400">to</span>
+                      <div>
+                        <label className="text-xs text-gray-400">Max</label>
+                        <input
+                          type="number"
+                          value={field.max || 5}
+                          onChange={(e) => updateField(index, 'max', parseInt(e.target.value) || 5)}
+                          className="w-16 px-2 py-1 border border-gray-200 rounded text-sm ml-1"
+                          min={1}
+                          max={10}
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-2 flex gap-1">
+                      {Array.from({ length: (field.max || 5) - (field.min || 1) + 1 }, (_, i) => (field.min || 1) + i).map((n) => (
+                        <span key={n} className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded text-sm text-gray-600">{n}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Rating editor */}
+                {needsRating(field.type) && (
+                  <div className="bg-white rounded-lg p-3 border border-gray-200">
+                    <label className="text-xs font-medium text-gray-500 mb-2 block">Max Stars</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        value={field.max || 5}
+                        onChange={(e) => updateField(index, 'max', Math.min(10, Math.max(1, parseInt(e.target.value) || 5)))}
+                        className="w-16 px-2 py-1 border border-gray-200 rounded text-sm"
+                        min={1}
+                        max={10}
+                      />
+                    </div>
+                    <div className="mt-2 flex gap-1">
+                      {Array.from({ length: field.max || 5 }, (_, i) => (
+                        <span key={i} className="text-2xl text-yellow-400">★</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Grid editor for multiple_choice_grid and checkbox_grid */}
+                {needsGrid(field.type) && (
+                  <div className="bg-white rounded-lg p-3 border border-gray-200 space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 mb-2 block">Rows</label>
+                      <div className="space-y-2">
+                        {(field.rows || []).map((row: string, rowIdx: number) => (
+                          <div key={rowIdx} className="flex items-center gap-2">
+                            <span className="text-gray-400 text-sm w-4">{rowIdx + 1}.</span>
+                            <input
+                              value={row}
+                              onChange={(e) => updateListField(index, 'rows', rowIdx, e.target.value)}
+                              className="flex-1 px-2 py-1 border border-gray-200 rounded text-sm"
+                              placeholder="Row label"
+                            />
+                            <button
+                              onClick={() => removeListItem(index, 'rows', rowIdx)}
+                              disabled={(field.rows || []).length <= 1}
+                              className="p-1 text-red-400 hover:text-red-600 disabled:opacity-30"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => addListItem(index, 'rows')}
+                        className="mt-2 text-xs text-primary-600 hover:text-primary-700 font-medium"
+                      >
+                        + Add row
+                      </button>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 mb-2 block">Columns</label>
+                      <div className="space-y-2">
+                        {(field.columns || []).map((col: string, colIdx: number) => (
+                          <div key={colIdx} className="flex items-center gap-2">
+                            <span className="text-gray-400 text-sm w-4">{colIdx + 1}.</span>
+                            <input
+                              value={col}
+                              onChange={(e) => updateListField(index, 'columns', colIdx, e.target.value)}
+                              className="flex-1 px-2 py-1 border border-gray-200 rounded text-sm"
+                              placeholder="Column label"
+                            />
+                            <button
+                              onClick={() => removeListItem(index, 'columns', colIdx)}
+                              disabled={(field.columns || []).length <= 1}
+                              className="p-1 text-red-400 hover:text-red-600 disabled:opacity-30"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => addListItem(index, 'columns')}
+                        className="mt-2 text-xs text-primary-600 hover:text-primary-700 font-medium"
+                      >
+                        + Add column
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Add Field Buttons */}
+          <div className="mt-4 relative">
+            <div className="flex flex-wrap gap-2">
+              {FIELD_TYPES.slice(0, 6).map((ft) => (
+                <button
+                  key={ft.value}
+                  onClick={() => addField(ft.value)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-full text-sm text-gray-600 hover:bg-gray-50 hover:border-gray-300"
+                >
+                  <span>{ft.icon}</span>
+                  <span>{ft.label}</span>
+                </button>
+              ))}
+              <div className="relative">
+                <button
+                  onClick={() => setShowTypePicker(showTypePicker === -1 ? null : -1)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-full text-sm text-gray-600 hover:bg-gray-50 hover:border-gray-300"
+                >
+                  <span>More</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {showTypePicker === -1 && (
+                  <div className="absolute z-10 mt-1 left-0 w-56 bg-white border border-gray-200 rounded-lg shadow-lg">
+                    {FIELD_TYPES.slice(6).map((ft) => (
+                      <button
+                        key={ft.value}
+                        onClick={() => {
+                          addField(ft.value);
+                          setShowTypePicker(null);
+                        }}
+                        className="w-full px-3 py-2.5 text-left text-sm flex items-center gap-2 hover:bg-gray-50"
+                      >
+                        <span className="text-base">{ft.icon}</span>
+                        <span>{ft.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-3 pt-4 border-t">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSubmit(title, fields)}
+            className="px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            Create & Publish
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
