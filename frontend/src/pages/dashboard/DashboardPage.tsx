@@ -185,7 +185,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Sales Funnel & Conversion Stats */}
-        {salesFunnel && (
+        {salesFunnel && selectedCampaign && (
           <div className="mb-8">
             {/* Campaign Filter */}
             <div className="flex items-center justify-between mb-4">
@@ -195,7 +195,7 @@ export default function DashboardPage() {
                 onChange={(e) => setSelectedCampaign(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               >
-                <option value="">All Campaigns</option>
+                <option value="">Select Campaign</option>
                 {campaigns.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
@@ -261,7 +261,7 @@ export default function DashboardPage() {
         )}
 
         {/* User-wise Conversion */}
-        {userConversion.length > 0 && (
+        {userConversion.length > 0 && selectedCampaign && (
           <div className="mb-8">
             <UserConversion data={userConversion} />
           </div>
