@@ -16,12 +16,17 @@ export default function DashboardPage() {
   const [recentFollowups, setRecentFollowups] = useState<Followup[]>([]);
   const [salesFunnel, setSalesFunnel] = useState<SalesFunnelData | null>(null);
   const [userConversion, setUserConversion] = useState<UserConversionData[]>([]);
+  const [selectedCampaign, setSelectedCampaign] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    loadFunnelAndConversion();
+  }, [selectedCampaign]);
 
   const loadData = async () => {
     setError(null);
@@ -43,6 +48,20 @@ export default function DashboardPage() {
       setError('Failed to load dashboard data. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadFunnelAndConversion = async () => {
+    try {
+      const campaignParam = selectedCampaign || undefined;
+      const [funnelData, conversionData] = await Promise.all([
+        dashboardService.getSalesFunnel(campaignParam),
+        dashboardService.getUserConversion(campaignParam),
+      ]);
+      setSalesFunnel(funnelData);
+      setUserConversion(conversionData);
+    } catch (error) {
+      console.error('Failed to load funnel data', error);
     }
   };
 
@@ -167,56 +186,73 @@ export default function DashboardPage() {
 
         {/* Sales Funnel & Conversion Stats */}
         {salesFunnel && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            {/* Sales Funnel */}
-            <div className="lg:col-span-2">
-              <SalesFunnel data={salesFunnel} />
+          <div className="mb-8">
+            {/* Campaign Filter */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Sales Funnel & Conversion</h2>
+              <select
+                value={selectedCampaign}
+                onChange={(e) => setSelectedCampaign(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="">All Campaigns</option>
+                {campaigns.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
             </div>
 
-            {/* Conversion Stats */}
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Conversion Overview</h3>
-              <div className="space-y-4">
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-blue-700">Total Leads</span>
-                    <span className="text-2xl font-bold text-blue-900">{salesFunnel.totalLeads}</span>
-                  </div>
-                </div>
-                <div className="p-4 bg-purple-50 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-purple-700">Contacted</span>
-                    <div className="text-right">
-                      <span className="text-2xl font-bold text-purple-900">{salesFunnel.contactedLeads}</span>
-                      <span className="text-sm text-purple-600 ml-2">({salesFunnel.contactRate}%)</span>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Sales Funnel */}
+              <div className="lg:col-span-2">
+                <SalesFunnel data={salesFunnel} />
+              </div>
+
+              {/* Conversion Stats */}
+              <div className="bg-white rounded-xl shadow-sm border p-6">
+                <h3 className="font-semibold text-gray-900 mb-4">Conversion Overview</h3>
+                <div className="space-y-4">
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-blue-700">Total Leads</span>
+                      <span className="text-2xl font-bold text-blue-900">{salesFunnel.totalLeads}</span>
                     </div>
                   </div>
-                  <div className="mt-2 w-full bg-purple-200 rounded-full h-2">
-                    <div
-                      className="bg-purple-600 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${salesFunnel.contactRate}%` }}
-                    />
-                  </div>
-                </div>
-                <div className="p-4 bg-amber-50 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-amber-700">Qualified</span>
-                    <div className="text-right">
-                      <span className="text-2xl font-bold text-amber-900">{salesFunnel.leadsWithStatus}</span>
-                      <span className="text-sm text-amber-600 ml-2">({salesFunnel.conversionRate}%)</span>
+                  <div className="p-4 bg-purple-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-purple-700">Contacted</span>
+                      <div className="text-right">
+                        <span className="text-2xl font-bold text-purple-900">{salesFunnel.contactedLeads}</span>
+                        <span className="text-sm text-purple-600 ml-2">({salesFunnel.contactRate}%)</span>
+                      </div>
+                    </div>
+                    <div className="mt-2 w-full bg-purple-200 rounded-full h-2">
+                      <div
+                        className="bg-purple-600 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${salesFunnel.contactRate}%` }}
+                      />
                     </div>
                   </div>
-                  <div className="mt-2 w-full bg-amber-200 rounded-full h-2">
-                    <div
-                      className="bg-amber-600 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${salesFunnel.conversionRate}%` }}
-                    />
+                  <div className="p-4 bg-amber-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-amber-700">Qualified</span>
+                      <div className="text-right">
+                        <span className="text-2xl font-bold text-amber-900">{salesFunnel.leadsWithStatus}</span>
+                        <span className="text-sm text-amber-600 ml-2">({salesFunnel.conversionRate}%)</span>
+                      </div>
+                    </div>
+                    <div className="mt-2 w-full bg-amber-200 rounded-full h-2">
+                      <div
+                        className="bg-amber-600 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${salesFunnel.conversionRate}%` }}
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="p-4 bg-red-50 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-red-700">DND</span>
-                    <span className="text-2xl font-bold text-red-900">{salesFunnel.dndLeads}</span>
+                  <div className="p-4 bg-red-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-red-700">DND</span>
+                      <span className="text-2xl font-bold text-red-900">{salesFunnel.dndLeads}</span>
+                    </div>
                   </div>
                 </div>
               </div>
