@@ -13,12 +13,14 @@ export default function DashboardPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [recentFollowups, setRecentFollowups] = useState<Followup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
+    setError(null);
     try {
       const [statsData, campaignsData, followupsData] = await Promise.all([
         dashboardService.getOverview(),
@@ -30,6 +32,7 @@ export default function DashboardPage() {
       setRecentFollowups(followupsData.slice(0, 5));
     } catch (error) {
       console.error('Failed to load stats', error);
+      setError('Failed to load dashboard data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -42,6 +45,24 @@ export default function DashboardPage() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
         </div>
       </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-red-700">{error}</span>
+          </div>
+          <button onClick={loadData} className="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium">
+            Retry
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -70,7 +91,7 @@ export default function DashboardPage() {
       color: 'bg-green-500',
       bgColor: 'bg-green-50',
       textColor: 'text-green-600',
-      link: user?.role === 'USER' ? '/campaigns' : '/leads',
+      link: '/followups',
     },
     {
       label: user?.role === 'USER' ? 'My Follow-ups' : "Today's Follow-ups",
@@ -159,7 +180,7 @@ export default function DashboardPage() {
               )}
               {user?.role !== 'USER' && (
                 <Link
-                  to="/leads"
+                  to="/followups"
                   className="flex items-center p-3 rounded-lg hover:bg-gray-50 transition-colors group"
                 >
                   <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center text-green-600 group-hover:bg-green-100 transition-colors">

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { AxiosResponse } from 'axios';
@@ -35,8 +35,8 @@ export class ProcessSutraService {
     payload: StartFlowPayload,
     actorEmail: string = 'crm-system',
   ): Promise<StartFlowResponse> {
-    if (!apiKey) throw new Error('Process Sutra API Key not configured');
-    if (!systemName) throw new Error('Process Sutra System Name not configured');
+    if (!apiKey) throw new BadRequestException('Process Sutra API Key not configured');
+    if (!systemName) throw new BadRequestException('Process Sutra System Name not configured');
 
     const body = {
       system: systemName,
@@ -72,7 +72,7 @@ export class ProcessSutraService {
       const status = error.response?.status || 'Unknown';
       const message = error.response?.data?.message || error.message;
       this.logger.error(`Process Sutra error: ${status} - ${message}`);
-      throw new Error(`Process Sutra API error: ${status} - ${message}`);
+      throw new BadRequestException(`Process Sutra API error: ${status} - ${message}`);
     }
   }
 }

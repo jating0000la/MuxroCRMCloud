@@ -63,6 +63,50 @@ const navItems: Array<{
   },
 ];
 
+interface SidebarContentProps {
+  collapsed: boolean;
+  filteredNav: typeof navItems;
+  currentPath: string;
+}
+
+function SidebarContent({ collapsed, filteredNav, currentPath }: SidebarContentProps) {
+  return (
+    <>
+      <div className={`p-4 border-b flex items-center ${collapsed ? 'justify-center' : ''}`}>
+        <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+          C
+        </div>
+        {!collapsed && <span className="ml-3 font-bold text-lg text-gray-800">Muxro CRM Cloud</span>}
+      </div>
+      <nav className="p-3 space-y-1">
+        {filteredNav.map((item) => {
+          const isActive = currentPath === item.path || currentPath.startsWith(item.path + '/');
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                isActive
+                  ? 'bg-primary-50 text-primary-700 border-l-4 border-primary-600'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              } ${collapsed ? 'justify-center' : ''}`}
+              title={collapsed ? item.label : undefined}
+            >
+              <span className={isActive ? 'text-primary-600' : 'text-gray-400'}>{item.icon}</span>
+              {!collapsed && <span className="ml-3">{item.label}</span>}
+            </Link>
+          );
+        })}
+      </nav>
+      {!collapsed && (
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-gray-50">
+          <div className="text-xs text-gray-400 text-center">CRM v1.0</div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -100,42 +144,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return false;
   });
 
-  const SidebarContent = () => (
-    <>
-      <div className={`p-4 border-b flex items-center ${collapsed ? 'justify-center' : ''}`}>
-        <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-          C
-        </div>
-        {!collapsed && <span className="ml-3 font-bold text-lg text-gray-800">Muxro CRM Cloud</span>}
-      </div>
-      <nav className="p-3 space-y-1">
-        {filteredNav.map((item) => {
-          const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                isActive
-                  ? 'bg-primary-50 text-primary-700 border-l-4 border-primary-600'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              } ${collapsed ? 'justify-center' : ''}`}
-              title={collapsed ? item.label : undefined}
-            >
-              <span className={isActive ? 'text-primary-600' : 'text-gray-400'}>{item.icon}</span>
-              {!collapsed && <span className="ml-3">{item.label}</span>}
-            </Link>
-          );
-        })}
-      </nav>
-      {!collapsed && (
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-gray-50">
-          <div className="text-xs text-gray-400 text-center">CRM v1.0</div>
-        </div>
-      )}
-    </>
-  );
-
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Desktop Sidebar */}
@@ -144,10 +152,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           collapsed ? 'w-16' : 'w-64'
         } fixed h-full z-30`}
       >
-        <SidebarContent />
+        <SidebarContent collapsed={collapsed} filteredNav={filteredNav} currentPath={location.pathname} />
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="absolute -right-3 top-20 bg-white border rounded-full p-1 shadow-sm hover:bg-gray-50"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           <svg
             className={`w-4 h-4 text-gray-500 transition-transform ${collapsed ? 'rotate-180' : ''}`}
@@ -165,7 +174,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="fixed inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
           <aside className="fixed left-0 top-0 bottom-0 w-64 bg-white shadow-xl z-50">
-            <SidebarContent />
+            <SidebarContent collapsed={false} filteredNav={filteredNav} currentPath={location.pathname} />
           </aside>
         </div>
       )}
@@ -179,6 +188,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <button
                 onClick={() => setMobileOpen(true)}
                 className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
+                aria-label="Open menu"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -194,6 +204,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50"
+                aria-label="User menu"
+                aria-expanded={userMenuOpen}
               >
                 <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
                   <span className="text-sm font-medium text-primary-700">

@@ -83,7 +83,7 @@ export interface FormField {
   name: string;
   label: string;
   type: string;
-  required?: boolean;
+  required: boolean;
   options?: string[];
   min?: number;
   max?: number;

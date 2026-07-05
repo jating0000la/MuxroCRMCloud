@@ -25,25 +25,29 @@ export default function SettingsPage() {
 
   // Load saved settings from localStorage
   useEffect(() => {
-    const psSettings = localStorage.getItem('processSutraSettings');
-    if (psSettings) {
-      const parsed = JSON.parse(psSettings);
-      setProcessSutraApiKey(parsed.apiKey || '');
-      setProcessSutraSystemName(parsed.systemName || '');
-    }
+    try {
+      const psSettings = localStorage.getItem('processSutraSettings');
+      if (psSettings) {
+        const parsed = JSON.parse(psSettings);
+        setProcessSutraApiKey(parsed.apiKey || '');
+        setProcessSutraSystemName(parsed.systemName || '');
+      }
 
-    const imSettings = localStorage.getItem('indiamartSettings');
-    if (imSettings) {
-      const parsed = JSON.parse(imSettings);
-      setIndiamartApiKey(parsed.apiKey || '');
-      setWebappUrl(parsed.webappUrl || 'https://your-webapp.com');
-    }
+      const imSettings = localStorage.getItem('indiamartSettings');
+      if (imSettings) {
+        const parsed = JSON.parse(imSettings);
+        setIndiamartApiKey(parsed.apiKey || '');
+        setWebappUrl(parsed.webappUrl || 'https://your-webapp.com');
+      }
 
-    const coSettings = localStorage.getItem('companySettings');
-    if (coSettings) {
-      const parsed = JSON.parse(coSettings);
-      setCompanyName(parsed.companyName || 'Muxro CRM Cloud');
-      setWebsiteLink(parsed.websiteLink || 'https://your-company.com');
+      const coSettings = localStorage.getItem('companySettings');
+      if (coSettings) {
+        const parsed = JSON.parse(coSettings);
+        setCompanyName(parsed.companyName || 'Muxro CRM Cloud');
+        setWebsiteLink(parsed.websiteLink || 'https://your-company.com');
+      }
+    } catch {
+      // Ignore corrupted localStorage data
     }
   }, []);
 

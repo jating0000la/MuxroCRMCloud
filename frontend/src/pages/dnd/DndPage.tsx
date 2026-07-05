@@ -16,6 +16,7 @@ export default function DndPage() {
   const [selectedCampaign, setSelectedCampaign] = useState<string>('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [campaignStatuses, setCampaignStatuses] = useState<CampaignStatus[]>([]);
 
@@ -24,6 +25,7 @@ export default function DndPage() {
   }, []);
 
   const loadData = async () => {
+    setError(null);
     try {
       const [leadsData, campaignsData] = await Promise.all([
         leadService.getDnd(),
@@ -33,6 +35,7 @@ export default function DndPage() {
       setCampaigns(campaignsData);
     } catch (error) {
       console.error('Failed to load data', error);
+      setError('Failed to load dashboard data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -102,6 +105,21 @@ export default function DndPage() {
 
   return (
     <Layout>
+      {error && (
+        <div className="p-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-red-700">{error}</span>
+            </div>
+            <button onClick={loadData} className="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium">
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
       <div className="p-6 lg:p-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">

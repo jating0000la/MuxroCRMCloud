@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { AxiosResponse } from 'axios';
 import { firstValueFrom } from 'rxjs';
@@ -33,7 +33,7 @@ export class IndiamartService {
    * Docs: https://developer.indiamart.com
    */
   async fetchLeads(apiKey: string, webappUrl: string): Promise<IndiamartFetchResponse> {
-    if (!apiKey) throw new Error('Indiamart API Key not configured');
+    if (!apiKey) throw new BadRequestException('Indiamart API Key not configured');
 
     this.logger.log('Fetching leads from Indiamart...');
 
@@ -74,7 +74,7 @@ export class IndiamartService {
       const status = error.response?.status || 'Unknown';
       const message = error.response?.data?.message || error.message;
       this.logger.error(`Indiamart API error: ${status} - ${message}`);
-      throw new Error(`Indiamart API error: ${status} - ${message}`);
+      throw new BadRequestException(`Indiamart API error: ${status} - ${message}`);
     }
   }
 

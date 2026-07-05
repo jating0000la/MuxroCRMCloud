@@ -24,14 +24,19 @@ export default function FollowupDashboardPage() {
   const [sortField, setSortField] = useState<SortField>('updatedAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [campaignStatuses, setCampaignStatuses] = useState<CampaignStatus[]>([]);
   const [startingFlow, setStartingFlow] = useState<string | null>(null);
 
   // Process Sutra settings (loaded from localStorage or settings page)
   const getProcessSutraSettings = () => {
-    const saved = localStorage.getItem('processSutraSettings');
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem('processSutraSettings');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // Ignore corrupted data
+    }
     return { apiKey: '', systemName: '' };
   };
 
@@ -40,6 +45,7 @@ export default function FollowupDashboardPage() {
   }, [selectedCampaign]);
 
   const loadData = async () => {
+    setError(null);
     try {
       const [leadsData, campaignsData] = await Promise.all([
         dashboardService.getAllLeadsDashboard(selectedCampaign || undefined),
@@ -49,6 +55,7 @@ export default function FollowupDashboardPage() {
       setCampaigns(campaignsData);
     } catch (error) {
       console.error('Failed to load data', error);
+      setError('Failed to load dashboard data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -193,6 +200,21 @@ export default function FollowupDashboardPage() {
 
   return (
     <Layout>
+      {error && (
+        <div className="p-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-red-700">{error}</span>
+            </div>
+            <button onClick={loadData} className="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium">
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
       <div className="p-6 lg:p-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
@@ -378,7 +400,7 @@ export default function FollowupDashboardPage() {
                         <div className="flex items-center justify-end gap-1.5">
                           {lead.phone && (
                             <a
-                              href={`https://api.whatsapp.com/send/?phone=91${lead.phone.replace(/[^0-9]/g, '')}&text=Dear ${lead.name}`}
+                               href={`https://api.whatsapp.com/send/?phone=91${encodeURIComponent(lead.phone.replace(/[^0-9]/g, ''))}&text=${encodeURIComponent(`Dear ${lead.name}`)}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center justify-center w-8 h-8 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
@@ -391,7 +413,7 @@ export default function FollowupDashboardPage() {
                           )}
                           {lead.email && (
                             <a
-                              href={`https://mail.google.com/mail/u/0/?to=${lead.email}&body=Dear ${lead.name}&fs=1&tf=cm`}
+                               href={`https://mail.google.com/mail/u/0/?to=${encodeURIComponent(lead.email)}&body=${encodeURIComponent(`Dear ${lead.name}`)}&fs=1&tf=cm`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
@@ -411,6 +433,7 @@ export default function FollowupDashboardPage() {
                                 : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
                             }`}
                             title="Start Process Sutra Flow"
+                            aria-label="Start flow"
                           >
                             {startingFlow === lead.id ? (
                               <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
@@ -427,6 +450,7 @@ export default function FollowupDashboardPage() {
                             onClick={() => handleViewLead(lead)}
                             className="inline-flex items-center justify-center w-8 h-8 bg-primary-100 text-primary-700 rounded-lg hover:bg-primary-200 transition-colors"
                             title="View Details"
+                            aria-label="View details"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />

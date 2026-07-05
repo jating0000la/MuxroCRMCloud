@@ -130,7 +130,7 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
             <div className="flex items-center space-x-2">
               {lead.phone && (
                 <a
-                  href={`https://api.whatsapp.com/send/?phone=91${lead.phone.replace(/[^0-9]/g, '')}&text=Dear ${lead.name}`}
+                   href={`https://api.whatsapp.com/send/?phone=91${encodeURIComponent(lead.phone.replace(/[^0-9]/g, ''))}&text=${encodeURIComponent(`Dear ${lead.name}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors"
@@ -143,7 +143,7 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
               )}
               {lead.email && (
                 <a
-                  href={`https://mail.google.com/mail/u/0/?to=${lead.email}&body=Dear ${lead.name}&fs=1&tf=cm`}
+                   href={`https://mail.google.com/mail/u/0/?to=${encodeURIComponent(lead.email)}&body=${encodeURIComponent(`Dear ${lead.name}`)}&fs=1&tf=cm`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors"
@@ -154,7 +154,7 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
                   Email
                 </a>
               )}
-              <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-lg">
+              <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-lg" aria-label="Close">
                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>

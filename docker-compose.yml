@@ -6,13 +6,18 @@ services:
     container_name: crm-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: crm_db
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-crm_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - crm-network
 
   backend:
     build:
@@ -20,15 +25,25 @@ services:
       dockerfile: Dockerfile
     container_name: crm-backend
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/crm_db?schema=public
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      JWT_EXPIRATION: 7d
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-crm_db}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-7d}
       PORT: 3000
+      NODE_ENV: production
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+      PUBLIC_FORMS_ENABLED: ${PUBLIC_FORMS_ENABLED:-true}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - crm-network
 
   frontend:
     build:
@@ -36,10 +51,45 @@ services:
       dockerfile: Dockerfile
     container_name: crm-frontend
     restart: unless-stopped
-    ports:
-      - "5173:80"
     depends_on:
       - backend
+    networks:
+      - crm-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: crm-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_conf:/etc/letsencrypt:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - crm-network
+
+  certbot:
+    image: certbot/certbot
+    container_name: crm-certbot
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - crm-network
 
 volumes:
   postgres_data:
+  certbot_www:
+  certbot_conf:
+
+networks:
+  crm-network:
+    driver: bridge
