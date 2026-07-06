@@ -165,3 +165,34 @@ model Followup {
   @@index([createdAt])
   @@index([userId, nextCallDate])
 }
+
+model Setting {
+  id            String    @id @default(uuid())
+  key           String    @unique
+  encryptedValue String
+  isEncrypted   Boolean   @default(true)
+  lastTestedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  auditLogs     SettingAuditLog[]
+
+  @@index([key])
+  @@index([updatedAt])
+}
+
+model SettingAuditLog {
+  id            String    @id @default(uuid())
+  settingId     String
+  action        String    @default("update")
+  changedBy     String?
+  oldValue      String?
+  newValue      String?
+  reason        String?
+  createdAt     DateTime  @default(now())
+
+  setting       Setting   @relation(fields: [settingId], references: [id], onDelete: Cascade)
+
+  @@index([settingId])
+  @@index([createdAt])
+}
