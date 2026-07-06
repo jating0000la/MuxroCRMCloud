@@ -16,7 +16,7 @@ export class BulkImportController {
   constructor(private bulkImportService: BulkImportService) {}
 
   @Post('csv')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Import leads from CSV file' })
   @ApiConsumes('multipart/form-data')
@@ -42,7 +42,7 @@ export class BulkImportController {
   }
 
   @Post('json')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Import leads from JSON data' })
   async importJSON(
     @Param('campaignId') campaignId: string,

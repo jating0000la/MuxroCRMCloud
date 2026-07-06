@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { Lead } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaginationDto } from '../common/pagination.dto';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
@@ -9,12 +10,18 @@ import { UpdateStatusDto } from './dto/update-status.dto';
 export class LeadsService {
   constructor(private prisma: PrismaService) {}
 
-  async findByCampaign(campaignId: string, userId?: string, role?: string) {
+  async findByCampaign(campaignId: string, userId?: string, role?: string, pagination?: PaginationDto) {
     const where: any = { campaignId };
     // USER: only see leads assigned to them
     if (role === 'USER' && userId) {
       where.doerId = userId;
+    } else if (role === 'MANAGER' && userId) {
+      where.campaign = { managerId: userId };
     }
+    // ✅ FIXED: Apply pagination with skip/take
+    const skip = pagination?.getSkip() || 0;
+    const take = pagination?.getTake() || 50;
+    
     return this.prisma.lead.findMany({
       where,
       include: {
@@ -27,6 +34,8 @@ export class LeadsService {
         },
       },
       orderBy: { createdAt: 'desc' },
+      skip,
+      take,
     });
   }
 
@@ -36,7 +45,7 @@ export class LeadsService {
       include: {
         doer: { select: { id: true, name: true, username: true } },
         status: true,
-        campaign: { select: { id: true, name: true } },
+        campaign: { select: { id: true, name: true, managerId: true } },
         followups: {
           orderBy: { createdAt: 'desc' },
           include: { user: { select: { name: true, username: true } } },
@@ -51,10 +60,16 @@ export class LeadsService {
       throw new ForbiddenException('You can only view leads assigned to you');
     }
 
+    if (role === 'MANAGER' && userId && lead.campaign.managerId !== userId) {
+      throw new ForbiddenException('You can only view leads from your campaigns');
+    }
+
     return lead;
   }
 
-  async create(dto: CreateLeadDto) {
+  async create(dto: CreateLeadDto, userId?: string, role?: string) {
+    await this.ensureCampaignAccess(dto.campaignId, userId, role);
+
     // Auto-assign via round-robin if no doerId provided
     const doerId = dto.doerId || await this.getNextRoundRobinUser(dto.campaignId);
 
@@ -161,11 +176,17 @@ export class LeadsService {
     return followup;
   }
 
-  async findDnd(userId?: string, role?: string) {
+  async findDnd(userId?: string, role?: string, pagination?: PaginationDto) {
     const where: any = { dnd: true };
     if (role === 'USER' && userId) {
       where.doerId = userId;
+    } else if (role === 'MANAGER' && userId) {
+      where.campaign = { managerId: userId };
     }
+    // ✅ FIXED: Apply pagination with skip/take
+    const skip = pagination?.getSkip() || 0;
+    const take = pagination?.getTake() || 50;
+    
     return this.prisma.lead.findMany({
       where,
       include: {
@@ -179,10 +200,14 @@ export class LeadsService {
         },
       },
       orderBy: { updatedAt: 'desc' },
+      skip,
+      take,
     });
   }
 
-  async allocateRoundRobin(campaignId: string, leadIds: string[]) {
+  async allocateRoundRobin(campaignId: string, leadIds: string[], userId?: string, role?: string) {
+    await this.ensureCampaignAccess(campaignId, userId, role);
+
     const activeUsers = await this.prisma.campaignUser.findMany({
       where: { campaignId, isActive: true },
       include: { user: { select: { role: true } } },
@@ -223,5 +248,18 @@ export class LeadsService {
       _count: true,
     });
     return { total, byStatus };
+  }
+
+  private async ensureCampaignAccess(campaignId: string, userId?: string, role?: string) {
+    if (role !== 'MANAGER' || !userId) return;
+
+    const campaign = await this.prisma.campaign.findFirst({
+      where: { id: campaignId, managerId: userId },
+      select: { id: true },
+    });
+
+    if (!campaign) {
+      throw new ForbiddenException('You can only manage leads from your campaigns');
+    }
   }
 }

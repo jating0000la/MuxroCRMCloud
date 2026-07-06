@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Lead } from '@prisma/client';
 import { parse } from 'csv-parse/sync';
+import { BulkLeadRowSchema, sanitizeJson } from '../common/validation';
 
 @Injectable()
 export class BulkImportService {
@@ -16,11 +17,32 @@ export class BulkImportService {
         trim: true,
       });
     } catch (error) {
-      throw new BadRequestException('Invalid CSV format');
+      throw new BadRequestException(`Invalid CSV format: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
     if (records.length === 0) {
       throw new BadRequestException('CSV file is empty');
+    }
+
+    // ✅ FIXED: Validate and sanitize each row before import
+    const validatedRecords: any[] = [];
+    for (let i = 0; i < records.length; i++) {
+      try {
+        const validated = BulkLeadRowSchema.parse({
+          name: records[i].name || records[i].Name || records[i].contact_name || '',
+          email: records[i].email || records[i].Email || '',
+          phone: records[i].phone || records[i].Phone || records[i].contact_phone || '',
+          source: 'bulk',
+        });
+        validatedRecords.push({
+          ...validated,
+          customData: sanitizeJson(records[i]), // Sanitize custom fields
+        });
+      } catch (error) {
+        throw new BadRequestException(
+          `Invalid data in row ${i + 1}: ${error instanceof Error ? error.message : 'Validation failed'}`
+        );
+      }
     }
 
     // Get the first status for the campaign
@@ -30,21 +52,15 @@ export class BulkImportService {
     });
 
     const leads: Lead[] = [];
-    for (const record of records) {
-      const name = record.name || record.Name || record.contact_name || '';
-      const email = record.email || record.Email || null;
-      const phone = record.phone || record.Phone || record.contact_phone || null;
-
-      if (!name) continue;
-
+    for (const record of validatedRecords) {
       const lead = await this.prisma.lead.create({
         data: {
           campaignId,
-          name,
-          email,
-          phone,
+          name: record.name,
+          email: record.email || null,
+          phone: record.phone || null,
           source: 'bulk',
-          customData: record,
+          customData: record.customData,
           statusId: firstStatus?.id || null,
         },
       });
@@ -78,12 +94,33 @@ export class BulkImportService {
 
     return {
       imported: leads.length,
-      total: records.length,
+      total: validatedRecords.length,
       leads: updatedLeads,
     };
   }
 
   async importFromJSON(campaignId: string, data: any[], allocateRoundRobin: boolean = true) {
+    // ✅ FIXED: Validate and sanitize each record before import
+    const validatedRecords: any[] = [];
+    for (let i = 0; i < data.length; i++) {
+      try {
+        const validated = BulkLeadRowSchema.parse({
+          name: data[i].name || data[i].Name || '',
+          email: data[i].email || data[i].Email || '',
+          phone: data[i].phone || data[i].Phone || '',
+          source: 'bulk',
+        });
+        validatedRecords.push({
+          ...validated,
+          customData: sanitizeJson(data[i]),
+        });
+      } catch (error) {
+        throw new BadRequestException(
+          `Invalid data in record ${i + 1}: ${error instanceof Error ? error.message : 'Validation failed'}`
+        );
+      }
+    }
+
     // Get the first status for the campaign
     const firstStatus = await this.prisma.campaignStatus.findFirst({
       where: { campaignId },
@@ -91,18 +128,15 @@ export class BulkImportService {
     });
 
     const leads: Lead[] = [];
-    for (const record of data) {
-      const name = record.name || record.Name || '';
-      if (!name) continue;
-
+    for (const record of validatedRecords) {
       const lead = await this.prisma.lead.create({
         data: {
           campaignId,
-          name,
+          name: record.name,
           email: record.email || null,
           phone: record.phone || null,
           source: 'bulk',
-          customData: record,
+          customData: record.customData,
           statusId: firstStatus?.id || null,
         },
       });

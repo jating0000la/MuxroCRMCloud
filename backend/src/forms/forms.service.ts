@@ -1,9 +1,20 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaginationDto } from '../common/pagination.dto';
 import { CreateFormDto } from './dto/create-form.dto';
 import { UpdateFormDto } from './dto/update-form.dto';
 import { v4 as uuidv4 } from 'uuid';
+
+type PublicFormField = {
+  name?: unknown;
+  label?: unknown;
+  type?: unknown;
+  required?: unknown;
+  options?: unknown;
+  min?: unknown;
+  max?: unknown;
+};
 
 @Injectable()
 export class FormsService {
@@ -56,6 +67,9 @@ export class FormsService {
 
   async submitForm(slug: string, data: Record<string, any>, ipAddress?: string) {
     const form = await this.findBySlug(slug);
+    const fields = Array.isArray(form.fields) ? form.fields as PublicFormField[] : [];
+    this.validateSubmissionData(fields, data);
+
     const submission = await this.prisma.enquiry.create({
       data: {
         formId: form.id,
@@ -169,10 +183,73 @@ export class FormsService {
     return this.prisma.form.delete({ where: { id } });
   }
 
-  async getSubmissions(formId: string) {
+  async getSubmissions(formId: string, pagination?: PaginationDto) {
+    // ✅ FIXED: Apply pagination with skip/take
+    const skip = pagination?.getSkip() || 0;
+    const take = pagination?.getTake() || 50;
+    
     return this.prisma.enquiry.findMany({
       where: { formId },
       orderBy: { submittedAt: 'desc' },
+      skip,
+      take,
     });
+  }
+
+  private validateSubmissionData(fields: PublicFormField[], data: Record<string, any>) {
+    for (const field of fields) {
+      if (typeof field.name !== 'string' || !field.name.trim()) continue;
+
+      const name = field.name;
+      const label = typeof field.label === 'string' && field.label.trim() ? field.label : name;
+      const type = typeof field.type === 'string' ? field.type : 'text';
+      const value = data[name];
+      const isEmpty =
+        value === undefined ||
+        value === null ||
+        (typeof value === 'string' && value.trim() === '') ||
+        (Array.isArray(value) && value.length === 0);
+
+      if (field.required && isEmpty) {
+        throw new BadRequestException(`${label} is required`);
+      }
+
+      if (isEmpty) continue;
+
+      if (type === 'email' && (typeof value !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))) {
+        throw new BadRequestException(`${label} must be a valid email address`);
+      }
+
+      if (type === 'phone' && (typeof value !== 'string' || !/^[\d\s\-+()]*$/.test(value))) {
+        throw new BadRequestException(`${label} must be a valid phone number`);
+      }
+
+      if (type === 'number' && Number.isNaN(Number(value))) {
+        throw new BadRequestException(`${label} must be a number`);
+      }
+
+      const options = Array.isArray(field.options)
+        ? field.options.map((option) => String(option))
+        : [];
+
+      if ((type === 'select' || type === 'radio') && options.length > 0 && !options.includes(String(value))) {
+        throw new BadRequestException(`${label} has an invalid option`);
+      }
+
+      if (type === 'checkbox' && options.length > 0) {
+        if (!Array.isArray(value) || value.some((item) => !options.includes(String(item)))) {
+          throw new BadRequestException(`${label} has an invalid option`);
+        }
+      }
+
+      if (type === 'linear_scale' || type === 'rating') {
+        const numericValue = Number(value);
+        const min = Number(field.min ?? 1);
+        const max = Number(field.max ?? 5);
+        if (Number.isNaN(numericValue) || numericValue < min || numericValue > max) {
+          throw new BadRequestException(`${label} is outside the allowed range`);
+        }
+      }
+    }
   }
 }

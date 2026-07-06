@@ -5,9 +5,13 @@ import { campaignService } from '../../services/campaigns';
 import { statusService } from '../../services/statuses';
 import { Lead, Campaign, CampaignStatus } from '../../types';
 import Layout from '../../components/layout/Layout';
+import Pagination from '../../components/common/Pagination';
 import LeadDetailDialog from '../../components/leads/LeadDetailDialog';
+import { downloadCsv } from '../../utils/csv';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+
+const DEFAULT_PAGE_SIZE = 50;
 
 export default function DndPage() {
   const { user } = useAuth();
@@ -19,6 +23,9 @@ export default function DndPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [campaignStatuses, setCampaignStatuses] = useState<CampaignStatus[]>([]);
+  const [removingDndId, setRemovingDndId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   useEffect(() => {
     loadData();
@@ -60,13 +67,23 @@ export default function DndPage() {
     return matchCampaign && matchSearch;
   });
 
+  const totalPages = Math.max(1, Math.ceil(filteredLeads.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedLeads = filteredLeads.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedCampaign, search, pageSize]);
+
   const handleViewLead = (lead: Lead) => {
     setSelectedLead(lead);
     loadCampaignStatuses(lead.campaignId);
   };
 
   const handleRemoveDnd = async (lead: Lead) => {
+    if (removingDndId) return;
     if (!confirm(`Remove DND for ${lead.name}?`)) return;
+    setRemovingDndId(lead.id);
     try {
       await leadService.updateStatus(lead.id, {
         status: lead.status?.label || 'Updated',
@@ -78,6 +95,8 @@ export default function DndPage() {
       loadData();
     } catch (error) {
       toast.error('Failed to remove DND');
+    } finally {
+      setRemovingDndId(null);
     }
   };
 
@@ -93,14 +112,12 @@ export default function DndPage() {
       format(new Date(lead.createdAt), 'MMM d, yyyy'),
     ]);
 
-    const csvContent = [headers, ...rows].map((row) => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `dnd-leads-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(`dnd-leads-${format(new Date(), 'yyyy-MM-dd')}.csv`, headers, rows);
+  };
+
+  const clearFilters = () => {
+    setSearch('');
+    setSelectedCampaign('');
   };
 
   return (
@@ -120,105 +137,7 @@ export default function DndPage() {
           </div>
         </div>
       )}
-      <div className="p-6 lg:p-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">DND (Do Not Disturb)</h1>
-            <p className="text-gray-500 mt-1">Leads that have requested not to be contacted</p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={exportToCSV}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm"
-            >
-              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Export CSV
-            </button>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-xl shadow-sm border p-4">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-gray-500">Total DND</p>
-                <p className="text-2xl font-bold text-gray-900">{leads.length}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border p-4">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-gray-500">Campaigns</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {new Set(leads.map((l) => l.campaignId)).size}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border p-4">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-gray-500">Shown in List</p>
-                <p className="text-2xl font-bold text-gray-900">{filteredLeads.length}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm border p-4 mb-6">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1 relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search by name, email, or phone..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-            <select
-              value={selectedCampaign}
-              onChange={(e) => setSelectedCampaign(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">All Campaigns</option>
-              {campaigns.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Results */}
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-gray-500">
-            Showing {filteredLeads.length} of {leads.length} DND leads
-          </p>
-        </div>
+      <div className="sleek-page p-3 lg:p-4">
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -238,39 +157,103 @@ export default function DndPage() {
           </div>
         ) : (
           <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
+                <div className="lg:col-span-4 relative">
+                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search lead"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+
+                <select
+                  value={selectedCampaign}
+                  onChange={(e) => setSelectedCampaign(e.target.value)}
+                  className="lg:col-span-3 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">All campaigns</option>
+                  {campaigns.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+
+                <div className="lg:col-span-5 flex items-center justify-end gap-2 flex-wrap">
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                  <button
+                    onClick={clearFilters}
+                    className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    onClick={loadData}
+                    className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                  >
+                    Refresh
+                  </button>
+                  <button
+                    onClick={exportToCSV}
+                    className="inline-flex items-center px-2.5 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 text-xs font-semibold"
+                  >
+                    <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export CSV
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                Showing {paginatedLeads.length} of {filteredLeads.length} filtered DND leads ({leads.length} total)
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lead</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Campaign</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Doer</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Lead</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Campaign</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Doer</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {filteredLeads.map((lead) => (
+                  {paginatedLeads.map((lead) => (
                     <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2.5">
                         <div className="flex items-center">
                           <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
                             <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                             </svg>
                           </div>
-                          <span className="ml-3 font-medium text-gray-900">{lead.name}</span>
+                          <span className="ml-2.5 font-medium text-gray-900 text-sm">{lead.name}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{lead.email || '-'}</div>
-                        <div className="text-sm text-gray-500">{lead.phone || '-'}</div>
+                      <td className="px-3 py-2.5">
+                        <div className="text-sm text-gray-900 leading-tight">{lead.email || '-'}</div>
+                        <div className="text-xs text-gray-500">{lead.phone || '-'}</div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{lead.campaign?.name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{lead.doer?.name || '-'}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2.5 text-sm text-gray-500">{lead.campaign?.name}</td>
+                      <td className="px-3 py-2.5 text-sm text-gray-500">{lead.doer?.name || '-'}</td>
+                      <td className="px-3 py-2.5">
                         <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
                           lead.source === 'form' ? 'bg-blue-100 text-blue-700' :
                           lead.source === 'bulk' ? 'bg-purple-100 text-purple-700' :
@@ -279,10 +262,10 @@ export default function DndPage() {
                           {lead.source}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
+                      <td className="px-3 py-2.5 text-sm text-gray-500">
                         {format(new Date(lead.createdAt), 'MMM d, yyyy')}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2.5">
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={() => handleViewLead(lead)}
@@ -292,9 +275,10 @@ export default function DndPage() {
                           </button>
                           <button
                             onClick={() => handleRemoveDnd(lead)}
-                            className="text-green-600 hover:text-green-700 text-sm font-medium"
+                            disabled={removingDndId === lead.id}
+                            className="text-green-600 hover:text-green-700 text-sm font-medium disabled:text-gray-400 disabled:cursor-not-allowed"
                           >
-                            Remove DND
+                            {removingDndId === lead.id ? 'Removing...' : 'Remove DND'}
                           </button>
                         </div>
                       </td>
@@ -303,6 +287,12 @@ export default function DndPage() {
                 </tbody>
               </table>
             </div>
+            <Pagination
+              page={currentPage}
+              pageSize={pageSize}
+              totalItems={filteredLeads.length}
+              onPageChange={setPage}
+            />
           </div>
         )}
       </div>

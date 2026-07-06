@@ -121,25 +121,41 @@ export class CampaignsService {
 
   async assignUsers(campaignId: string, dto: AssignUsersDto, userId?: string, role?: string) {
     await this.findOne(campaignId, userId, role);
-    const results: CampaignUser[] = [];
-    for (const uid of dto.userIds) {
-      const existing = await this.prisma.campaignUser.findUnique({
-        where: { campaignId_userId: { campaignId, userId: uid } },
-      });
-      if (existing) {
-        const updated = await this.prisma.campaignUser.update({
-          where: { id: existing.id },
-          data: { isActive: true },
-        });
-        results.push(updated);
-      } else {
-        const created = await this.prisma.campaignUser.create({
-          data: { campaignId, userId: uid },
-        });
-        results.push(created);
+    const uniqueUserIds = [...new Set(dto.userIds)];
+
+    return this.prisma.$transaction(async (tx) => {
+      const deactivateWhere: any = { campaignId, isActive: true };
+      if (uniqueUserIds.length > 0) {
+        deactivateWhere.userId = { notIn: uniqueUserIds };
       }
-    }
-    return results;
+
+      await tx.campaignUser.updateMany({
+        where: deactivateWhere,
+        data: { isActive: false },
+      });
+
+      const results: CampaignUser[] = [];
+      for (const uid of uniqueUserIds) {
+        const existing = await tx.campaignUser.findUnique({
+          where: { campaignId_userId: { campaignId, userId: uid } },
+        });
+
+        if (existing) {
+          const updated = await tx.campaignUser.update({
+            where: { id: existing.id },
+            data: { isActive: true },
+          });
+          results.push(updated);
+        } else {
+          const created = await tx.campaignUser.create({
+            data: { campaignId, userId: uid },
+          });
+          results.push(created);
+        }
+      }
+
+      return results;
+    });
   }
 
   async removeUser(campaignId: string, userId: string, requestUserId?: string, role?: string) {
@@ -150,7 +166,8 @@ export class CampaignsService {
     });
   }
 
-  async getAssignedUsers(campaignId: string) {
+  async getAssignedUsers(campaignId: string, userId?: string, role?: string) {
+    await this.findOne(campaignId, userId, role);
     return this.prisma.campaignUser.findMany({
       where: { campaignId, isActive: true },
       include: { user: { select: { id: true, name: true, username: true, role: true } } },

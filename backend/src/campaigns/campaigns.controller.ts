@@ -18,7 +18,7 @@ export class CampaignsController {
   constructor(private campaignsService: CampaignsService) {}
 
   @Post()
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Create a campaign' })
   create(@Body() dto: CreateCampaignDto, @Request() req) {
     return this.campaignsService.create(dto, req.user.id);
@@ -37,7 +37,7 @@ export class CampaignsController {
   }
 
   @Put(':id')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Update campaign' })
   update(@Param('id') id: string, @Body() dto: UpdateCampaignDto, @Request() req) {
     return this.campaignsService.update(id, dto, req.user.id, req.user.role);
@@ -51,14 +51,14 @@ export class CampaignsController {
   }
 
   @Post(':id/users')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Assign users to campaign' })
   assignUsers(@Param('id') id: string, @Body() dto: AssignUsersDto, @Request() req) {
     return this.campaignsService.assignUsers(id, dto, req.user.id, req.user.role);
   }
 
   @Delete(':id/users/:userId')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Remove user from campaign' })
   removeUser(@Param('id') id: string, @Param('userId') userId: string, @Request() req) {
     return this.campaignsService.removeUser(id, userId, req.user.id, req.user.role);
@@ -66,7 +66,7 @@ export class CampaignsController {
 
   @Get(':id/users')
   @ApiOperation({ summary: 'Get assigned users' })
-  getAssignedUsers(@Param('id') id: string) {
-    return this.campaignsService.getAssignedUsers(id);
+  getAssignedUsers(@Param('id') id: string, @Request() req) {
+    return this.campaignsService.getAssignedUsers(id, req.user.id, req.user.role);
   }
 }

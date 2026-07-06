@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Req, OnModuleInit } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Req, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { FormsService } from './forms.service';
@@ -21,7 +21,7 @@ export class PublicFormsController implements OnModuleInit {
   @ApiOperation({ summary: 'Get public form by slug' })
   getForm(@Param('slug') slug: string) {
     if (!this.enabled) {
-      return { error: 'Public forms are disabled' };
+      throw new ServiceUnavailableException('Public forms are disabled');
     }
     return this.formsService.findBySlug(slug);
   }
@@ -30,9 +30,9 @@ export class PublicFormsController implements OnModuleInit {
   @ApiOperation({ summary: 'Submit public form' })
   submitForm(@Param('slug') slug: string, @Body() body: { data: Record<string, any> }, @Req() req) {
     if (!this.enabled) {
-      return { error: 'Public forms are disabled' };
+      throw new ServiceUnavailableException('Public forms are disabled');
     }
     const ipAddress = req.ip || req.connection?.remoteAddress;
-    return this.formsService.submitForm(slug, body.data, ipAddress);
+    return this.formsService.submitForm(slug, body?.data || {}, ipAddress);
   }
 }

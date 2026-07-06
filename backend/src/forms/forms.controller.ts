@@ -17,7 +17,7 @@ export class FormsController {
   constructor(private formsService: FormsService) {}
 
   @Post()
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Create a form for campaign' })
   create(@Param('campaignId') campaignId: string, @Body() dto: CreateFormDto) {
     return this.formsService.create(campaignId, dto);
@@ -36,21 +36,21 @@ export class FormsController {
   }
 
   @Put(':id')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Update form' })
   update(@Param('id') id: string, @Body() dto: UpdateFormDto) {
     return this.formsService.update(id, dto);
   }
 
   @Post(':id/publish')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Publish form' })
   publish(@Param('id') id: string) {
     return this.formsService.publish(id);
   }
 
   @Post(':id/unpublish')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Unpublish form' })
   unpublish(@Param('id') id: string) {
     return this.formsService.unpublish(id);

@@ -4,12 +4,18 @@ import { authService } from '../services/auth';
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, remember?: boolean) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// ✅ FIXED: Remove token storage (now using httpOnly cookies)
+const clearStoredAuth = () => {
+  localStorage.removeItem('user');
+  sessionStorage.removeItem('user');
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -17,28 +23,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      const token = localStorage.getItem('token');
-      const savedUser = localStorage.getItem('user');
-      if (token && savedUser) {
+      const savedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
+      if (savedUser) {
         setUser(JSON.parse(savedUser));
       }
     } catch {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      clearStoredAuth();
     }
     setIsLoading(false);
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, remember = false) => {
     const response = await authService.login(username, password);
-    localStorage.setItem('token', response.access_token);
-    localStorage.setItem('user', JSON.stringify(response.user));
+    // ✅ FIXED: Only store user info, token is in httpOnly cookie
+    const storage = remember ? localStorage : sessionStorage;
+    clearStoredAuth();
+    storage.setItem('user', JSON.stringify(response.user));
     setUser(response.user);
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    clearStoredAuth();
     setUser(null);
   };
 

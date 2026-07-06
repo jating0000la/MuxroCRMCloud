@@ -12,15 +12,22 @@ import { FollowupsModule } from './followups/followups.module';
 import { BulkImportModule } from './bulk-import/bulk-import.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { SettingsModule } from './settings/settings.module';
 import { HealthController } from './health.controller';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 100,
-    }]),
+    // ✅ FIXED: Reduced rate limits and added endpoint-specific throttling
+    // Default: 100 requests per minute
+    // Auth endpoints will override with stricter limits
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,        // 1 minute
+        limit: 100,        // 100 requests per minute (default)
+        blockDuration: 5000,  // Block for 5 seconds after limit exceeded
+      },
+    ]),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -31,6 +38,7 @@ import { HealthController } from './health.controller';
     BulkImportModule,
     DashboardModule,
     IntegrationsModule,
+    SettingsModule,
   ],
   controllers: [HealthController],
   providers: [

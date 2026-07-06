@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
+import { readBranding } from '../../utils/branding';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -10,24 +11,30 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [shake, setShake] = useState(false);
+  const [formError, setFormError] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
+  const showDemoCredentials = (import.meta as any).env?.DEV === true;
+  const branding = readBranding();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password) {
+    setFormError('');
+    if (!username.trim() || !password) {
+      setFormError('Enter username and password');
       setShake(true);
       setTimeout(() => setShake(false), 500);
       return;
     }
     setLoading(true);
     try {
-      await login(username, password);
+      await login(username.trim(), password, rememberMe);
       toast.success('Welcome back!');
       navigate('/dashboard');
     } catch (error: any) {
       setShake(true);
       setTimeout(() => setShake(false), 500);
+      setFormError(error.response?.data?.message || 'Invalid credentials');
       toast.error(error.response?.data?.message || 'Invalid credentials');
     } finally {
       setLoading(false);
@@ -35,7 +42,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 flex items-center justify-center p-4">
+    <div className="sleek-page min-h-screen bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 flex items-center justify-center p-4">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
@@ -62,9 +69,18 @@ export default function LoginPage() {
         <div className="bg-white rounded-2xl shadow-2xl p-8" style={{ animation: 'fadeInUp 0.6s ease-out' }}>
           {/* Logo */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <span className="text-2xl font-bold text-white">C</span>
-            </div>
+            {branding.appLogoUrl ? (
+              <img
+                src={branding.appLogoUrl}
+                alt="App logo"
+                className="w-16 h-16 rounded-2xl object-cover mx-auto mb-4 shadow-lg border border-primary-100 bg-white"
+              />
+            ) : (
+              <div className="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <span className="text-2xl font-bold text-white">{(branding.appName || 'M').charAt(0).toUpperCase()}</span>
+              </div>
+            )}
+            <p className="text-[11px] uppercase tracking-[0.14em] text-gray-500 font-semibold mb-1 truncate">{branding.appName}</p>
             <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
             <p className="text-gray-500 mt-1">Sign in to your CRM account</p>
           </div>
@@ -82,7 +98,7 @@ export default function LoginPage() {
                 <input
                   type="text"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => { setUsername(e.target.value); setFormError(''); }}
                   className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                   placeholder="Enter your username"
                 />
@@ -100,7 +116,7 @@ export default function LoginPage() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); setFormError(''); }}
                   className="block w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                   placeholder="Enter your password"
                 />
@@ -123,6 +139,12 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+
+            {formError && (
+              <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700" role="alert">
+                {formError}
+              </div>
+            )}
 
             <div className="flex items-center justify-between">
               <label className="flex items-center">
@@ -155,30 +177,32 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Demo Credentials */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs text-gray-500 text-center mb-3">Demo Credentials</p>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { role: 'Admin', user: 'admin', pass: 'admin123', color: 'bg-red-50 text-red-700 border-red-200' },
-                { role: 'Manager', user: 'manager1', pass: 'manager123', color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
-                { role: 'User', user: 'user1', pass: 'user123', color: 'bg-green-50 text-green-700 border-green-200' },
-              ].map((demo) => (
-                <button
-                  key={demo.role}
-                  type="button"
-                  onClick={() => {
-                    setUsername(demo.user);
-                    setPassword(demo.pass);
-                  }}
-                  className={`px-2 py-2 rounded-lg text-xs font-medium border hover:shadow-sm transition-all ${demo.color}`}
-                >
-                  {demo.role}
-                </button>
-              ))}
+          {showDemoCredentials && (
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <p className="text-xs text-gray-500 text-center mb-3">Demo Credentials</p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { role: 'Admin', user: 'admin', pass: 'admin123', color: 'bg-red-50 text-red-700 border-red-200' },
+                  { role: 'User', user: 'user1', pass: 'user123', color: 'bg-green-50 text-green-700 border-green-200' },
+                ].map((demo) => (
+                  <button
+                    key={demo.role}
+                    type="button"
+                    onClick={() => {
+                      setUsername(demo.user);
+                      setPassword(demo.pass);
+                      setFormError('');
+                    }}
+                    className={`px-2 py-2 rounded-lg text-xs font-medium border hover:shadow-sm transition-all ${demo.color}`}
+                  >
+                    {demo.role}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
+        <p className="mt-4 text-center text-xs text-white/80">Copyright by Muxro Technologies 2026</p>
       </div>
     </div>
   );

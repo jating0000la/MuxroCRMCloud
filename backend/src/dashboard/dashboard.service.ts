@@ -174,56 +174,115 @@ export class DashboardService {
     };
   }
 
-  async getUserConversion(userId: string, role: string, campaignId?: string) {
+  async getUserConversion(userId: string, role: string, campaignId?: string, startDate?: string, endDate?: string) {
     const leadWhere: any = {};
     if (role === 'MANAGER') leadWhere.campaign = { managerId: userId };
     if (campaignId) leadWhere.campaignId = campaignId;
 
+    if (startDate || endDate) {
+      const createdAt: any = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        createdAt.gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        createdAt.lte = end;
+      }
+      leadWhere.createdAt = createdAt;
+    }
+
+    // ✅ OPTIMIZED: Use database aggregation instead of N+1 queries
+    // Get all active users first (small dataset)
     const users = await this.prisma.user.findMany({
       where: { isActive: true, role: 'USER' },
       select: { id: true, name: true, username: true },
     });
 
-    const userStats = await Promise.all(
-      users.map(async (user) => {
-        const userLeadWhere: any = { ...leadWhere, doerId: user.id };
+    // Get all aggregated stats in ONE query using groupBy
+    const leadStats = await this.prisma.lead.groupBy({
+      by: ['doerId'],
+      where: leadWhere,
+      _count: {
+        id: true,
+      },
+    });
 
-        const totalLeads = await this.prisma.lead.count({ where: userLeadWhere });
-
-        const contactedLeads = await this.prisma.lead.count({
-          where: { ...userLeadWhere, followups: { some: {} } },
-        });
-
-        const leadsWithStatus = await this.prisma.lead.count({
-          where: { ...userLeadWhere, statusId: { not: null } },
-        });
-
-        const convertedLeads = await this.prisma.lead.count({
-          where: {
-            ...userLeadWhere,
-            status: { is: { label: { contains: 'convert', mode: 'insensitive' } } },
-          },
-        });
-
-        const dndLeads = await this.prisma.lead.count({
-          where: { ...userLeadWhere, dnd: true },
-        });
-
-        return {
-          userId: user.id,
-          name: user.name,
-          username: user.username,
-          totalLeads,
-          contactedLeads,
-          contactRate: totalLeads > 0 ? Math.round((contactedLeads / totalLeads) * 100) : 0,
-          leadsWithStatus,
-          qualifiedRate: totalLeads > 0 ? Math.round((leadsWithStatus / totalLeads) * 100) : 0,
-          convertedLeads,
-          conversionRate: totalLeads > 0 ? Math.round((convertedLeads / totalLeads) * 100) : 0,
-          dndLeads,
-        };
-      }),
+    const leadStatsMap = new Map(
+      leadStats.map((stat) => [stat.doerId, stat._count.id]),
     );
+
+    // Get contacted leads (has followups)
+    const contactedLeads = await this.prisma.lead.groupBy({
+      by: ['doerId'],
+      where: { ...leadWhere, followups: { some: {} } },
+      _count: { id: true },
+    });
+
+    const contactedLeadsMap = new Map(
+      contactedLeads.map((stat) => [stat.doerId, stat._count.id]),
+    );
+
+    // Get qualified leads (has status)
+    const qualifiedLeads = await this.prisma.lead.groupBy({
+      by: ['doerId'],
+      where: { ...leadWhere, statusId: { not: null } },
+      _count: { id: true },
+    });
+
+    const qualifiedLeadsMap = new Map(
+      qualifiedLeads.map((stat) => [stat.doerId, stat._count.id]),
+    );
+
+    // Get converted leads
+    const convertedLeads = await this.prisma.lead.groupBy({
+      by: ['doerId'],
+      where: {
+        ...leadWhere,
+        status: { is: { label: { contains: 'convert', mode: 'insensitive' } } },
+      },
+      _count: { id: true },
+    });
+
+    const convertedLeadsMap = new Map(
+      convertedLeads.map((stat) => [stat.doerId, stat._count.id]),
+    );
+
+    // Get DND leads
+    const dndLeads = await this.prisma.lead.groupBy({
+      by: ['doerId'],
+      where: { ...leadWhere, dnd: true },
+      _count: { id: true },
+    });
+
+    const dndLeadsMap = new Map(
+      dndLeads.map((stat) => [stat.doerId, stat._count.id]),
+    );
+
+    // Calculate stats from aggregated data (no N+1)
+    const userStats = users.map((user) => {
+      const totalLeads = leadStatsMap.get(user.id) || 0;
+      const contacted = contactedLeadsMap.get(user.id) || 0;
+      const qualified = qualifiedLeadsMap.get(user.id) || 0;
+      const converted = convertedLeadsMap.get(user.id) || 0;
+      const dnd = dndLeadsMap.get(user.id) || 0;
+
+      return {
+        userId: user.id,
+        name: user.name,
+        username: user.username,
+        totalLeads,
+        contactedLeads: contacted,
+        contactRate: totalLeads > 0 ? Math.round((contacted / totalLeads) * 100) : 0,
+        leadsWithStatus: qualified,
+        qualifiedRate: totalLeads > 0 ? Math.round((qualified / totalLeads) * 100) : 0,
+        convertedLeads: converted,
+        conversionRate: totalLeads > 0 ? Math.round((converted / totalLeads) * 100) : 0,
+        dndLeads: dnd,
+      };
+    });
 
     return userStats.sort((a, b) => b.conversionRate - a.conversionRate);
   }

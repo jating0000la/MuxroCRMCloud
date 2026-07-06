@@ -6,8 +6,10 @@ import { leadService } from '../../services/leads';
 import { formService } from '../../services/forms';
 import { bulkImportService } from '../../services/bulkImport';
 import { statusService } from '../../services/statuses';
+import { userService } from '../../services/users';
 import { Campaign, Lead, Form, User, CampaignStatus } from '../../types';
 import Layout from '../../components/layout/Layout';
+import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
 import StatusUpdateDialog from '../../components/leads/StatusUpdateDialog';
 import LeadDetailDialog from '../../components/leads/LeadDetailDialog';
@@ -17,6 +19,8 @@ const STATUS_COLORS = [
   '#3B82F6', '#F59E0B', '#10B981', '#059669', '#EF4444',
   '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#F97316',
 ];
+
+const DEFAULT_LEAD_PAGE_SIZE = 50;
 
 export default function CampaignDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -31,10 +35,14 @@ export default function CampaignDetailPage() {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [showFormBuilder, setShowFormBuilder] = useState(false);
   const [showAssignUsers, setShowAssignUsers] = useState(false);
+  const [assignUserIds, setAssignUserIds] = useState<string[]>([]);
+  const [assigningUsers, setAssigningUsers] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [editingForm, setEditingForm] = useState<Form | null>(null);
   const [leadSearch, setLeadSearch] = useState('');
   const [leadStatusFilter, setLeadStatusFilter] = useState('');
+  const [leadPage, setLeadPage] = useState(1);
+  const [leadPageSize, setLeadPageSize] = useState(DEFAULT_LEAD_PAGE_SIZE);
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -52,7 +60,7 @@ export default function CampaignDetailPage() {
   const [editIsActive, setEditIsActive] = useState(true);
   const [savingCampaign, setSavingCampaign] = useState(false);
 
-  const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const canManage = user?.role === 'ADMIN';
 
   useEffect(() => {
     if (id) loadData();
@@ -72,7 +80,7 @@ export default function CampaignDetailPage() {
       setUsers(assignedUsers.map((au) => au.user!).filter(Boolean));
 
       if (canManage) {
-        const allUsersData = await import('../../services/users').then((m) => m.userService.getAll());
+        const allUsersData = await userService.getAll();
         setAllUsers(allUsersData);
       }
     } catch (error: any) {
@@ -148,6 +156,10 @@ export default function CampaignDetailPage() {
   };
 
   const handleAssignUsers = async (userIds: string[]) => {
+    if (userIds.length === 0 && !confirm('Remove all users from this campaign? New leads cannot be assigned until a telecaller is added.')) {
+      return;
+    }
+    setAssigningUsers(true);
     try {
       await campaignService.assignUsers(id!, userIds);
       toast.success('Users assigned successfully');
@@ -159,10 +171,23 @@ export default function CampaignDetailPage() {
       } else {
         toast.error('Failed to assign users');
       }
+      } finally {
+        setAssigningUsers(false);
     }
   };
 
-  const handleCreateForm = async (title: string, fields: any[], whatsappConfig?: any, emailConfig?: any) => {
+    const openAssignUsers = () => {
+      setAssignUserIds(users.map((assignedUser) => assignedUser.id));
+      setShowAssignUsers(true);
+    };
+
+    const toggleAssignUser = (userId: string) => {
+      setAssignUserIds((prev) =>
+        prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+      );
+    };
+
+  const handleCreateForm = async (title: string, fields: any[]) => {
     try {
       const form = await formService.create(id!, { title, fields });
       await formService.publish(id!, form.id);
@@ -174,7 +199,7 @@ export default function CampaignDetailPage() {
     }
   };
 
-  const handleUpdateForm = async (title: string, fields: any[], whatsappConfig?: any, emailConfig?: any) => {
+  const handleUpdateForm = async (title: string, fields: any[]) => {
     if (!editingForm) return;
     try {
       await formService.update(id!, editingForm.id, { title, fields } as any);
@@ -196,6 +221,19 @@ export default function CampaignDetailPage() {
     const matchStatus = !leadStatusFilter || lead.statusId === leadStatusFilter;
     return matchSearch && matchStatus;
   });
+
+  const totalLeadPages = Math.max(1, Math.ceil(filteredLeads.length / leadPageSize));
+  const currentLeadPage = Math.min(leadPage, totalLeadPages);
+  const paginatedLeads = filteredLeads.slice((currentLeadPage - 1) * leadPageSize, currentLeadPage * leadPageSize);
+
+  useEffect(() => {
+    setLeadPage(1);
+  }, [leadSearch, leadStatusFilter, leadPageSize]);
+
+  const clearLeadFilters = () => {
+    setLeadSearch('');
+    setLeadStatusFilter('');
+  };
 
   if (loading) {
     return (
@@ -219,19 +257,19 @@ export default function CampaignDetailPage() {
 
   return (
     <Layout>
-      <div className="p-6 lg:p-8">
+      <div className="sleek-page p-3 lg:p-4">
         {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center space-x-2 text-sm text-gray-500 mb-2">
+        <div className="mb-3">
+          <div className="flex items-center space-x-2 text-xs text-gray-500 mb-1">
             <span>Campaigns</span>
             <span>/</span>
             <span className="text-gray-900">{campaign.name}</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{campaign.name}</h1>
+              <h1 className="text-xl font-bold text-gray-900">{campaign.name}</h1>
               {campaign.description && (
-                <p className="text-gray-500 mt-1">{campaign.description}</p>
+                <p className="text-sm text-gray-500 mt-0.5">{campaign.description}</p>
               )}
             </div>
             {canManage && (
@@ -243,18 +281,18 @@ export default function CampaignDetailPage() {
                     setEditIsActive(campaign.isActive);
                     setEditingCampaign(true);
                   }}
-                  className="inline-flex items-center px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                  className="inline-flex items-center px-2.5 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-xs font-semibold"
                 >
-                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                   Edit
                 </button>
                 <button
                   onClick={() => setShowBulkImport(true)}
-                  className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                  className="inline-flex items-center px-2.5 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 text-xs font-semibold"
                 >
-                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                   </svg>
                   Import CSV
@@ -262,19 +300,19 @@ export default function CampaignDetailPage() {
                 {forms.length === 0 && (
                   <button
                     onClick={() => setShowFormBuilder(true)}
-                    className="inline-flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+                    className="inline-flex items-center px-2.5 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-xs font-semibold"
                   >
-                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     New Form
                   </button>
                 )}
                 <button
-                  onClick={() => setShowAssignUsers(true)}
-                  className="inline-flex items-center px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
+                  onClick={openAssignUsers}
+                  className="inline-flex items-center px-2.5 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-xs font-semibold"
                 >
-                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                   </svg>
                   Assign Users
@@ -285,7 +323,7 @@ export default function CampaignDetailPage() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200 mb-6">
+        <div className="border-b border-gray-200 mb-3">
           <nav className="flex space-x-8">
             {([
               { key: 'leads' as const, label: 'Leads', count: leads.length },
@@ -296,7 +334,7 @@ export default function CampaignDetailPage() {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === tab.key
                     ? 'border-primary-600 text-primary-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -318,67 +356,92 @@ export default function CampaignDetailPage() {
         {/* Leads Tab */}
         {activeTab === 'leads' && (
           <div>
-            {/* Lead Filters */}
-            <div className="bg-white rounded-xl shadow-sm border p-4 mb-4">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1 relative">
-                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <input
-                    type="text"
-                    placeholder="Search leads by name, email, or phone..."
-                    value={leadSearch}
-                    onChange={(e) => setLeadSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <select
-                  value={leadStatusFilter}
-                  onChange={(e) => setLeadStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value="">All Status</option>
-                  {campaign.statuses?.map((s) => (
-                    <option key={s.id} value={s.id}>{s.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
             {/* Leads Table */}
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
+                  <div className="lg:col-span-5 relative">
+                    <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search leads"
+                      value={leadSearch}
+                      onChange={(e) => setLeadSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <select
+                    value={leadStatusFilter}
+                    onChange={(e) => setLeadStatusFilter(e.target.value)}
+                    className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">All status</option>
+                    {campaign.statuses?.map((s) => (
+                      <option key={s.id} value={s.id}>{s.label}</option>
+                    ))}
+                  </select>
+                  <div className="lg:col-span-5 flex items-center justify-end gap-2 flex-wrap">
+                    <select
+                      value={leadPageSize}
+                      onChange={(e) => setLeadPageSize(Number(e.target.value))}
+                      className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <button
+                      onClick={clearLeadFilters}
+                      className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      onClick={loadData}
+                      className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-gray-500">
+                  Showing {paginatedLeads.length} of {filteredLeads.length} filtered leads ({leads.length} total)
+                </div>
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Doer</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Doer</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {filteredLeads.map((lead) => (
+                    {paginatedLeads.map((lead) => (
                       <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4">
+                        <td className="px-3 py-2.5">
                           <div className="flex items-center">
                             <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
                               <span className="text-sm font-medium text-primary-700">{lead.name.charAt(0)}</span>
                             </div>
-                            <span className="ml-3 font-medium text-gray-900">{lead.name}</span>
+                            <span className="ml-2.5 font-medium text-gray-900 text-sm">{lead.name}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">{lead.email || '-'}</div>
-                          <div className="text-sm text-gray-500">{lead.phone || '-'}</div>
+                        <td className="px-3 py-2.5">
+                          <div className="text-sm text-gray-900 leading-tight">{lead.email || '-'}</div>
+                          <div className="text-xs text-gray-500">{lead.phone || '-'}</div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
+                        <td className="px-3 py-2.5 text-sm text-gray-500">
                           {lead.doer?.name || <span className="text-gray-400 italic">Unassigned</span>}
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-3 py-2.5">
                           {lead.status ? (
                             <span
                               className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
@@ -390,7 +453,7 @@ export default function CampaignDetailPage() {
                             <span className="text-gray-400 text-sm">No status</span>
                           )}
                         </td>
-                        <td className="px-6 py-4">
+                          <td className="px-3 py-2.5">
                           <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
                             lead.source === 'form' ? 'bg-blue-100 text-blue-700' :
                             lead.source === 'bulk' ? 'bg-purple-100 text-purple-700' :
@@ -399,7 +462,7 @@ export default function CampaignDetailPage() {
                             {lead.source}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
+                          <td className="px-3 py-2.5">
                           <button
                             onClick={() => setSelectedLead(lead)}
                             className="text-primary-600 hover:text-primary-700 text-sm font-medium"
@@ -412,6 +475,12 @@ export default function CampaignDetailPage() {
                   </tbody>
                 </table>
               </div>
+              <Pagination
+                page={currentLeadPage}
+                pageSize={leadPageSize}
+                totalItems={filteredLeads.length}
+                onPageChange={setLeadPage}
+              />
               {filteredLeads.length === 0 && (
                 <div className="text-center py-12">
                   <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -878,7 +947,7 @@ export default function CampaignDetailPage() {
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {allUsers.filter((u) => u.isActive).map((u) => {
-                    const isAssigned = users.some((au) => au.id === u.id);
+                    const isAssigned = assignUserIds.includes(u.id);
                     return (
                       <label
                         key={u.id}
@@ -888,8 +957,8 @@ export default function CampaignDetailPage() {
                       >
                         <input
                           type="checkbox"
-                          defaultChecked={isAssigned}
-                          value={u.id}
+                          checked={isAssigned}
+                          onChange={() => toggleAssignUser(u.id)}
                           className="user-checkbox w-4 h-4 text-primary-600 rounded"
                         />
                         <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
@@ -902,6 +971,9 @@ export default function CampaignDetailPage() {
                       </label>
                     );
                   })}
+                  {allUsers.filter((u) => u.isActive).length === 0 && (
+                    <p className="text-sm text-gray-500 text-center py-6">No active users available.</p>
+                  )}
                 </div>
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
@@ -911,14 +983,11 @@ export default function CampaignDetailPage() {
                     Cancel
                   </button>
                   <button
-                    onClick={() => {
-                      const checked = document.querySelectorAll('.user-checkbox:checked');
-                      const ids = Array.from(checked).map((el: any) => el.value);
-                      handleAssignUsers(ids);
-                    }}
-                    className="px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                    onClick={() => handleAssignUsers(assignUserIds)}
+                    disabled={assigningUsers}
+                    className="px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
                   >
-                    Save Changes
+                    {assigningUsers ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>

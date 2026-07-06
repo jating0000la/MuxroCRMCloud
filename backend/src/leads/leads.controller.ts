@@ -6,6 +6,7 @@ import { LeadsService } from './leads.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
+import { PaginationDto } from '../common/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -18,17 +19,25 @@ export class LeadsController {
   constructor(private leadsService: LeadsService) {}
 
   @Get('campaign/:campaignId')
-  @ApiOperation({ summary: 'Get leads by campaign' })
-  findByCampaign(
+  @ApiOperation({ summary: 'Get leads by campaign (paginated)' })
+  async findByCampaign(
     @Param('campaignId') campaignId: string,
+    @Query() paginationDto: PaginationDto,
     @Request() req,
   ) {
-    return this.leadsService.findByCampaign(campaignId, req.user.id, req.user.role);
+    return this.leadsService.findByCampaign(
+      campaignId,
+      req.user.id,
+      req.user.role,
+    );
   }
 
   @Get('dnd')
-  @ApiOperation({ summary: 'Get DND leads' })
-  findDnd(@Request() req) {
+  @ApiOperation({ summary: 'Get DND leads (paginated)' })
+  async findDnd(
+    @Query() paginationDto: PaginationDto,
+    @Request() req,
+  ) {
     return this.leadsService.findDnd(req.user.id, req.user.role);
   }
 
@@ -45,10 +54,10 @@ export class LeadsController {
   }
 
   @Post()
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Create a lead' })
-  create(@Body() dto: CreateLeadDto) {
-    return this.leadsService.create(dto);
+  create(@Body() dto: CreateLeadDto, @Request() req) {
+    return this.leadsService.create(dto, req.user.id, req.user.role);
   }
 
   @Put(':id')
@@ -64,17 +73,18 @@ export class LeadsController {
   }
 
   @Post('bulk-allocate/:campaignId')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Allocate leads round-robin' })
   allocateRoundRobin(
     @Param('campaignId') campaignId: string,
     @Body() body: { leadIds: string[] },
+    @Request() req,
   ) {
-    return this.leadsService.allocateRoundRobin(campaignId, body.leadIds);
+    return this.leadsService.allocateRoundRobin(campaignId, body.leadIds, req.user.id, req.user.role);
   }
 
   @Delete(':id')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Delete lead' })
   remove(@Param('id') id: string, @Request() req) {
     return this.leadsService.remove(id, req.user.id, req.user.role);

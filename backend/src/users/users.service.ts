@@ -62,6 +62,10 @@ export class UsersService {
 
   async update(id: string, dto: UpdateUserDto) {
     await this.findOne(id);
+    if (dto.username) {
+      const existing = await this.prisma.user.findUnique({ where: { username: dto.username } });
+      if (existing && existing.id !== id) throw new ConflictException('Username already exists');
+    }
     if (dto.password) {
       dto.password = await bcrypt.hash(dto.password, 10);
     }

@@ -59,8 +59,11 @@ export const dashboardService = {
     return data;
   },
 
-  getUserConversion: async (campaignId?: string): Promise<UserConversionData[]> => {
-    const params = campaignId ? { campaignId } : {};
+  getUserConversion: async (campaignId?: string, startDate?: string, endDate?: string): Promise<UserConversionData[]> => {
+    const params: Record<string, string> = {};
+    if (campaignId) params.campaignId = campaignId;
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
     const { data } = await api.get('/dashboard/user-conversion', { params });
     return data;
   },

@@ -6,9 +6,23 @@ import { formService } from '../../services/forms';
 import { userService } from '../../services/users';
 import { Campaign, User, FormField } from '../../types';
 import Layout from '../../components/layout/Layout';
+import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
 
 type WizardStep = 'campaign' | 'form' | 'users';
+type SortField = 'name' | 'manager' | 'leads' | 'forms' | 'status';
+type SortDir = 'asc' | 'desc';
+
+const DEFAULT_PAGE_SIZE = 24;
+
+const toFieldName = (value: string, fallback: string) => {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return normalized || fallback;
+};
 
 export default function CampaignsPage() {
   const { user } = useAuth();
@@ -18,6 +32,10 @@ export default function CampaignsPage() {
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   // Wizard state
   const [showWizard, setShowWizard] = useState(false);
@@ -41,7 +59,7 @@ export default function CampaignsPage() {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
-  const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const canManage = user?.role === 'ADMIN';
 
   useEffect(() => {
     loadCampaigns();
@@ -63,6 +81,36 @@ export default function CampaignsPage() {
     }
     setFilteredCampaigns(result);
   }, [campaigns, search, filterStatus]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, filterStatus, viewMode, pageSize]);
+
+  const sortedCampaigns = [...filteredCampaigns].sort((a, b) => {
+    let comparison = 0;
+    switch (sortField) {
+      case 'name':
+        comparison = a.name.localeCompare(b.name);
+        break;
+      case 'manager':
+        comparison = (a.manager?.name || '').localeCompare(b.manager?.name || '');
+        break;
+      case 'leads':
+        comparison = (a._count?.leads || 0) - (b._count?.leads || 0);
+        break;
+      case 'forms':
+        comparison = (a._count?.forms || 0) - (b._count?.forms || 0);
+        break;
+      case 'status':
+        comparison = Number(a.isActive) - Number(b.isActive);
+        break;
+    }
+    return sortDir === 'asc' ? comparison : -comparison;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(sortedCampaigns.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedCampaigns = sortedCampaigns.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const loadCampaigns = async () => {
     try {
@@ -131,9 +179,13 @@ export default function CampaignsPage() {
       toast.error('Form title is required');
       return;
     }
+
+    const normalizedFields = normalizeFormFields();
+    if (!normalizedFields) return;
+
     setCreating(true);
     try {
-      const form = await formService.create(newCampaignId!, { title: formTitle, fields: formFields });
+      const form = await formService.create(newCampaignId!, { title: formTitle.trim(), fields: normalizedFields });
       await formService.publish(newCampaignId!, form.id);
       toast.success('Form created and published');
       setWizardStep('users');
@@ -174,7 +226,7 @@ export default function CampaignsPage() {
   };
 
   const addFormField = () => {
-    setFormFields((prev) => [...prev, { name: '', label: '', type: 'text', required: false }]);
+    setFormFields((prev) => [...prev, { name: `field_${prev.length + 1}`, label: '', type: 'text', required: false }]);
   };
 
   const updateFormField = (index: number, key: keyof FormField, value: any) => {
@@ -185,6 +237,40 @@ export default function CampaignsPage() {
     setFormFields((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const normalizeFormFields = () => {
+    const names = new Set<string>();
+    const normalized: FormField[] = [];
+
+    for (let index = 0; index < formFields.length; index += 1) {
+      const field = formFields[index];
+      const label = field.label.trim();
+      const name = toFieldName(field.name || label, `field_${index + 1}`);
+      const options = field.type === 'select'
+        ? (field.options || []).map((option) => option.trim()).filter(Boolean)
+        : undefined;
+
+      if (!label) {
+        toast.error(`Field ${index + 1} needs a label`);
+        return null;
+      }
+
+      if (names.has(name)) {
+        toast.error(`Field name "${name}" is duplicated`);
+        return null;
+      }
+
+      if (field.type === 'select' && (!options || options.length === 0)) {
+        toast.error(`Add options for "${label}"`);
+        return null;
+      }
+
+      names.add(name);
+      normalized.push({ ...field, label, name, options });
+    }
+
+    return normalized;
+  };
+
   const steps: { key: WizardStep; label: string; num: number }[] = [
     { key: 'campaign', label: 'Campaign', num: 1 },
     { key: 'form', label: 'Form', num: 2 },
@@ -193,75 +279,110 @@ export default function CampaignsPage() {
 
   const currentStepIndex = steps.findIndex((s) => s.key === wizardStep);
 
+  const clearFilters = () => {
+    setSearch('');
+    setFilterStatus('all');
+  };
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setSortField(field);
+    setSortDir('asc');
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => (
+    <svg className={`w-4 h-4 inline-block ml-1 ${sortField === field ? 'text-primary-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      {sortField === field && sortDir === 'desc' ? (
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      ) : (
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      )}
+    </svg>
+  );
+
   return (
     <Layout>
-      <div className="p-6 lg:p-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Campaigns</h1>
-            <p className="text-gray-500 mt-1">{canManage ? 'Manage your marketing campaigns' : 'View your assigned campaigns'}</p>
-          </div>
-          {canManage && (
-            <button
-              onClick={openWizard}
-              className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              New Campaign
-            </button>
-          )}
-        </div>
+      <div className="sleek-page p-3 lg:p-4">
 
-        {/* Filters & Search */}
-        <div className="bg-white rounded-xl shadow-sm border p-4 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden mb-3">
+          <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
+              <div className="lg:col-span-4 relative">
+                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
                   type="text"
-                  placeholder="Search campaigns..."
+                  placeholder="Search campaign"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
                 />
               </div>
-            </div>
-            <div className="flex items-center space-x-2">
+
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value as any)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
               >
-                <option value="all">All Status</option>
+                <option value="all">All status</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
-              <div className="flex border border-gray-300 rounded-lg overflow-hidden">
+
+              <div className="lg:col-span-2 flex border border-gray-300 rounded-md overflow-hidden w-fit">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-2 ${viewMode === 'grid' ? 'bg-primary-50 text-primary-600' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                  className={`px-2 py-1.5 ${viewMode === 'grid' ? 'bg-primary-50 text-primary-700' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
                   aria-label="Grid view"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                   </svg>
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-2 ${viewMode === 'list' ? 'bg-primary-50 text-primary-600' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                  className={`px-2 py-1.5 ${viewMode === 'list' ? 'bg-primary-50 text-primary-700' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
                   aria-label="List view"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                   </svg>
                 </button>
               </div>
+
+              <div className="lg:col-span-4 flex items-center justify-end gap-2 flex-wrap">
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value={12}>12</option>
+                  <option value={24}>24</option>
+                  <option value={48}>48</option>
+                </select>
+                <button
+                  onClick={clearFilters}
+                  className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                >
+                  Clear
+                </button>
+                {canManage && (
+                  <button
+                    onClick={openWizard}
+                    className="inline-flex items-center px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-xs font-semibold"
+                  >
+                    New Campaign
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-2 text-xs text-gray-500">
+              Showing {paginatedCampaigns.length} of {filteredCampaigns.length} filtered campaigns ({campaigns.length} total)
             </div>
           </div>
         </div>
@@ -293,13 +414,14 @@ export default function CampaignsPage() {
             )}
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredCampaigns.map((campaign) => (
-              <Link
-                key={campaign.id}
-                to={`/campaigns/${campaign.id}`}
-                className="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md transition-all group"
-              >
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {paginatedCampaigns.map((campaign) => (
+                <Link
+                  key={campaign.id}
+                  to={`/campaigns/${campaign.id}`}
+                  className="bg-white rounded-xl shadow-sm border p-4 hover:shadow-md transition-all group"
+                >
                 <div className="flex items-start justify-between mb-3">
                   <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center group-hover:bg-primary-100 transition-colors">
                     <span className="text-lg font-semibold text-primary-700">
@@ -337,36 +459,45 @@ export default function CampaignsPage() {
                     {campaign.manager?.name}
                   </span>
                 </div>
-              </Link>
-            ))}
-          </div>
+                </Link>
+              ))}
+            </div>
+            <div className="mt-3 bg-white rounded-xl shadow-sm border overflow-hidden">
+              <Pagination
+                page={currentPage}
+                pageSize={pageSize}
+                totalItems={filteredCampaigns.length}
+                onPageChange={setPage}
+              />
+            </div>
+          </>
         ) : (
           <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Campaign</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Manager</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Leads</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Forms</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th onClick={() => handleSort('name')} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">Campaign <SortIcon field="name" /></th>
+                  <th onClick={() => handleSort('manager')} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">Manager <SortIcon field="manager" /></th>
+                  <th onClick={() => handleSort('leads')} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">Leads <SortIcon field="leads" /></th>
+                  <th onClick={() => handleSort('forms')} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">Forms <SortIcon field="forms" /></th>
+                  <th onClick={() => handleSort('status')} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">Status <SortIcon field="status" /></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredCampaigns.map((campaign) => (
+                {paginatedCampaigns.map((campaign) => (
                   <tr key={campaign.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-2.5">
                       <Link to={`/campaigns/${campaign.id}`} className="font-medium text-gray-900 hover:text-primary-600">
                         {campaign.name}
                       </Link>
                       {campaign.description && (
-                        <p className="text-sm text-gray-500 mt-0.5">{campaign.description}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{campaign.description}</p>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{campaign.manager?.name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{campaign._count?.leads || 0}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{campaign._count?.forms || 0}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-2.5 text-sm text-gray-500">{campaign.manager?.name}</td>
+                    <td className="px-3 py-2.5 text-sm text-gray-500">{campaign._count?.leads || 0}</td>
+                    <td className="px-3 py-2.5 text-sm text-gray-500">{campaign._count?.forms || 0}</td>
+                    <td className="px-3 py-2.5">
                       <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
                         campaign.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
                       }`}>
@@ -377,6 +508,12 @@ export default function CampaignsPage() {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              page={currentPage}
+              pageSize={pageSize}
+              totalItems={filteredCampaigns.length}
+              onPageChange={setPage}
+            />
           </div>
         )}
 
@@ -497,46 +634,57 @@ export default function CampaignsPage() {
                       </div>
                       <div className="space-y-2 max-h-48 overflow-y-auto">
                         {formFields.map((field, i) => (
-                          <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
-                            <input
-                              type="text"
-                              value={field.label}
-                              onChange={(e) => updateFormField(i, 'label', e.target.value)}
-                              placeholder="Label"
-                              className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded"
-                            />
-                            <select
-                              value={field.type}
-                              onChange={(e) => updateFormField(i, 'type', e.target.value)}
-                              className="px-2 py-1.5 text-sm border border-gray-300 rounded"
-                            >
-                              <option value="text">Text</option>
-                              <option value="email">Email</option>
-                              <option value="phone">Phone</option>
-                              <option value="number">Number</option>
-                              <option value="textarea">Textarea</option>
-                              <option value="select">Dropdown</option>
-                            </select>
-                            <label className="flex items-center text-xs text-gray-500">
+                          <div key={i} className="bg-gray-50 rounded-lg p-2 space-y-2">
+                            <div className="flex items-center gap-2">
                               <input
-                                type="checkbox"
-                                checked={field.required}
-                                onChange={(e) => updateFormField(i, 'required', e.target.checked)}
-                                className="mr-1 rounded"
+                                type="text"
+                                value={field.label}
+                                onChange={(e) => updateFormField(i, 'label', e.target.value)}
+                                placeholder="Label"
+                                className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded"
                               />
-                              Req
-                            </label>
-                            {formFields.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => removeFormField(i)}
-                                className="p-1 text-red-400 hover:text-red-600"
-                                aria-label="Remove field"
+                              <select
+                                value={field.type}
+                                onChange={(e) => updateFormField(i, 'type', e.target.value)}
+                                className="px-2 py-1.5 text-sm border border-gray-300 rounded"
                               >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </button>
+                                <option value="text">Text</option>
+                                <option value="email">Email</option>
+                                <option value="phone">Phone</option>
+                                <option value="number">Number</option>
+                                <option value="textarea">Textarea</option>
+                                <option value="select">Dropdown</option>
+                              </select>
+                              <label className="flex items-center text-xs text-gray-500">
+                                <input
+                                  type="checkbox"
+                                  checked={field.required}
+                                  onChange={(e) => updateFormField(i, 'required', e.target.checked)}
+                                  className="mr-1 rounded"
+                                />
+                                Req
+                              </label>
+                              {formFields.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeFormField(i)}
+                                  className="p-1 text-red-400 hover:text-red-600"
+                                  aria-label="Remove field"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                            {field.type === 'select' && (
+                              <input
+                                type="text"
+                                value={field.options?.join(', ') || ''}
+                                onChange={(e) => updateFormField(i, 'options', e.target.value.split(','))}
+                                placeholder="Dropdown options separated by commas"
+                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                              />
                             )}
                           </div>
                         ))}

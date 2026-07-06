@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaginationDto } from '../common/pagination.dto';
 import { CreateFollowupDto } from './dto/create-followup.dto';
 import { UpdateFollowupDto } from './dto/update-followup.dto';
 
@@ -28,11 +29,15 @@ export class FollowupsService {
     });
   }
 
-  async getMyFollowups(userId: string, campaignId?: string) {
+  async getMyFollowups(userId: string, campaignId?: string, pagination?: PaginationDto) {
     const where: any = { userId };
     if (campaignId) {
       where.lead = { campaignId };
     }
+    // ✅ FIXED: Apply pagination with skip/take
+    const skip = pagination?.getSkip() || 0;
+    const take = pagination?.getTake() || 50;
+    
     return this.prisma.followup.findMany({
       where,
       include: {
@@ -45,6 +50,8 @@ export class FollowupsService {
         },
       },
       orderBy: { createdAt: 'desc' },
+      skip,
+      take,
     });
   }
 

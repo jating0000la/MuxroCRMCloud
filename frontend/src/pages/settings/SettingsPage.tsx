@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import Layout from '../../components/layout/Layout';
 import integrationService from '../../services/integrations';
+import settingsService from '../../services/settings';
+import { readBranding, saveBranding } from '../../utils/branding';
 import toast from 'react-hot-toast';
 
 export default function SettingsPage() {
@@ -12,7 +14,9 @@ export default function SettingsPage() {
   const [webappUrl, setWebappUrl] = useState('https://your-webapp.com');
 
   // Company settings
-  const [companyName, setCompanyName] = useState('Muxro CRM Cloud');
+  const initialBranding = readBranding();
+  const [companyName, setCompanyName] = useState(initialBranding.appName || 'Muxro CRM');
+  const [appLogoUrl, setAppLogoUrl] = useState(initialBranding.appLogoUrl || '');
   const [websiteLink, setWebsiteLink] = useState('https://your-company.com');
 
   // Process Sutra settings
@@ -20,61 +24,142 @@ export default function SettingsPage() {
   const [processSutraSystemName, setProcessSutraSystemName] = useState('');
 
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [testingIndiamart, setTestingIndiamart] = useState(false);
   const [testingProcessSutra, setTestingProcessSutra] = useState(false);
+  const [showIndiamartApiKey, setShowIndiamartApiKey] = useState(false);
+  const [showProcessSutraApiKey, setShowProcessSutraApiKey] = useState(false);
 
-  // Load saved settings from localStorage
   useEffect(() => {
-    try {
-      const psSettings = localStorage.getItem('processSutraSettings');
-      if (psSettings) {
-        const parsed = JSON.parse(psSettings);
-        setProcessSutraApiKey(parsed.apiKey || '');
-        setProcessSutraSystemName(parsed.systemName || '');
-      }
-
-      const imSettings = localStorage.getItem('indiamartSettings');
-      if (imSettings) {
-        const parsed = JSON.parse(imSettings);
-        setIndiamartApiKey(parsed.apiKey || '');
-        setWebappUrl(parsed.webappUrl || 'https://your-webapp.com');
-      }
-
-      const coSettings = localStorage.getItem('companySettings');
-      if (coSettings) {
-        const parsed = JSON.parse(coSettings);
-        setCompanyName(parsed.companyName || 'Muxro CRM Cloud');
-        setWebsiteLink(parsed.websiteLink || 'https://your-company.com');
-      }
-    } catch {
-      // Ignore corrupted localStorage data
-    }
+    loadSettings();
   }, []);
 
+  const normalizeUrl = (value: string): string => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  };
+
+  const isValidUrl = (value: string): boolean => {
+    if (!value) return true;
+    try {
+      const candidate = normalizeUrl(value);
+      // URL constructor provides robust validation for common website inputs.
+      new URL(candidate);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      const allSettings = await settingsService.getAllSettings(true);
+
+      allSettings.forEach((setting) => {
+        switch (setting.key) {
+          case 'indiamartApiKey':
+            setIndiamartApiKey(setting.value);
+            break;
+          case 'indiamartWebappUrl':
+            setWebappUrl(setting.value);
+            break;
+          case 'companyName':
+            setCompanyName(setting.value);
+            break;
+          case 'websiteLink':
+            setWebsiteLink(setting.value);
+            break;
+          case 'appLogoUrl':
+            setAppLogoUrl(setting.value);
+            break;
+          case 'processSutraApiKey':
+            setProcessSutraApiKey(setting.value);
+            break;
+          case 'processSutraSystemName':
+            setProcessSutraSystemName(setting.value);
+            break;
+        }
+      });
+    } catch (error: any) {
+      console.log('Settings not yet configured:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSave = async () => {
+    if (!indiamartApiKey && !processSutraApiKey && !companyName) {
+      toast.error('Enter at least one setting');
+      return;
+    }
+
+    const normalizedWebappUrl = normalizeUrl(webappUrl);
+    const normalizedAppLogoUrl = normalizeUrl(appLogoUrl);
+    const normalizedWebsiteLink = normalizeUrl(websiteLink);
+    const isMaskedPlaceholder = (value: string) => value.includes('•');
+
+    if (!isValidUrl(webappUrl) || !isValidUrl(appLogoUrl) || !isValidUrl(websiteLink)) {
+      toast.error('Please enter valid URL values');
+      return;
+    }
+
     setSaving(true);
+    const settingsToUpdate = [
+      {
+        key: 'indiamartApiKey',
+        value: isMaskedPlaceholder(indiamartApiKey) ? '' : indiamartApiKey,
+        reason: 'Updated via Settings page',
+      },
+      { key: 'indiamartWebappUrl', value: normalizedWebappUrl, reason: 'Updated via Settings page' },
+      { key: 'companyName', value: companyName, reason: 'Updated via Settings page' },
+      { key: 'appLogoUrl', value: normalizedAppLogoUrl, reason: 'Updated via Settings page' },
+      { key: 'websiteLink', value: normalizedWebsiteLink, reason: 'Updated via Settings page' },
+      {
+        key: 'processSutraApiKey',
+        value: isMaskedPlaceholder(processSutraApiKey) ? '' : processSutraApiKey,
+        reason: 'Updated via Settings page',
+      },
+      { key: 'processSutraSystemName', value: processSutraSystemName, reason: 'Updated via Settings page' },
+    ];
 
-    // Save Process Sutra settings to localStorage for Follow-up page access
-    localStorage.setItem('processSutraSettings', JSON.stringify({
-      apiKey: processSutraApiKey,
-      systemName: processSutraSystemName,
-    }));
+    try {
+      for (const setting of settingsToUpdate) {
+        if (setting.value) {
+          try {
+            await settingsService.updateSetting(setting.key, {
+              value: setting.value,
+              reason: setting.reason,
+            });
+          } catch (error: any) {
+            if (error.response?.status === 404) {
+              await settingsService.createSetting({
+                key: setting.key,
+                value: setting.value,
+                reason: setting.reason,
+              });
+            } else {
+              throw error;
+            }
+          }
+        }
+      }
 
-    // Save Indiamart settings
-    localStorage.setItem('indiamartSettings', JSON.stringify({
-      apiKey: indiamartApiKey,
-      webappUrl,
-    }));
+        setWebappUrl(normalizedWebappUrl);
+        setAppLogoUrl(normalizedAppLogoUrl);
+        setWebsiteLink(normalizedWebsiteLink);
 
-    // Save company settings
-    localStorage.setItem('companySettings', JSON.stringify({
-      companyName,
-      websiteLink,
-    }));
-
-    await new Promise((r) => setTimeout(r, 800));
-    toast.success('Settings saved successfully');
-    setSaving(false);
+        toast.success('Settings saved successfully to secure storage');
+      saveBranding({ appName: companyName || 'Muxro CRM', appLogoUrl: normalizedAppLogoUrl || '' });
+      await loadSettings();
+    } catch (error: any) {
+      console.error('Failed to save settings:', error);
+      toast.error(error.response?.data?.message || 'Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleTestIndiamart = async () => {
@@ -82,14 +167,29 @@ export default function SettingsPage() {
       toast.error('Enter Indiamart API key first');
       return;
     }
+
     setTestingIndiamart(true);
     try {
+      const unmaskedKey = indiamartApiKey.includes('•')
+        ? await settingsService.getSettingUnmasked('indiamartApiKey')
+        : indiamartApiKey;
+
       const result = await integrationService.testIndiamart({
-        apiKey: indiamartApiKey,
+        apiKey: unmaskedKey,
         webappUrl,
       });
+
       if (result.success) {
         toast.success(result.message);
+        try {
+          await settingsService.updateSetting('indiamartApiKey', {
+            value: unmaskedKey,
+            lastTestedAt: new Date().toISOString(),
+            reason: 'Connection test successful',
+          });
+        } catch (e) {
+          // Ignore timestamp update failures
+        }
       } else {
         toast.error(result.message || 'Connection failed');
       }
@@ -105,14 +205,29 @@ export default function SettingsPage() {
       toast.error('Enter Process Sutra API key and system name first');
       return;
     }
+
     setTestingProcessSutra(true);
     try {
+      const unmaskedKey = processSutraApiKey.includes('•')
+        ? await settingsService.getSettingUnmasked('processSutraApiKey')
+        : processSutraApiKey;
+
       const result = await integrationService.testProcessSutra({
-        apiKey: processSutraApiKey,
+        apiKey: unmaskedKey,
         systemName: processSutraSystemName,
       });
+
       if (result.success) {
         toast.success(result.message);
+        try {
+          await settingsService.updateSetting('processSutraApiKey', {
+            value: unmaskedKey,
+            lastTestedAt: new Date().toISOString(),
+            reason: 'Connection test successful',
+          });
+        } catch (e) {
+          // Ignore timestamp update failures
+        }
       } else {
         toast.error(result.message || 'Connection failed');
       }
@@ -123,12 +238,33 @@ export default function SettingsPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <Layout>
+        <div className="p-6 max-w-4xl mx-auto">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <svg className="animate-spin h-8 w-8 text-primary-600 mx-auto mb-2" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <p className="text-gray-600">Loading settings...</p>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
-      <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <div className="sleek-page p-6 max-w-4xl mx-auto space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-500 mt-1">Manage integrations and company details</p>
+          <p className="text-gray-500">Manage integrations and company details</p>
+        </div>
+
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800">
+          ✓ Integration keys are now encrypted and stored securely on the server. Your browser no longer stores sensitive credentials.
         </div>
 
         {/* Company Details */}
@@ -147,21 +283,35 @@ export default function SettingsPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tool Name</label>
               <input
                 type="text"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Enter company name"
+                placeholder="Enter tool name"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tool Logo URL</label>
+              <input
+                type="text"
+                inputMode="url"
+                value={appLogoUrl}
+                onChange={(e) => setAppLogoUrl(e.target.value)}
+                onBlur={() => setAppLogoUrl((value) => normalizeUrl(value))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="https://your-domain.com/logo.png"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Website Link</label>
               <input
-                type="url"
+                type="text"
+                inputMode="url"
                 value={websiteLink}
                 onChange={(e) => setWebsiteLink(e.target.value)}
+                onBlur={() => setWebsiteLink((value) => normalizeUrl(value))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="https://your-company.com"
               />
@@ -186,21 +336,32 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Indiamart API Key</label>
-              <input
-                type="password"
-                value={indiamartApiKey}
-                onChange={(e) => setIndiamartApiKey(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Enter your Indiamart API key"
-              />
+              <div className="relative">
+                <input
+                  type={showIndiamartApiKey ? 'text' : 'password'}
+                  value={indiamartApiKey}
+                  onChange={(e) => setIndiamartApiKey(e.target.value)}
+                  className="w-full px-3 py-2 pr-16 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Enter your Indiamart API key"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowIndiamartApiKey((value) => !value)}
+                  className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-gray-500 hover:text-gray-700"
+                >
+                  {showIndiamartApiKey ? 'Hide' : 'Show'}
+                </button>
+              </div>
               <p className="text-xs text-gray-400 mt-1">Found in your Indiamart seller dashboard</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Webapp URL</label>
               <input
-                type="url"
+                type="text"
+                inputMode="url"
                 value={webappUrl}
                 onChange={(e) => setWebappUrl(e.target.value)}
+                onBlur={() => setWebappUrl((value) => normalizeUrl(value))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 placeholder="https://your-webapp.com"
               />
@@ -251,13 +412,22 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Process Sutra API Key</label>
-              <input
-                type="password"
-                value={processSutraApiKey}
-                onChange={(e) => setProcessSutraApiKey(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Enter your Process Sutra API key"
-              />
+              <div className="relative">
+                <input
+                  type={showProcessSutraApiKey ? 'text' : 'password'}
+                  value={processSutraApiKey}
+                  onChange={(e) => setProcessSutraApiKey(e.target.value)}
+                  className="w-full px-3 py-2 pr-16 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Enter your Process Sutra API key"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowProcessSutraApiKey((value) => !value)}
+                  className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-gray-500 hover:text-gray-700"
+                >
+                  {showProcessSutraApiKey ? 'Hide' : 'Show'}
+                </button>
+              </div>
               <p className="text-xs text-gray-400 mt-1">Found in your Process Sutra admin panel</p>
             </div>
             <div>

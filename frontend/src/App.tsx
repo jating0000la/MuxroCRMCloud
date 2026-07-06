@@ -26,25 +26,28 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <Navigate to="/dashboard" />;
 }
 
-function ManagerRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  if (user?.role === 'ADMIN' || user?.role === 'MANAGER') {
-    return <>{children}</>;
-  }
-  return <Navigate to="/dashboard" />;
-}
-
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Toaster position="top-right" />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              borderRadius: '10px',
+              border: '1px solid #dce7ff',
+              background: '#ffffff',
+              color: '#1e2a44',
+              boxShadow: '0 10px 30px rgba(33, 49, 93, 0.12)',
+            },
+          }}
+        />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/form/:slug" element={<PublicFormPage />} />
           <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
-          <Route path="/campaigns" element={<PrivateRoute><ManagerRoute><CampaignsPage /></ManagerRoute></PrivateRoute>} />
-          <Route path="/campaigns/:id" element={<PrivateRoute><ManagerRoute><CampaignDetailPage /></ManagerRoute></PrivateRoute>} />
+          <Route path="/campaigns" element={<PrivateRoute><AdminRoute><CampaignsPage /></AdminRoute></PrivateRoute>} />
+          <Route path="/campaigns/:id" element={<PrivateRoute><AdminRoute><CampaignDetailPage /></AdminRoute></PrivateRoute>} />
           <Route path="/followups" element={<PrivateRoute><FollowupDashboardPage /></PrivateRoute>} />
           <Route path="/dnd" element={<PrivateRoute><DndPage /></PrivateRoute>} />
           <Route path="/admin/users" element={<PrivateRoute><AdminRoute><AdminUsersPage /></AdminRoute></PrivateRoute>} />

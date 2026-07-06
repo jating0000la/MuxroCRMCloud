@@ -20,7 +20,7 @@ export class IntegrationsController {
   ) {}
 
   @Post('process-sutra/start-flow')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Start a Process Sutra flow' })
   @ApiResponse({ status: 200, description: 'Flow started successfully' })
@@ -41,7 +41,7 @@ export class IntegrationsController {
   }
 
   @Post('indiamart/fetch-leads')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Fetch recent leads from Indiamart' })
   @ApiResponse({ status: 200, description: 'Leads fetched successfully' })
@@ -52,7 +52,7 @@ export class IntegrationsController {
   }
 
   @Post('indiamart/test-connection')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Test Indiamart API connection' })
   @ApiResponse({ status: 200, description: 'Connection test result' })
@@ -74,7 +74,7 @@ export class IntegrationsController {
   }
 
   @Post('process-sutra/test-connection')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Test Process Sutra API connection' })
   @ApiResponse({ status: 200, description: 'Connection test result' })

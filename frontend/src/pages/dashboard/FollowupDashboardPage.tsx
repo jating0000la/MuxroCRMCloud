@@ -6,9 +6,13 @@ import { statusService } from '../../services/statuses';
 import integrationService from '../../services/integrations';
 import { Lead, Campaign, CampaignStatus } from '../../types';
 import Layout from '../../components/layout/Layout';
+import Pagination from '../../components/common/Pagination';
 import LeadDetailDialog from '../../components/leads/LeadDetailDialog';
+import { downloadCsv } from '../../utils/csv';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+
+const DEFAULT_PAGE_SIZE = 50;
 
 type SortField = 'name' | 'campaign' | 'status' | 'doer' | 'dueDate' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
@@ -21,6 +25,7 @@ export default function FollowupDashboardPage() {
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [dndFilter, setDndFilter] = useState<'all' | 'dnd' | 'no_dnd'>('all');
+  const [dueFilter, setDueFilter] = useState<'all' | 'overdue' | 'today' | 'next3' | 'completed'>('all');
   const [sortField, setSortField] = useState<SortField>('updatedAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [loading, setLoading] = useState(true);
@@ -28,6 +33,8 @@ export default function FollowupDashboardPage() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [campaignStatuses, setCampaignStatuses] = useState<CampaignStatus[]>([]);
   const [startingFlow, setStartingFlow] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   // Process Sutra settings (loaded from localStorage or settings page)
   const getProcessSutraSettings = () => {
@@ -45,6 +52,7 @@ export default function FollowupDashboardPage() {
   }, [selectedCampaign]);
 
   const loadData = async () => {
+    setLoading(true);
     setError(null);
     try {
       const [leadsData, campaignsData] = await Promise.all([
@@ -121,7 +129,23 @@ export default function FollowupDashboardPage() {
         dndFilter === 'all' ||
         (dndFilter === 'dnd' && lead.dnd) ||
         (dndFilter === 'no_dnd' && !lead.dnd);
-      return matchSearch && matchSource && matchDnd;
+
+      const nextCall = lead.followups?.[0]?.nextCallDate ? new Date(lead.followups[0].nextCallDate) : null;
+      const now = new Date();
+      const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      const after3 = new Date(now);
+      after3.setDate(now.getDate() + 3);
+      const isCompleted = (lead.status?.label || '').toLowerCase().includes('completed');
+
+      const matchDue =
+        dueFilter === 'all' ||
+        (dueFilter === 'overdue' && !!nextCall && nextCall < startToday && !isCompleted) ||
+        (dueFilter === 'today' && !!nextCall && nextCall >= startToday && nextCall <= endToday) ||
+        (dueFilter === 'next3' && !!nextCall && nextCall > endToday && nextCall <= after3) ||
+        (dueFilter === 'completed' && isCompleted);
+
+      return matchSearch && matchSource && matchDnd && matchDue;
     })
     .sort((a, b) => {
       let comparison = 0;
@@ -152,6 +176,14 @@ export default function FollowupDashboardPage() {
       }
       return sortDir === 'asc' ? comparison : -comparison;
     });
+
+  const totalPages = Math.max(1, Math.ceil(filteredLeads.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedLeads = filteredLeads.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedCampaign, search, sourceFilter, dndFilter, dueFilter, pageSize]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -191,14 +223,15 @@ export default function FollowupDashboardPage() {
       l.status?.label || '',
     ]);
 
-    const csvContent = [headers, ...rows].map((row) => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `leads-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(`leads-${format(new Date(), 'yyyy-MM-dd')}.csv`, headers, rows);
+  };
+
+  const clearFilters = () => {
+    setSearch('');
+    setSourceFilter('');
+    setDndFilter('all');
+    setDueFilter('all');
+    setSelectedCampaign('');
   };
 
   return (
@@ -218,81 +251,7 @@ export default function FollowupDashboardPage() {
           </div>
         </div>
       )}
-      <div className="p-6 lg:p-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {user?.role === 'USER' ? 'My Leads' : 'All Leads'}
-            </h1>
-            <p className="text-gray-500 mt-1">
-              {user?.role === 'USER' ? 'View and manage your assigned leads' : 'Manage and track all leads across campaigns'}
-            </p>
-          </div>
-          <button
-            onClick={exportToCSV}
-            className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm"
-          >
-            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export CSV
-          </button>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm border p-4 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search by name, email, or phone..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-            <select
-              value={selectedCampaign}
-              onChange={(e) => setSelectedCampaign(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">All Campaigns</option>
-              {campaigns.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <select
-              value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">All Sources</option>
-              {uniqueSources.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-            <select
-              value={dndFilter}
-              onChange={(e) => setDndFilter(e.target.value as any)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="all">All Leads</option>
-              <option value="no_dnd">Non-DND Only</option>
-              <option value="dnd">DND Only</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Results Count */}
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-gray-500">
-            Showing {filteredLeads.length} of {leads.length} leads
-          </p>
-        </div>
+      <div className="sleek-page p-3 lg:p-4">
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -312,55 +271,151 @@ export default function FollowupDashboardPage() {
           </div>
         ) : (
           <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
+                <div className="lg:col-span-3 relative">
+                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search lead"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+
+                <select
+                  value={selectedCampaign}
+                  onChange={(e) => setSelectedCampaign(e.target.value)}
+                  className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">Campaign</option>
+                  {campaigns.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={sourceFilter}
+                  onChange={(e) => setSourceFilter(e.target.value)}
+                  className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">Source</option>
+                  {uniqueSources.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={dndFilter}
+                  onChange={(e) => setDndFilter(e.target.value as any)}
+                  className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="all">All</option>
+                  <option value="no_dnd">Non-DND</option>
+                  <option value="dnd">DND</option>
+                </select>
+
+                <div className="lg:col-span-3 flex items-center justify-end gap-2">
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                  <button
+                    onClick={clearFilters}
+                    className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    onClick={exportToCSV}
+                    className="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                  >
+                    Export
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'overdue', label: 'Overdue' },
+                  { key: 'today', label: 'Today' },
+                  { key: 'next3', label: 'Next 3 Days' },
+                  { key: 'completed', label: 'Completed' },
+                ].map((chip) => (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    onClick={() => setDueFilter(chip.key as any)}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md border ${dueFilter === chip.key ? 'border-primary-300 bg-primary-100 text-primary-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-2 text-xs text-gray-500">
+                Showing {paginatedLeads.length} of {filteredLeads.length} filtered leads ({leads.length} total)
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lead ID</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Lead ID</th>
                     <th
                       onClick={() => handleSort('campaign')}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                     >
                       Campaign <SortIcon field="campaign" />
                     </th>
                     <th
                       onClick={() => handleSort('name')}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                     >
                       Name <SortIcon field="name" />
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
                     <th
                       onClick={() => handleSort('dueDate')}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                     >
                       Due Date <SortIcon field="dueDate" />
                     </th>
                     <th
                       onClick={() => handleSort('updatedAt')}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                     >
                       Updated <SortIcon field="updatedAt" />
                     </th>
                     <th
                       onClick={() => handleSort('status')}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                     >
                       Status <SortIcon field="status" />
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {filteredLeads.map((lead) => (
+                  {paginatedLeads.map((lead) => (
                     <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 text-xs text-gray-500 font-mono">{lead.id.slice(0, 8)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-500 truncate max-w-[120px]">{lead.campaign?.name}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2 text-xs text-gray-500 font-mono">{lead.id.slice(0, 8)}</td>
+                      <td className="px-3 py-2 text-sm text-gray-500 truncate max-w-[120px]">{lead.campaign?.name}</td>
+                      <td className="px-3 py-2">
                         <div className="flex items-center">
-                          <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${lead.dnd ? 'bg-red-100' : 'bg-primary-100'}`}>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${lead.dnd ? 'bg-red-100' : 'bg-primary-100'}`}>
                             {lead.dnd ? (
-                              <svg className="w-3.5 h-3.5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-3 h-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                               </svg>
                             ) : (
@@ -368,13 +423,13 @@ export default function FollowupDashboardPage() {
                             )}
                           </div>
                           <div className="ml-2 min-w-0">
-                            <p className="font-medium text-gray-900 truncate text-sm">{lead.name}</p>
+                            <p className="font-medium text-gray-900 truncate text-sm leading-tight">{lead.name}</p>
                             {lead.dnd && <span className="text-xs text-red-600 font-medium">DND</span>}
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{lead.phone || '-'}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2 text-sm text-gray-700">{lead.phone || '-'}</td>
+                      <td className="px-3 py-2">
                         {lead.followups?.[0]?.nextCallDate ? (
                           <span className={`text-xs font-medium ${
                             new Date(lead.followups[0].nextCallDate) < new Date()
@@ -389,8 +444,8 @@ export default function FollowupDashboardPage() {
                           <span className="text-gray-400 text-xs">-</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{format(new Date(lead.updatedAt), 'MMM d, yyyy')}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2 text-xs text-gray-500">{format(new Date(lead.updatedAt), 'MMM d, yyyy')}</td>
+                      <td className="px-3 py-2">
                         {lead.status ? (
                           <span
                             className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
@@ -402,7 +457,7 @@ export default function FollowupDashboardPage() {
                           <span className="text-gray-400 text-xs">-</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2">
                         <div className="flex items-center justify-end gap-1">
                           {lead.phone && (
                             <a
@@ -470,6 +525,12 @@ export default function FollowupDashboardPage() {
                 </tbody>
               </table>
             </div>
+            <Pagination
+              page={currentPage}
+              pageSize={pageSize}
+              totalItems={filteredLeads.length}
+              onPageChange={setPage}
+            />
           </div>
         )}
       </div>

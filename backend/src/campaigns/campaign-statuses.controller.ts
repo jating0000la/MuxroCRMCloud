@@ -21,7 +21,7 @@ export class CampaignStatusesController {
   }
 
   @Post()
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Create a new status' })
   create(
     @Param('campaignId') campaignId: string,
@@ -31,7 +31,7 @@ export class CampaignStatusesController {
   }
 
   @Put(':id')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Update a status' })
   update(
     @Param('id') id: string,
@@ -41,7 +41,7 @@ export class CampaignStatusesController {
   }
 
   @Delete(':id')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Delete a status' })
   remove(@Param('id') id: string) {
     return this.statusesService.remove(id);

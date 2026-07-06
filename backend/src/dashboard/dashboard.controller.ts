@@ -46,7 +46,14 @@ export class DashboardController {
   @Get('user-conversion')
   @ApiOperation({ summary: 'Get user-wise conversion ratio' })
   @ApiQuery({ name: 'campaignId', required: false })
-  getUserConversion(@Request() req, @Query('campaignId') campaignId?: string) {
-    return this.dashboardService.getUserConversion(req.user.id, req.user.role, campaignId);
+  @ApiQuery({ name: 'startDate', required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'YYYY-MM-DD' })
+  getUserConversion(
+    @Request() req,
+    @Query('campaignId') campaignId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.dashboardService.getUserConversion(req.user.id, req.user.role, campaignId, startDate, endDate);
   }
 }

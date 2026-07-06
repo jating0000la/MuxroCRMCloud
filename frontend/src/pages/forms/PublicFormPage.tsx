@@ -4,6 +4,40 @@ import { formService } from '../../services/forms';
 import { Form, FormField } from '../../types';
 import toast from 'react-hot-toast';
 
+type FormDesignTheme = 'ocean' | 'sunset' | 'forest' | 'royal';
+type FormDesignLayout = 'centered' | 'split';
+type FormButtonStyle = 'solid' | 'gradient' | 'outline';
+type FormRadiusStyle = 'soft' | 'rounded' | 'pill';
+
+interface FormDesign {
+  theme: FormDesignTheme;
+  layout: FormDesignLayout;
+  buttonStyle: FormButtonStyle;
+  radius: FormRadiusStyle;
+  showProgress: boolean;
+  customColor: string;
+}
+
+const DEFAULT_FORM_DESIGN: FormDesign = {
+  theme: 'ocean',
+  layout: 'centered',
+  buttonStyle: 'gradient',
+  radius: 'rounded',
+  showProgress: true,
+  customColor: '#0ea5e9',
+};
+
+const extractPublicFormConfig = (allFields: FormField[]) => {
+  const metaField = allFields.find((f) => f.type === '__design_meta' || f.name === '__form_meta') as any;
+  const fields = allFields.filter((f) => f.type !== '__design_meta' && f.name !== '__form_meta');
+  const design = {
+    ...DEFAULT_FORM_DESIGN,
+    ...(metaField?.meta?.design || {}),
+  } as FormDesign;
+  const description = metaField?.meta?.description || '';
+  return { fields, design, description };
+};
+
 export default function PublicFormPage() {
   const { slug } = useParams<{ slug: string }>();
   const [form, setForm] = useState<Form | null>(null);
@@ -31,7 +65,7 @@ export default function PublicFormPage() {
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
-    const fields = (form?.fields as FormField[]) || [];
+    const fields = extractPublicFormConfig((form?.fields as FormField[]) || []).fields;
 
     fields.forEach((field) => {
       const value = formData[field.name];
@@ -78,7 +112,7 @@ export default function PublicFormPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+      <div className="sleek-page min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600 mx-auto" />
           <p className="mt-4 text-gray-500">Loading form...</p>
@@ -89,7 +123,7 @@ export default function PublicFormPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+      <div className="sleek-page min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
         <div className="text-center max-w-md">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,7 +139,7 @@ export default function PublicFormPage() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+      <div className="sleek-page min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
         <div className="max-w-md w-full text-center">
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -132,10 +166,66 @@ export default function PublicFormPage() {
     );
   }
 
-  const fields = (form?.fields as FormField[]) || [];
+  const { fields, design, description } = extractPublicFormConfig((form?.fields as FormField[]) || []);
   const progress = fields.length > 0
     ? Math.round((Object.keys(formData).filter((k) => formData[k] && formData[k].toString().trim() !== '').length / fields.length) * 100)
     : 0;
+
+  const themeClasses: Record<FormDesignTheme, { page: string; card: string; accent: string; title: string; muted: string }> = {
+    ocean: {
+      page: 'from-sky-100 via-cyan-50 to-blue-100',
+      card: 'border-cyan-200 bg-white/95',
+      accent: 'from-sky-600 to-cyan-500',
+      title: 'text-slate-900',
+      muted: 'text-slate-600',
+    },
+    sunset: {
+      page: 'from-rose-100 via-orange-50 to-amber-100',
+      card: 'border-rose-200 bg-white/95',
+      accent: 'from-rose-600 to-orange-500',
+      title: 'text-slate-900',
+      muted: 'text-slate-600',
+    },
+    forest: {
+      page: 'from-emerald-100 via-lime-50 to-teal-100',
+      card: 'border-emerald-200 bg-white/95',
+      accent: 'from-emerald-600 to-lime-500',
+      title: 'text-slate-900',
+      muted: 'text-slate-600',
+    },
+    royal: {
+      page: 'from-indigo-100 via-fuchsia-50 to-violet-100',
+      card: 'border-indigo-200 bg-white/95',
+      accent: 'from-indigo-600 to-fuchsia-500',
+      title: 'text-slate-900',
+      muted: 'text-slate-600',
+    },
+  };
+
+  const radiusClass = design.radius === 'pill' ? 'rounded-3xl' : design.radius === 'soft' ? 'rounded-xl' : 'rounded-2xl';
+  const activeTheme = themeClasses[design.theme];
+  const validCustomColor = /^#([0-9a-fA-F]{6})$/.test(design.customColor || '') ? design.customColor : null;
+  const accentStyle = validCustomColor
+    ? { background: `linear-gradient(135deg, ${validCustomColor}, ${validCustomColor}cc)` }
+    : undefined;
+  const buttonStyle: React.CSSProperties | undefined =
+    design.buttonStyle === 'gradient'
+      ? validCustomColor
+        ? { background: `linear-gradient(90deg, ${validCustomColor}, ${validCustomColor}cc)` }
+        : undefined
+      : design.buttonStyle === 'solid'
+      ? validCustomColor
+        ? { backgroundColor: validCustomColor }
+        : undefined
+      : validCustomColor
+      ? { borderColor: validCustomColor, color: validCustomColor }
+      : undefined;
+  const buttonClass =
+    design.buttonStyle === 'outline'
+      ? 'border border-slate-300 text-slate-700 hover:bg-slate-100 bg-white'
+      : design.buttonStyle === 'solid'
+      ? 'bg-slate-900 text-white hover:bg-slate-800'
+      : `bg-gradient-to-r ${themeClasses[design.theme].accent} text-white hover:opacity-95`;
 
   const renderField = (field: FormField) => {
     const hasError = !!errors[field.name];
@@ -211,30 +301,6 @@ export default function PublicFormPage() {
                 <span className="text-sm text-gray-700">{opt}</span>
               </label>
             ))}
-          </div>
-        );
-
-      case 'file':
-        return (
-          <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-            hasError ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-gray-400'
-          }`}>
-            <svg className="w-10 h-10 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-            <input
-              type="file"
-              onChange={(e) => handleChange(field.name, e.target.files?.[0]?.name || '')}
-              className="hidden"
-              id={`file-${field.name}`}
-            />
-            <label htmlFor={`file-${field.name}`} className="cursor-pointer">
-              <span className="text-sm text-primary-600 hover:text-primary-700 font-medium">Click to upload</span>
-              <span className="text-sm text-gray-500 ml-1">or drag and drop</span>
-            </label>
-            {formData[field.name] && (
-              <p className="mt-2 text-sm text-gray-600">{formData[field.name]}</p>
-            )}
           </div>
         );
 
@@ -406,35 +472,54 @@ export default function PublicFormPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
-      <div className="max-w-lg mx-auto">
+    <div className={`sleek-page min-h-screen bg-gradient-to-br ${activeTheme.page} py-8 px-4`}>
+      <div className={`mx-auto ${design.layout === 'split' ? 'max-w-5xl grid grid-cols-1 lg:grid-cols-5 gap-6' : 'max-w-lg'}`}>
+        {design.layout === 'split' && (
+          <aside className={`lg:col-span-2 ${radiusClass} border ${activeTheme.card} p-6 shadow-lg h-fit`}>
+            <div className={`w-12 h-12 bg-gradient-to-br ${activeTheme.accent} rounded-xl flex items-center justify-center mb-4 shadow-md`} style={accentStyle}>
+              <span className="text-xl font-bold text-white">C</span>
+            </div>
+            <h2 className={`text-2xl font-bold ${activeTheme.title}`}>{form?.title}</h2>
+            <p className={`mt-2 text-sm ${activeTheme.muted}`}>{description || 'Please share your details. Our team will contact you soon.'}</p>
+            <div className="mt-6 space-y-2 text-sm text-slate-600">
+              <p>Fast response from our team</p>
+              <p>Secure data handling</p>
+              <p>Quick callback and assistance</p>
+            </div>
+          </aside>
+        )}
+
+        <div className={design.layout === 'split' ? 'lg:col-span-3' : ''}>
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+          <div className={`w-12 h-12 bg-gradient-to-br ${activeTheme.accent} rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg`} style={accentStyle}>
             <span className="text-xl font-bold text-white">C</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">{form?.title}</h1>
+          <h1 className={`text-2xl font-bold ${activeTheme.title}`}>{form?.title}</h1>
+          {description && <p className={`mt-2 text-sm ${activeTheme.muted}`}>{description}</p>}
           {(form as any)?.campaign?.name && (
-            <p className="text-gray-500 mt-1">{(form as any).campaign.name}</p>
+            <p className={`mt-1 text-sm ${activeTheme.muted}`}>{(form as any).campaign.name}</p>
           )}
         </div>
 
         {/* Progress Bar */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
-            <span>Progress</span>
-            <span>{progress}%</span>
+        {design.showProgress && (
+          <div className="mb-6">
+            <div className={`flex items-center justify-between text-sm ${activeTheme.muted} mb-2`}>
+              <span>Progress</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="w-full bg-white/70 rounded-full h-2 border border-white/60 overflow-hidden">
+              <div
+                className={`bg-gradient-to-r ${activeTheme.accent} h-2 rounded-full transition-all duration-300`}
+                style={{ ...(accentStyle || {}), width: `${progress}%` }}
+              />
+            </div>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
+        )}
 
         {/* Form */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
+        <div className={`border ${activeTheme.card} ${radiusClass} shadow-xl p-6 sm:p-8 backdrop-blur`}>
           <form onSubmit={handleSubmit} className="space-y-5">
             {fields.map((field, index) => (
               <div key={field.name}>
@@ -452,7 +537,8 @@ export default function PublicFormPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 px-4 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className={`w-full py-3 px-4 font-medium ${radiusClass} focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${buttonClass}`}
+              style={buttonStyle}
             >
               {submitting ? (
                 <span className="flex items-center justify-center">
@@ -470,9 +556,10 @@ export default function PublicFormPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-xs text-gray-400 mt-6">
-          Powered by Muxro CRM Cloud
+        <p className={`text-center text-xs ${activeTheme.muted} mt-6`}>
+          Copyright by Muxro Technologies 2026
         </p>
+        </div>
       </div>
     </div>
   );

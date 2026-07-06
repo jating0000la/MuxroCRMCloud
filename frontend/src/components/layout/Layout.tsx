@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import settingsService from '../../services/settings';
+import { brandingFromSettings, readBranding, saveBranding } from '../../utils/branding';
 
-type NavRole = 'ALL' | 'ADMIN' | 'MANAGER' | 'USER' | 'ADMIN_MANAGER';
+type NavRole = 'ALL' | 'ADMIN' | 'USER';
 
 const navItems: Array<{
   label: string;
@@ -28,7 +30,7 @@ const navItems: Array<{
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
       </svg>
     ),
-    roles: ['ADMIN_MANAGER'],
+    roles: ['ADMIN'],
   },
   {
     label: 'Follow-ups',
@@ -63,47 +65,29 @@ const navItems: Array<{
   },
 ];
 
-interface SidebarContentProps {
-  collapsed: boolean;
-  filteredNav: typeof navItems;
-  currentPath: string;
-}
-
-function SidebarContent({ collapsed, filteredNav, currentPath }: SidebarContentProps) {
+function BottomBar({ filteredNav, currentPath }: { filteredNav: typeof navItems; currentPath: string }) {
   return (
-    <>
-      <div className={`p-4 border-b flex items-center ${collapsed ? 'justify-center' : ''}`}>
-        <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-          C
-        </div>
-        {!collapsed && <span className="ml-3 font-bold text-lg text-gray-800">Muxro CRM Cloud</span>}
-      </div>
-      <nav className="p-3 space-y-1">
-        {filteredNav.map((item) => {
+    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-primary-100 bg-white/95 backdrop-blur-md">
+      <div className="mx-auto max-w-6xl px-2 sm:px-4">
+        <div className="flex items-center justify-center gap-1 sm:gap-2 overflow-x-auto py-2">
+          {filteredNav.map((item) => {
           const isActive = currentPath === item.path || currentPath.startsWith(item.path + '/');
           return (
             <Link
               key={item.path}
               to={item.path}
-              className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                isActive
-                  ? 'bg-primary-50 text-primary-700 border-l-4 border-primary-600'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              } ${collapsed ? 'justify-center' : ''}`}
-              title={collapsed ? item.label : undefined}
+              className={`flex min-w-[74px] sm:min-w-[96px] flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] sm:text-xs font-semibold transition-colors ${
+                isActive ? 'text-primary-700 bg-primary-50 border border-primary-200' : 'text-slate-500 hover:text-slate-700'
+              }`}
             >
-              <span className={isActive ? 'text-primary-600' : 'text-gray-400'}>{item.icon}</span>
-              {!collapsed && <span className="ml-3">{item.label}</span>}
+              <span className={isActive ? 'text-primary-600' : 'text-slate-400'}>{item.icon}</span>
+              <span className="leading-none">{item.label}</span>
             </Link>
           );
-        })}
-      </nav>
-      {!collapsed && (
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-gray-50">
-          <div className="text-xs text-gray-400 text-center">CRM v1.0</div>
+          })}
         </div>
-      )}
-    </>
+      </div>
+    </nav>
   );
 }
 
@@ -111,9 +95,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [density, setDensity] = useState<'compact' | 'comfortable'>(() => {
+    const saved = localStorage.getItem('uiDensity');
+    return saved === 'comfortable' ? 'comfortable' : 'compact';
+  });
+  const [branding, setBranding] = useState(readBranding());
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -127,8 +114,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
+    document.body.setAttribute('data-density', density);
+    localStorage.setItem('uiDensity', density);
+  }, [density]);
+
+  useEffect(() => {
+    let active = true;
+    const loadBranding = async () => {
+      try {
+        const settings = await settingsService.getAllSettings(true);
+        const nextBranding = brandingFromSettings(settings);
+        if (!active) return;
+        setBranding(nextBranding);
+        saveBranding(nextBranding);
+      } catch {
+        // Keep local branding fallback when settings are unavailable.
+      }
+    };
+    loadBranding();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -137,135 +144,134 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const filteredNav = navItems.filter((item) => {
     if (!item.roles || item.roles.includes('ALL')) return true;
-    if (item.roles.includes('ADMIN_MANAGER')) {
-      return user?.role === 'ADMIN' || user?.role === 'MANAGER';
-    }
     if (item.roles.includes(user?.role as any)) return true;
     return false;
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Desktop Sidebar */}
-      <aside
-        className={`hidden lg:flex flex-col bg-white border-r transition-all duration-300 ${
-          collapsed ? 'w-16' : 'w-64'
-        } fixed h-full z-30`}
-      >
-        <SidebarContent collapsed={collapsed} filteredNav={filteredNav} currentPath={location.pathname} />
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="absolute -right-3 top-20 bg-white border rounded-full p-1 shadow-sm hover:bg-gray-50"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          <svg
-            className={`w-4 h-4 text-gray-500 transition-transform ${collapsed ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-      </aside>
-
-      {/* Mobile Sidebar Overlay */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-          <aside className="fixed left-0 top-0 bottom-0 w-64 bg-white shadow-xl z-50">
-            <SidebarContent collapsed={false} filteredNav={filteredNav} currentPath={location.pathname} />
-          </aside>
-        </div>
-      )}
-
+    <div className="min-h-screen bg-transparent flex">
       {/* Main Content */}
-      <div className={`flex-1 flex flex-col ${collapsed ? 'lg:ml-16' : 'lg:ml-64'} transition-all duration-300`}>
+      <div className="flex-1 flex flex-col transition-all duration-300">
         {/* Header */}
-        <header className="bg-white border-b sticky top-0 z-20">
-          <div className="flex items-center justify-between px-4 py-3">
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => setMobileOpen(true)}
-                className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
-                aria-label="Open menu"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-              <h2 className="text-lg font-semibold text-gray-800">
-                {filteredNav.find((item) => item.path === location.pathname)?.label || 'Muxro CRM Cloud'}
-              </h2>
-            </div>
-
-            {/* User Menu */}
-            <div className="relative" ref={userMenuRef}>
-              <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50"
-                aria-label="User menu"
-                aria-expanded={userMenuOpen}
-              >
-                <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-primary-700">
-                    {user?.name?.charAt(0)?.toUpperCase()}
-                  </span>
-                </div>
-                <div className="hidden sm:block text-left">
-                  <div className="text-sm font-medium text-gray-700">{user?.name}</div>
-                  <div className="text-xs text-gray-400">{user?.role}</div>
-                </div>
-                <svg
-                  className={`w-4 h-4 text-gray-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border py-1 z-50">
-                  <div className="px-4 py-3 border-b">
-                    <div className="font-medium text-gray-900">{user?.name}</div>
-                    <div className="text-sm text-gray-500">{user?.email || user?.username}</div>
-                    <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-primary-100 text-primary-700">
-                      {user?.role}
-                    </span>
-                  </div>
-                  {user?.role === 'ADMIN' && (
-                    <Link
-                      to="/settings"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
-                    >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      Settings
-                    </Link>
+        <header className="sticky top-0 z-20 border-b border-primary-100/90 bg-white/90 backdrop-blur-xl">
+          <div className="h-1 w-full bg-gradient-to-r from-primary-600 via-primary-400 to-primary-700" />
+          <div className="mx-auto max-w-7xl px-3 sm:px-4 py-2.5">
+            <div className="rounded-xl border border-primary-100/80 bg-white/80 px-3 py-2 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {branding.appLogoUrl ? (
+                    <img
+                      src={branding.appLogoUrl}
+                      alt="App logo"
+                      className="h-8 w-8 rounded-lg object-cover border border-primary-100 bg-white"
+                    />
+                  ) : (
+                    <div className="h-8 w-8 rounded-lg bg-primary-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                      {(branding.appName || 'M').charAt(0).toUpperCase()}
+                    </div>
                   )}
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    Sign out
-                  </button>
+                  <div className="min-w-0">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500 font-semibold truncate">{branding.appName}</p>
+                    <h2 className="text-sm sm:text-base font-bold text-slate-800 tracking-tight truncate">
+                      {filteredNav.find((item) => item.path === location.pathname)?.label || 'Workspace'}
+                    </h2>
+                  </div>
                 </div>
-              )}
+
+                {/* User Menu */}
+                <div className="flex items-center gap-2">
+                  <div className="hidden sm:flex items-center rounded-lg border border-primary-100 bg-white p-1">
+                    <button
+                      type="button"
+                      onClick={() => setDensity('compact')}
+                      className={`px-2 py-1 text-[11px] font-semibold rounded ${density === 'compact' ? 'bg-primary-100 text-primary-700' : 'text-slate-500 hover:bg-slate-100'}`}
+                    >
+                      Compact
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDensity('comfortable')}
+                      className={`px-2 py-1 text-[11px] font-semibold rounded ${density === 'comfortable' ? 'bg-primary-100 text-primary-700' : 'text-slate-500 hover:bg-slate-100'}`}
+                    >
+                      Comfortable
+                    </button>
+                  </div>
+
+                <div className="relative" ref={userMenuRef}>
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="flex items-center space-x-2 rounded-lg border border-primary-100 bg-white px-2 py-1.5 hover:bg-primary-50/70"
+                    aria-label="User menu"
+                    aria-expanded={userMenuOpen}
+                  >
+                    <div className="w-7 h-7 bg-primary-100 rounded-full flex items-center justify-center">
+                      <span className="text-xs font-bold text-primary-700">
+                        {user?.name?.charAt(0)?.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="hidden sm:block text-left leading-tight">
+                      <div className="text-xs font-semibold text-slate-700 truncate max-w-[140px]">{user?.name}</div>
+                      <div className="text-[11px] text-slate-400">{user?.role}</div>
+                    </div>
+                    <svg
+                      className={`w-4 h-4 text-slate-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {userMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-primary-100 py-1 z-50">
+                      <div className="px-4 py-3 border-b border-primary-100">
+                        <div className="font-semibold text-slate-900">{user?.name}</div>
+                        <div className="text-sm text-slate-500">{user?.email || user?.username}</div>
+                        <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-primary-100 text-primary-700">
+                          {user?.role}
+                        </span>
+                      </div>
+                      {user?.role === 'ADMIN' && (
+                        <Link
+                          to="/settings"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-primary-50 flex items-center"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          Settings
+                        </Link>
+                      )}
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Sign out
+                      </button>
+                    </div>
+                  )}
+                </div>
+                </div>
+              </div>
             </div>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-y-scroll overflow-x-hidden animate-fade-up pb-24 [scrollbar-gutter:stable]">{children}</main>
+        <footer className="px-4 pb-20 text-center text-xs text-slate-500">
+          Copyright by Muxro Technologies 2026
+        </footer>
       </div>
+
+      {/* Global Bottom Bar */}
+      <BottomBar filteredNav={filteredNav} currentPath={location.pathname} />
     </div>
   );
 }

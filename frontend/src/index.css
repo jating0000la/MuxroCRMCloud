@@ -1,7 +1,153 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --app-bg: #f5f7fb;
+  --app-surface: #ffffff;
+  --app-surface-soft: #f8fafe;
+  --app-border: #d9e2f2;
+  --app-text: #1e2a44;
+  --app-muted: #64718d;
+  --app-accent: #466fce;
+  --app-accent-soft: #dce7ff;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  height: 100%;
+}
+
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Manrope', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: radial-gradient(circle at top left, #ffffff 0%, var(--app-bg) 45%, #eef3ff 100%);
+  color: var(--app-text);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body[data-density='compact'] .sleek-page table th,
+body[data-density='compact'] .sleek-page table td {
+  padding-top: 0.45rem !important;
+  padding-bottom: 0.45rem !important;
+}
+
+body[data-density='compact'] .sleek-page input:not([type='checkbox']):not([type='radio']):not([type='file']),
+body[data-density='compact'] .sleek-page select,
+body[data-density='compact'] .sleek-page textarea,
+body[data-density='compact'] .sleek-page button {
+  font-size: 0.8125rem;
+}
+
+body[data-density='comfortable'] .sleek-page table th,
+body[data-density='comfortable'] .sleek-page table td {
+  padding-top: 0.7rem !important;
+  padding-bottom: 0.7rem !important;
+}
+
+* {
+  scrollbar-color: #b7c6e5 #eef3ff;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #eef3ff;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #b7c6e5;
+  border-radius: 9999px;
+  border: 2px solid #eef3ff;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  * {
+    transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+    transition-duration: 180ms;
+    transition-timing-function: ease;
+  }
+}
+
+@layer components {
+  .theme-surface {
+    @apply bg-white border border-primary-100 shadow-sm;
+  }
+
+  .theme-heading {
+    @apply text-slate-800 font-extrabold tracking-tight;
+  }
+
+  .theme-muted {
+    @apply text-slate-500;
+  }
+
+  .sleek-page {
+    @apply relative;
+  }
+
+  .sleek-page::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at 0% 0%, rgba(70, 111, 206, 0.08), transparent 36%);
+  }
+
+  .sleek-page > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .sleek-page .bg-white.rounded-xl.shadow-sm.border,
+  .sleek-page .bg-white.rounded-xl.border,
+  .sleek-page .bg-white.rounded-2xl.border,
+  .sleek-page .bg-white.rounded-lg.border,
+  .sleek-page .bg-white.border.rounded-lg,
+  .sleek-page .bg-white.border.rounded-xl,
+  .sleek-page .bg-white.border.rounded-2xl {
+    border-color: #dce7ff;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 10px 28px rgba(33, 49, 93, 0.08);
+    backdrop-filter: blur(8px);
+  }
+
+  .sleek-page input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  .sleek-page select,
+  .sleek-page textarea {
+    border-color: #cfdaf2;
+    background: #f9fbff;
+    border-radius: 0.625rem;
+  }
+
+  .sleek-page input:focus,
+  .sleek-page select:focus,
+  .sleek-page textarea:focus {
+    border-color: #466fce;
+    box-shadow: 0 0 0 3px rgba(70, 111, 206, 0.16);
+    outline: none;
+  }
+
+  .sleek-page table thead {
+    background: linear-gradient(180deg, #f8faff 0%, #f2f6ff 100%);
+  }
+
+  .sleek-page .overflow-x-auto table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    backdrop-filter: blur(4px);
+  }
 }

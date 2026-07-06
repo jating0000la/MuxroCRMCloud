@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 
 interface FormBuilderField {
   name: string;
@@ -11,7 +11,46 @@ interface FormBuilderField {
   max?: number;
   rows?: string[];
   columns?: string[];
+  meta?: any;
 }
+
+type FormDesignTheme = 'ocean' | 'sunset' | 'forest' | 'royal';
+type FormDesignLayout = 'centered' | 'split';
+type FormButtonStyle = 'solid' | 'gradient' | 'outline';
+type FormRadiusStyle = 'soft' | 'rounded' | 'pill';
+
+interface FormDesign {
+  theme: FormDesignTheme;
+  layout: FormDesignLayout;
+  buttonStyle: FormButtonStyle;
+  radius: FormRadiusStyle;
+  showProgress: boolean;
+  customColor: string;
+}
+
+const DEFAULT_FORM_DESIGN: FormDesign = {
+  theme: 'ocean',
+  layout: 'centered',
+  buttonStyle: 'gradient',
+  radius: 'rounded',
+  showProgress: true,
+  customColor: '#0ea5e9',
+};
+
+const DEFAULT_FIELDS: FormBuilderField[] = [
+  { name: 'name', label: 'Full Name', type: 'text', required: true },
+  { name: 'email', label: 'Email Address', type: 'text', required: false },
+  { name: 'phone', label: 'Phone Number', type: 'text', required: false },
+];
+
+const BASIC_COLORS = [
+  '#f87171', '#ef4444', '#b91c1c', '#f59e0b', '#facc15', '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6',
+  '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#fb7185', '#fb923c', '#fbbf24', '#a3e635', '#4ade80', '#34d399',
+  '#2dd4bf', '#22d3ee', '#38bdf8', '#60a5fa', '#818cf8', '#a78bfa', '#c084fc', '#e879f9', '#f472b6', '#fb7185', '#fca5a5', '#fdba74',
+  '#fcd34d', '#bef264', '#86efac', '#6ee7b7', '#5eead4', '#67e8f9', '#7dd3fc', '#93c5fd', '#a5b4fc', '#c4b5fd', '#d8b4fe', '#f0abfc',
+];
+
+const EMPTY_CUSTOM_SLOTS = Array.from({ length: 24 }, () => '');
 
 interface InitialForm {
   id: string;
@@ -21,7 +60,7 @@ interface InitialForm {
 
 interface FormBuilderProps {
   initialForm?: InitialForm;
-  onSubmit: (title: string, fields: FormBuilderField[], whatsappConfig?: any, emailConfig?: any) => void;
+  onSubmit: (title: string, fields: FormBuilderField[]) => void;
   onCancel: () => void;
 }
 
@@ -31,7 +70,6 @@ const FIELD_TYPES = [
   { value: 'radio', label: 'Multiple choice', icon: '◉' },
   { value: 'checkbox', label: 'Checkboxes', icon: '☑' },
   { value: 'select', label: 'Drop-down', icon: '▾' },
-  { value: 'file', label: 'File upload', icon: '↑' },
   { value: 'linear_scale', label: 'Linear scale', icon: '─' },
   { value: 'rating', label: 'Rating', icon: '★' },
   { value: 'multiple_choice_grid', label: 'Choice grid', icon: '⊞' },
@@ -41,56 +79,53 @@ const FIELD_TYPES = [
 ];
 
 export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBuilderProps) {
-  const [title, setTitle] = useState(initialForm?.title || '');
-  const [description, setDescription] = useState('');
-  const [fields, setFields] = useState<FormBuilderField[]>(initialForm?.fields || [
-    { name: 'name', label: 'Full Name', type: 'text', required: true },
-    { name: 'email', label: 'Email Address', type: 'text', required: false },
-    { name: 'phone', label: 'Phone Number', type: 'text', required: false },
-  ]);
+  const initialConfig = useMemo(() => {
+    const sourceFields = initialForm?.fields || DEFAULT_FIELDS;
+    const metaField = sourceFields.find((f) => f.type === '__design_meta' || f.name === '__form_meta');
+    const safeDesign = {
+      ...DEFAULT_FORM_DESIGN,
+      ...(metaField?.meta?.design || {}),
+    } as FormDesign;
+
+    return {
+      title: initialForm?.title || '',
+      description: metaField?.meta?.description || '',
+      design: safeDesign,
+      fields: sourceFields.filter((f) => f.type !== '__design_meta' && f.name !== '__form_meta'),
+    };
+  }, [initialForm]);
+
+  const [title, setTitle] = useState(initialConfig.title);
+  const [description, setDescription] = useState(initialConfig.description);
+  const [fields, setFields] = useState<FormBuilderField[]>(initialConfig.fields.length > 0 ? initialConfig.fields : DEFAULT_FIELDS);
+  const [design, setDesign] = useState<FormDesign>(initialConfig.design);
   const [selectedFieldIndex, setSelectedFieldIndex] = useState<number | null>(null);
-  const [builderTab, setBuilderTab] = useState<'fields' | 'communication'>('fields');
+  const [builderTab, setBuilderTab] = useState<'fields' | 'design'>('fields');
+  const [customColorSlots, setCustomColorSlots] = useState<string[]>(EMPTY_CUSTOM_SLOTS);
 
-  // Communication config
-  const [whatsappEnabled, setWhatsappEnabled] = useState(false);
-  const [whatsappPhone, setWhatsappPhone] = useState('');
-  const [whatsappMessage, setWhatsappMessage] = useState('');
-  const [emailEnabled, setEmailEnabled] = useState(false);
-  const [emailRecipient, setEmailRecipient] = useState('');
-  const [emailSubject, setEmailSubject] = useState('');
-  const [emailBody, setEmailBody] = useState('');
+  const normalizeHexColor = (value: string) => {
+    const trimmed = value.trim();
+    const withHash = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+    return /^#([0-9a-fA-F]{6})$/.test(withHash) ? withHash : null;
+  };
 
-  const whatsappPhoneRef = useRef<HTMLInputElement>(null);
-  const whatsappMessageRef = useRef<HTMLTextAreaElement>(null);
-  const emailRecipientRef = useRef<HTMLInputElement>(null);
-  const emailSubjectRef = useRef<HTMLInputElement>(null);
-  const emailBodyRef = useRef<HTMLTextAreaElement>(null);
+  const hexToRgb = (hex: string) => {
+    const normalized = normalizeHexColor(hex);
+    if (!normalized) return { r: 14, g: 165, b: 233 };
+    const h = normalized.slice(1);
+    return {
+      r: parseInt(h.slice(0, 2), 16),
+      g: parseInt(h.slice(2, 4), 16),
+      b: parseInt(h.slice(4, 6), 16),
+    };
+  };
 
-  const insertTagAtCursor = useCallback(
-    (
-      ref: React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>,
-      currentValue: string,
-      setter: (v: string) => void,
-      tag: string
-    ) => {
-      const el = ref.current;
-      const placeholder = `{{${tag}}}`;
-      if (el) {
-        const start = el.selectionStart ?? currentValue.length;
-        const end = el.selectionEnd ?? currentValue.length;
-        const newVal = currentValue.slice(0, start) + placeholder + currentValue.slice(end);
-        setter(newVal);
-        requestAnimationFrame(() => {
-          const pos = start + placeholder.length;
-          el.focus();
-          el.setSelectionRange(pos, pos);
-        });
-      } else {
-        setter(currentValue + placeholder);
-      }
-    },
-    []
-  );
+  const rgbToHex = (r: number, g: number, b: number) => {
+    const clamp = (n: number) => Math.max(0, Math.min(255, n));
+    return `#${clamp(r).toString(16).padStart(2, '0')}${clamp(g).toString(16).padStart(2, '0')}${clamp(b).toString(16).padStart(2, '0')}`.toUpperCase();
+  };
+
+  const currentRgb = useMemo(() => hexToRgb(design.customColor), [design.customColor]);
 
   const slugify = (text: string) =>
     text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'field';
@@ -185,6 +220,38 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
   const needsScale = (type: string) => type === 'linear_scale';
   const needsRating = (type: string) => type === 'rating';
 
+  const duplicateField = (index: number) => {
+    const field = fields[index];
+    const copiedLabel = `${field.label} Copy`;
+    const copied: FormBuilderField = {
+      ...field,
+      name: slugify(copiedLabel),
+      label: copiedLabel,
+    };
+    const updated = [...fields];
+    updated.splice(index + 1, 0, copied);
+    setFields(updated);
+    setSelectedFieldIndex(index + 1);
+  };
+
+  const addLeadCaptureTemplate = () => {
+    const requiredFields: FormBuilderField[] = [
+      { name: 'name', label: 'Full Name', type: 'text', required: true, placeholder: 'Enter full name' },
+      { name: 'phone', label: 'Phone Number', type: 'text', required: true, placeholder: 'Enter phone number' },
+      { name: 'email', label: 'Email Address', type: 'text', required: false, placeholder: 'Enter email address' },
+      { name: 'city', label: 'City', type: 'text', required: false, placeholder: 'Enter city' },
+      {
+        name: 'interest',
+        label: 'Interested Service',
+        type: 'select',
+        required: true,
+        options: ['Service A', 'Service B', 'Service C'],
+      },
+    ];
+    setFields(requiredFields);
+    setSelectedFieldIndex(0);
+  };
+
   const renderFieldPreview = (field: FormBuilderField) => {
     switch (field.type) {
       case 'text':
@@ -218,8 +285,6 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
             {field.options?.map((o, i) => <option key={i}>{o}</option>)}
           </select>
         );
-      case 'file':
-        return <input type="file" disabled className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50" />;
       case 'date':
         return <input type="date" disabled className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50" />;
       case 'time':
@@ -290,11 +355,11 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
           </button>
           <button
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              builderTab === 'communication' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              builderTab === 'design' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
-            onClick={() => setBuilderTab('communication')}
+            onClick={() => setBuilderTab('design')}
           >
-            Communication
+            Design
           </button>
         </div>
       </div>
@@ -305,6 +370,12 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
           {/* Left: Field palette */}
           <div className="w-56 bg-gray-50 border-r border-gray-200 p-4 overflow-y-auto flex-shrink-0">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Form Elements</h3>
+            <button
+              onClick={addLeadCaptureTemplate}
+              className="w-full mb-3 px-3 py-2.5 rounded-lg bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700"
+            >
+              Use Lead Capture Template
+            </button>
             <div className="space-y-2">
               {FIELD_TYPES.map((ft) => (
                 <button
@@ -375,6 +446,9 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); moveField(idx, 'down'); }} disabled={idx === fields.length - 1} className="p-1 hover:bg-gray-100 rounded disabled:opacity-30 text-gray-400">
                           ↓
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); duplicateField(idx); }} className="p-1 hover:bg-gray-100 rounded text-gray-400" title="Duplicate">
+                          ⧉
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); deleteField(idx); }} disabled={fields.length <= 1} className="p-1 hover:bg-red-50 text-red-400 hover:text-red-600 rounded disabled:opacity-30">
                           ✕
@@ -518,117 +592,207 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
           </div>
         </div>
       ) : (
-        /* Communication Tab */
-        <div className="flex-1 overflow-y-auto p-6 max-w-3xl mx-auto w-full space-y-8">
-          {fields.length > 0 ? (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
-              <p className="font-medium text-blue-800 mb-1">Click tags below each field to insert placeholders</p>
-              <p className="text-blue-600 text-xs">The user's submitted value will replace the tag.</p>
-            </div>
-          ) : (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
-              <p className="font-medium text-amber-800">Add form fields first</p>
-              <p className="text-amber-600 text-xs">Switch to "Form Fields" tab to add fields.</p>
-            </div>
-          )}
+        <div className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto w-full space-y-6">
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+            <h3 className="text-base font-semibold text-gray-900 mb-1">Form Design Studio</h3>
+            <p className="text-sm text-gray-500 mb-5">Tune layout, colors, and button style directly.</p>
 
-          {/* WhatsApp */}
-          <div className="space-y-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={whatsappEnabled} onChange={(e) => setWhatsappEnabled(e.target.checked)} className="w-4 h-4 text-green-600 rounded" />
-              <span className="text-sm font-semibold text-gray-900">💬 Enable WhatsApp Integration</span>
-            </label>
-            {whatsappEnabled && (
-              <div className="ml-6 space-y-4 border-l-2 border-green-200 pl-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                  <input ref={whatsappPhoneRef} placeholder="e.g. 919876543210" value={whatsappPhone} onChange={(e) => setWhatsappPhone(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500" />
-                  <p className="text-xs text-gray-400 mt-1">Country code + number, no + or spaces</p>
-                  {fields.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {fields.map((f) => (
-                        <button key={f.label} type="button" onClick={() => insertTagAtCursor(whatsappPhoneRef, whatsappPhone, setWhatsappPhone, f.label)}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-100 text-green-700 hover:bg-green-200 border border-green-300 transition cursor-pointer">
-                          + {f.label}
+            <div className="space-y-5">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Quick Tune</label>
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-3">
+                  <div>
+                    <p className="text-xs font-medium text-gray-600 mb-1.5">Layout</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDesign((prev) => ({ ...prev, layout: 'centered' }))}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${
+                          design.layout === 'centered' ? 'border-primary-400 bg-primary-100 text-primary-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        Centered
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDesign((prev) => ({ ...prev, layout: 'split' }))}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${
+                          design.layout === 'split' ? 'border-primary-400 bg-primary-100 text-primary-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        Split
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-medium text-gray-600 mb-1.5">Button</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(['solid', 'gradient', 'outline'] as FormButtonStyle[]).map((style) => (
+                        <button
+                          key={style}
+                          type="button"
+                          onClick={() => setDesign((prev) => ({ ...prev, buttonStyle: style }))}
+                          className={`px-3 py-1.5 text-xs font-semibold rounded-md border capitalize ${
+                            design.buttonStyle === style ? 'border-primary-400 bg-primary-100 text-primary-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          {style}
                         </button>
                       ))}
                     </div>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Message Template</label>
-                  {fields.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {fields.map((f) => (
-                        <button key={f.label} type="button" onClick={() => insertTagAtCursor(whatsappMessageRef, whatsappMessage, setWhatsappMessage, f.label)}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-100 text-green-700 hover:bg-green-200 border border-green-300 transition cursor-pointer">
-                          + {f.label}
-                        </button>
-                      ))}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="show-progress"
+                      type="checkbox"
+                      checked={design.showProgress}
+                      onChange={(e) => setDesign((prev) => ({ ...prev, showProgress: e.target.checked }))}
+                      className="w-4 h-4 text-primary-600 rounded"
+                    />
+                    <label htmlFor="show-progress" className="text-sm text-gray-700">Show progress bar</label>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-medium text-gray-600 mb-1.5">Accent Color</p>
+                    <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={normalizeHexColor(design.customColor) || '#0EA5E9'}
+                          onChange={(e) => setDesign((prev) => ({ ...prev, customColor: e.target.value.toUpperCase() }))}
+                          className="h-16 w-20 rounded border border-gray-300 bg-white p-1 cursor-pointer"
+                        />
+                        <div className="grid grid-cols-2 gap-2 flex-1">
+                          <input
+                            type="text"
+                            value={design.customColor}
+                            onChange={(e) => setDesign((prev) => ({ ...prev, customColor: e.target.value }))}
+                            onBlur={(e) => {
+                              const normalized = normalizeHexColor(e.target.value);
+                              setDesign((prev) => ({ ...prev, customColor: (normalized || prev.customColor).toUpperCase() }));
+                            }}
+                            className="col-span-2 px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md uppercase"
+                            placeholder="#0EA5E9"
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            max={255}
+                            value={currentRgb.r}
+                            onChange={(e) => setDesign((prev) => ({ ...prev, customColor: rgbToHex(Number(e.target.value), currentRgb.g, currentRgb.b) }))}
+                            className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md"
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            max={255}
+                            value={currentRgb.g}
+                            onChange={(e) => setDesign((prev) => ({ ...prev, customColor: rgbToHex(currentRgb.r, Number(e.target.value), currentRgb.b) }))}
+                            className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md"
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            max={255}
+                            value={currentRgb.b}
+                            onChange={(e) => setDesign((prev) => ({ ...prev, customColor: rgbToHex(currentRgb.r, currentRgb.g, Number(e.target.value)) }))}
+                            className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = normalizeHexColor(design.customColor);
+                              if (!current) return;
+                              setCustomColorSlots((prev) => {
+                                const next = [...prev];
+                                const existing = next.findIndex((c) => c.toLowerCase() === current.toLowerCase());
+                                if (existing >= 0) return next;
+                                const emptyIndex = next.findIndex((c) => !c);
+                                if (emptyIndex >= 0) {
+                                  next[emptyIndex] = current.toUpperCase();
+                                } else {
+                                  next[next.length - 1] = current.toUpperCase();
+                                }
+                                return next;
+                              });
+                            }}
+                            className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                          >
+                            Add to Custom
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Basic Colors</p>
+                        <div className="grid grid-cols-12 gap-1.5">
+                          {BASIC_COLORS.map((color) => {
+                            const active = (normalizeHexColor(design.customColor) || '').toLowerCase() === color.toLowerCase();
+                            return (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={() => setDesign((prev) => ({ ...prev, customColor: color.toUpperCase() }))}
+                                className={`h-5 w-5 rounded-full border ${active ? 'ring-2 ring-primary-400 border-primary-500' : 'border-black/10 hover:scale-105'}`}
+                                style={{ backgroundColor: color }}
+                                title={color}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Custom Colors</p>
+                        <div className="grid grid-cols-8 gap-1.5">
+                          {customColorSlots.map((color, idx) => {
+                            const active = color && (normalizeHexColor(design.customColor) || '').toLowerCase() === color.toLowerCase();
+                            return color ? (
+                              <button
+                                key={`custom-${idx}`}
+                                type="button"
+                                onClick={() => setDesign((prev) => ({ ...prev, customColor: color }))}
+                                className={`h-6 w-6 rounded-full border ${active ? 'ring-2 ring-primary-400 border-primary-500' : 'border-black/10 hover:scale-105'}`}
+                                style={{ backgroundColor: color }}
+                                title={color}
+                              />
+                            ) : (
+                              <span key={`empty-${idx}`} className="h-6 w-6 rounded-full border border-dashed border-gray-300 bg-gray-50" />
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  <textarea ref={whatsappMessageRef} className="w-full border border-gray-300 rounded-lg p-3 text-sm min-h-[120px] resize-y focus:ring-2 focus:ring-green-500"
-                    placeholder={"Hello! New form submission:\n\nName: ...\nEmail: ...\n\nThank you!"}
-                    value={whatsappMessage} onChange={(e) => setWhatsappMessage(e.target.value)} />
+                  </div>
                 </div>
               </div>
-            )}
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Form Introduction</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm h-20"
+                  placeholder="Short intro message shown above the public form"
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Email */}
-          <div className="space-y-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={emailEnabled} onChange={(e) => setEmailEnabled(e.target.checked)} className="w-4 h-4 text-blue-600 rounded" />
-              <span className="text-sm font-semibold text-gray-900">✉ Enable Email Integration</span>
-            </label>
-            {emailEnabled && (
-              <div className="ml-6 space-y-4 border-l-2 border-blue-200 pl-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Email</label>
-                  <input ref={emailRecipientRef} placeholder="e.g. admin@example.com" value={emailRecipient} onChange={(e) => setEmailRecipient(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
-                  {fields.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {fields.map((f) => (
-                        <button key={f.label} type="button" onClick={() => insertTagAtCursor(emailRecipientRef, emailRecipient, setEmailRecipient, f.label)}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-300 transition cursor-pointer">
-                          + {f.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                  <input ref={emailSubjectRef} placeholder="e.g. New Form Submission" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
-                  {fields.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {fields.map((f) => (
-                        <button key={f.label} type="button" onClick={() => insertTagAtCursor(emailSubjectRef, emailSubject, setEmailSubject, f.label)}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-300 transition cursor-pointer">
-                          + {f.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Body Template</label>
-                  {fields.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {fields.map((f) => (
-                        <button key={f.label} type="button" onClick={() => insertTagAtCursor(emailBodyRef, emailBody, setEmailBody, f.label)}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-300 transition cursor-pointer">
-                          + {f.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <textarea ref={emailBodyRef} className="w-full border border-gray-300 rounded-lg p-3 text-sm min-h-[120px] resize-y focus:ring-2 focus:ring-blue-500"
-                    placeholder={"Hello,\n\nNew submission received:\n\nRegards"}
-                    value={emailBody} onChange={(e) => setEmailBody(e.target.value)} />
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3">Live Style Preview</h4>
+            <div className="rounded-2xl border border-dashed border-gray-300 p-4 bg-gray-50">
+              <div className="rounded-xl bg-white border border-gray-200 p-4">
+                <p className="text-lg font-bold text-gray-900">{title || 'Your Form Title'}</p>
+                <p className="text-sm text-gray-500 mt-1">{description || 'Your form intro will appear here.'}</p>
+                <p className="text-xs text-gray-400 mt-1">Theme: {design.theme}</p>
+                <div className="mt-4 h-2 w-32 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="h-full w-1/2 bg-primary-500" />
                 </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}
@@ -642,13 +806,17 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
           onClick={() => {
             if (!title.trim()) { alert('Form title is required'); return; }
             if (fields.length === 0) { alert('Add at least one field'); return; }
-            const wc = whatsappEnabled && whatsappPhone.trim() && whatsappMessage.trim()
-              ? { enabled: true, phoneNumber: whatsappPhone.trim(), messageTemplate: whatsappMessage.trim() }
-              : { enabled: false, phoneNumber: '', messageTemplate: '' };
-            const ec = emailEnabled && emailRecipient.trim() && emailSubject.trim() && emailBody.trim()
-              ? { enabled: true, recipientEmail: emailRecipient.trim(), subject: emailSubject.trim(), bodyTemplate: emailBody.trim() }
-              : { enabled: false, recipientEmail: '', subject: '', bodyTemplate: '' };
-            onSubmit(title.trim(), fields, wc, ec);
+            const metaField: FormBuilderField = {
+              name: '__form_meta',
+              label: 'Form Meta',
+              type: '__design_meta',
+              required: false,
+              meta: {
+                description: description.trim(),
+                design,
+              },
+            };
+            onSubmit(title.trim(), [...fields, metaField]);
           }}
           className="px-5 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium"
         >

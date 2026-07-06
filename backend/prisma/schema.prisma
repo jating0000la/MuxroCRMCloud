@@ -109,7 +109,7 @@ model Enquiry {
   form          Form      @relation(fields: [formId], references: [id], onDelete: Cascade)
   lead          Lead?
 
-  @@index([formId])
+  @@index([formId, submittedAt])     // For form submission history
   @@index([submittedAt])
 }
 

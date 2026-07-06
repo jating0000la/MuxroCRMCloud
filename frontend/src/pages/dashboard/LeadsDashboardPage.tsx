@@ -3,8 +3,12 @@ import { dashboardService } from '../../services/dashboard';
 import { campaignService } from '../../services/campaigns';
 import { Lead, Campaign } from '../../types';
 import Layout from '../../components/layout/Layout';
+import Pagination from '../../components/common/Pagination';
 import StatusUpdateDialog from '../../components/leads/StatusUpdateDialog';
+import { downloadCsv } from '../../utils/csv';
 import { format } from 'date-fns';
+
+const PAGE_SIZE = 25;
 
 type SortField = 'name' | 'campaign' | 'status' | 'doer' | 'source' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
@@ -19,6 +23,7 @@ export default function LeadsDashboardPage() {
   const [sortField, setSortField] = useState<SortField>('updatedAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     loadData();
@@ -74,6 +79,14 @@ export default function LeadsDashboardPage() {
       return sortDir === 'asc' ? comparison : -comparison;
     });
 
+  const totalPages = Math.max(1, Math.ceil(filteredLeads.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedLeads = filteredLeads.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedCampaign, search, sourceFilter]);
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
@@ -108,24 +121,16 @@ export default function LeadsDashboardPage() {
       format(new Date(l.updatedAt), 'MMM d, yyyy'),
     ]);
 
-    const csvContent = [headers, ...rows].map((row) => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `leads-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(`leads-${format(new Date(), 'yyyy-MM-dd')}.csv`, headers, rows);
   };
 
   return (
     <Layout>
-      <div className="p-6 lg:p-8">
+      <div className="sleek-page p-6 lg:p-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">All Leads</h1>
-            <p className="text-gray-500 mt-1">Manage and track all your leads across campaigns</p>
+            <p className="text-gray-500">Manage and track all your leads across campaigns</p>
           </div>
           <button
             onClick={exportToCSV}
@@ -238,7 +243,7 @@ export default function LeadsDashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {filteredLeads.map((lead) => (
+                  {paginatedLeads.map((lead) => (
                     <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center">
@@ -290,6 +295,12 @@ export default function LeadsDashboardPage() {
                 </tbody>
               </table>
             </div>
+            <Pagination
+              page={currentPage}
+              pageSize={PAGE_SIZE}
+              totalItems={filteredLeads.length}
+              onPageChange={setPage}
+            />
           </div>
         )}
 
