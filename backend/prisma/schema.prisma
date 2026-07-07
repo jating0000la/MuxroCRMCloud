@@ -9,7 +9,6 @@ datasource db {
 
 enum Role {
   ADMIN
-  MANAGER
   USER
 }
 
@@ -28,6 +27,7 @@ model User {
   managedCampaigns  Campaign[]       @relation("Manager")
   campaignUsers     CampaignUser[]
   followups         Followup[]
+  notifications     Notification[]
 
   @@index([role])
   @@index([isActive])
@@ -41,8 +41,8 @@ model Campaign {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  managerId     String
-  manager       User      @relation("Manager", fields: [managerId], references: [id])
+  managerId     String?
+  manager       User?     @relation("Manager", fields: [managerId], references: [id])
 
   forms         Form[]
   leads         Lead[]
@@ -158,12 +158,31 @@ model Followup {
 
   lead          Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications Notification[]
 
   @@index([leadId])
   @@index([userId])
   @@index([nextCallDate])
   @@index([createdAt])
   @@index([userId, nextCallDate])
+}
+
+model Notification {
+  id            String    @id @default(uuid())
+  userId        String
+  followupId    String
+  type          String    // "overdue", "today", "tomorrow", "warning"
+  isRead        Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  followup      Followup  @relation(fields: [followupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, followupId])
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@index([type])
 }
 
 model Setting {

@@ -2,10 +2,12 @@ import { Controller, Get, Param, Query, UseGuards, Request } from '@nestjs/commo
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('dashboard')
 export class DashboardController {
   constructor(private dashboardService: DashboardService) {}
@@ -44,6 +46,7 @@ export class DashboardController {
   }
 
   @Get('user-conversion')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get user-wise conversion ratio' })
   @ApiQuery({ name: 'campaignId', required: false })
   @ApiQuery({ name: 'startDate', required: false, description: 'YYYY-MM-DD' })

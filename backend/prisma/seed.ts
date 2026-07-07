@@ -4,42 +4,33 @@ import * as bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  const hashedPassword = await bcrypt.hash('admin123', 10);
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'ChangeMe@123';
+  const userPassword = process.env.SEED_USER_PASSWORD || 'ChangeMe@123';
+  const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@example.com';
+  const userEmail = process.env.SEED_USER_EMAIL || 'user@example.com';
 
+  const hashedAdminPassword = await bcrypt.hash(adminPassword, 10);
   await prisma.user.upsert({
     where: { username: 'admin' },
     update: {},
     create: {
       username: 'admin',
-      password: hashedPassword,
+      password: hashedAdminPassword,
       name: 'System Admin',
-      email: 'admin@crm.com',
+      email: adminEmail,
       role: 'ADMIN',
     },
   });
 
-  const managerPassword = await bcrypt.hash('manager123', 10);
-  await prisma.user.upsert({
-    where: { username: 'manager1' },
-    update: {},
-    create: {
-      username: 'manager1',
-      password: managerPassword,
-      name: 'Campaign Manager',
-      email: 'manager@crm.com',
-      role: 'MANAGER',
-    },
-  });
-
-  const userPassword = await bcrypt.hash('user123', 10);
+  const hashedUserPassword = await bcrypt.hash(userPassword, 10);
   await prisma.user.upsert({
     where: { username: 'user1' },
     update: {},
     create: {
       username: 'user1',
-      password: userPassword,
+      password: hashedUserPassword,
       name: 'Sales User',
-      email: 'user@crm.com',
+      email: userEmail,
       role: 'USER',
     },
   });

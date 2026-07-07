@@ -13,6 +13,7 @@ import { BulkImportModule } from './bulk-import/bulk-import.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { SettingsModule } from './settings/settings.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -39,6 +40,7 @@ import { HealthController } from './health.controller';
     DashboardModule,
     IntegrationsModule,
     SettingsModule,
+    NotificationsModule,
   ],
   controllers: [HealthController],
   providers: [

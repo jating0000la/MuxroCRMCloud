@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PaginationDto } from '../common/pagination.dto';
 import { CreateFollowupDto } from './dto/create-followup.dto';
 import { UpdateFollowupDto } from './dto/update-followup.dto';
 
 @Injectable()
 export class FollowupsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   async findByLead(leadId: string) {
     return this.prisma.followup.findMany({
@@ -17,7 +21,7 @@ export class FollowupsService {
   }
 
   async create(dto: CreateFollowupDto, userId: string) {
-    return this.prisma.followup.create({
+    const followup = await this.prisma.followup.create({
       data: {
         leadId: dto.leadId,
         userId,
@@ -27,6 +31,11 @@ export class FollowupsService {
       },
       include: { user: { select: { name: true } } },
     });
+
+    // Create notification for this followup
+    await this.notificationsService.createNotificationForFollowup(userId, followup.id);
+
+    return followup;
   }
 
   async getMyFollowups(userId: string, campaignId?: string, pagination?: PaginationDto) {
@@ -93,7 +102,7 @@ export class FollowupsService {
     const followup = await this.prisma.followup.findUnique({ where: { id } });
     if (!followup) throw new NotFoundException('Followup not found');
 
-    return this.prisma.followup.update({
+    const updated = await this.prisma.followup.update({
       where: { id },
       data: {
         ...(dto.status !== undefined && { status: dto.status }),
@@ -104,6 +113,14 @@ export class FollowupsService {
       },
       include: { user: { select: { name: true } } },
     });
+
+    // Update notification for this followup
+    await this.notificationsService.createNotificationForFollowup(
+      followup.userId,
+      id,
+    );
+
+    return updated;
   }
 
   async remove(id: string) {

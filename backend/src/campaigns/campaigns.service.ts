@@ -40,22 +40,6 @@ export class CampaignsService {
         orderBy: { createdAt: 'desc' },
       });
     }
-    if (role === 'MANAGER') {
-      return this.prisma.campaign.findMany({
-        where: {
-          OR: [
-            { managerId: userId },
-            { assignedUsers: { some: { userId, isActive: true } } },
-          ],
-          isActive: true,
-        },
-        include: {
-          manager: { select: { id: true, name: true, username: true } },
-          _count: { select: { leads: true, forms: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    }
     // USER: only campaigns they're assigned to
     return this.prisma.campaign.findMany({
       where: {
@@ -94,15 +78,6 @@ export class CampaignsService {
       }
     }
 
-    // MANAGER: check if they own or are assigned to this campaign
-    if (role === 'MANAGER' && userId) {
-      const isManager = campaign.managerId === userId;
-      const isAssigned = campaign.assignedUsers.some((au) => au.userId === userId && au.isActive);
-      if (!isManager && !isAssigned) {
-        throw new ForbiddenException('You do not have access to this campaign');
-      }
-    }
-
     return campaign;
   }
 
@@ -122,6 +97,19 @@ export class CampaignsService {
   async assignUsers(campaignId: string, dto: AssignUsersDto, userId?: string, role?: string) {
     await this.findOne(campaignId, userId, role);
     const uniqueUserIds = [...new Set(dto.userIds)];
+
+    // Validate that only USER role users can be assigned to campaigns
+    if (uniqueUserIds.length > 0) {
+      const usersToAssign = await this.prisma.user.findMany({
+        where: { id: { in: uniqueUserIds } },
+        select: { id: true, role: true },
+      });
+
+      const invalidUsers = usersToAssign.filter((u) => u.role !== 'USER');
+      if (invalidUsers.length > 0) {
+        throw new ForbiddenException('Only USER role users can be assigned to campaigns');
+      }
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const deactivateWhere: any = { campaignId, isActive: true };

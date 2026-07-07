@@ -7,9 +7,7 @@ export class DashboardService {
 
   async getOverview(userId: string, role: string) {
     const campaignWhere: any = {};
-    if (role === 'MANAGER') {
-      campaignWhere.managerId = userId;
-    } else if (role === 'USER') {
+    if (role === 'USER') {
       campaignWhere.assignedUsers = { some: { userId, isActive: true } };
     }
 
@@ -20,9 +18,6 @@ export class DashboardService {
     const leadWhere: any = {};
     if (role === 'USER') {
       leadWhere.doerId = userId;
-    }
-    if (role === 'MANAGER') {
-      leadWhere.campaign = { managerId: userId };
     }
 
     const totalLeads = await this.prisma.lead.count({ where: leadWhere });
@@ -102,8 +97,6 @@ export class DashboardService {
 
     if (role === 'USER') {
       where.doerId = userId;
-    } else if (role === 'MANAGER') {
-      where.campaign = { managerId: userId };
     }
 
     return this.prisma.lead.findMany({
@@ -124,7 +117,6 @@ export class DashboardService {
   async getSalesFunnel(userId: string, role: string, campaignId?: string) {
     const leadWhere: any = {};
     if (role === 'USER') leadWhere.doerId = userId;
-    if (role === 'MANAGER') leadWhere.campaign = { managerId: userId };
     if (campaignId) leadWhere.campaignId = campaignId;
 
     const totalLeads = await this.prisma.lead.count({ where: leadWhere });

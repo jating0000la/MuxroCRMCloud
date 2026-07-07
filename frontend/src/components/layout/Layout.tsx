@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import settingsService from '../../services/settings';
 import { brandingFromSettings, readBranding, saveBranding } from '../../utils/branding';
@@ -93,20 +94,26 @@ function BottomBar({ filteredNav, currentPath }: { filteredNav: typeof navItems;
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const { pendingCount, notifications, markAsRead, soundEnabled, toggleSound } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
   const [density, setDensity] = useState<'compact' | 'comfortable'>(() => {
     const saved = localStorage.getItem('uiDensity');
     return saved === 'comfortable' ? 'comfortable' : 'compact';
   });
   const [branding, setBranding] = useState(readBranding());
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const notificationMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setUserMenuOpen(false);
+      }
+      if (notificationMenuRef.current && !notificationMenuRef.current.contains(e.target as Node)) {
+        setNotificationMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -195,6 +202,108 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     >
                       Comfortable
                     </button>
+                  </div>
+
+                  {/* Notification Bell */}
+                  <div className="relative" ref={notificationMenuRef}>
+                    <button
+                      onClick={() => setNotificationMenuOpen(!notificationMenuOpen)}
+                      className={`relative flex items-center justify-center w-10 h-10 rounded-lg border bg-white transition-colors ${
+                        notifications.some(n => n.type === 'overdue')
+                          ? 'border-red-300 hover:bg-red-50'
+                          : notifications.some(n => n.type === 'today')
+                          ? 'border-amber-300 hover:bg-amber-50'
+                          : 'border-primary-100 hover:bg-primary-50/70'
+                      }`}
+                      aria-label="Notifications"
+                    >
+                      <svg className={`w-5 h-5 ${notifications.some(n => n.type === 'overdue') ? 'text-red-600' : notifications.some(n => n.type === 'today') ? 'text-amber-600' : 'text-slate-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                      </svg>
+                      {pendingCount > 0 && (
+                        <span className={`absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-5 px-1 text-xs font-bold text-white rounded-full ${notifications.some(n => n.type === 'overdue') ? 'bg-red-500 animate-pulse' : 'bg-amber-500'}`}>
+                          {pendingCount > 9 ? '9+' : pendingCount}
+                        </span>
+                      )}
+                    </button>
+
+                    {notificationMenuOpen && (
+                      <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-xl border border-slate-200 z-50 max-h-[480px] flex flex-col overflow-hidden">
+                        {/* Header */}
+                        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                          <div>
+                            <h3 className="font-bold text-slate-900 text-sm">Followup Reminders</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">{pendingCount} pending</p>
+                          </div>
+                          {/* Sound toggle */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleSound(); }}
+                            title={soundEnabled ? 'Mute alerts' : 'Enable alerts'}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${soundEnabled ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                          >
+                            {soundEnabled ? (
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M12 6v12m0 0L8 14m4 4l4-4M9.172 9.172a4 4 0 000 5.656" />
+                              </svg>
+                            ) : (
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                              </svg>
+                            )}
+                            {soundEnabled ? 'Sound On' : 'Muted'}
+                          </button>
+                        </div>
+                        {/* Notification list */}
+                        <div className="overflow-y-auto flex-1">
+                          {notifications.length === 0 ? (
+                            <div className="px-4 py-10 text-center">
+                              <svg className="w-10 h-10 text-green-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <p className="text-sm font-medium text-slate-600">All clear!</p>
+                              <p className="text-xs text-slate-400 mt-1">No pending followups</p>
+                            </div>
+                          ) : (
+                            <div className="divide-y divide-slate-100">
+                              {notifications.map((notif) => (
+                                <button
+                                  key={notif.id}
+                                  onClick={() => {
+                                    if (!notif.isRead) markAsRead(notif.id);
+                                    setNotificationMenuOpen(false);
+                                  }}
+                                  className={`w-full text-left px-4 py-3 transition-colors ${
+                                    notif.type === 'overdue'
+                                      ? 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500'
+                                      : notif.type === 'today'
+                                      ? 'bg-amber-50 hover:bg-amber-100 border-l-4 border-amber-500'
+                                      : 'bg-green-50 hover:bg-green-100 border-l-4 border-green-500'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-base">
+                                      {notif.type === 'overdue' ? '🔴' : notif.type === 'today' ? '⏰' : '📅'}
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                      <div className={`text-xs font-bold uppercase tracking-wide ${notif.type === 'overdue' ? 'text-red-700' : notif.type === 'today' ? 'text-amber-700' : 'text-green-700'}`}>
+                                        {notif.type === 'overdue' ? 'Overdue' : notif.type === 'today' ? 'Due Today' : 'Due Tomorrow'}
+                                      </div>
+                                      <div className="font-semibold text-slate-900 text-sm truncate">
+                                        {notif.followup?.lead?.name || 'Unknown Lead'}
+                                      </div>
+                                    </div>
+                                    {!notif.isRead && (
+                                      <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                                    )}
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                 <div className="relative" ref={userMenuRef}>

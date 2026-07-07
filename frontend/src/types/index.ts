@@ -3,7 +3,7 @@ export interface User {
   username: string;
   name: string;
   email?: string;
-  role: 'ADMIN' | 'MANAGER' | 'USER';
+  role: 'ADMIN' | 'USER';
   isActive: boolean;
   createdAt: string;
 }
@@ -13,7 +13,7 @@ export interface Campaign {
   name: string;
   description?: string;
   isActive: boolean;
-  managerId: string;
+  managerId?: string | null;
   manager?: { id: string; name: string; username: string };
   assignedUsers?: CampaignUser[];
   statuses?: CampaignStatus[];

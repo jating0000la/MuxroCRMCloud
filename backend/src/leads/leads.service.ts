@@ -15,8 +15,6 @@ export class LeadsService {
     // USER: only see leads assigned to them
     if (role === 'USER' && userId) {
       where.doerId = userId;
-    } else if (role === 'MANAGER' && userId) {
-      where.campaign = { managerId: userId };
     }
     // ✅ FIXED: Apply pagination with skip/take
     const skip = pagination?.getSkip() || 0;
@@ -45,7 +43,7 @@ export class LeadsService {
       include: {
         doer: { select: { id: true, name: true, username: true } },
         status: true,
-        campaign: { select: { id: true, name: true, managerId: true } },
+        campaign: { select: { id: true, name: true } },
         followups: {
           orderBy: { createdAt: 'desc' },
           include: { user: { select: { name: true, username: true } } },
@@ -58,10 +56,6 @@ export class LeadsService {
     // USER: can only view leads assigned to them
     if (role === 'USER' && userId && lead.doerId !== userId) {
       throw new ForbiddenException('You can only view leads assigned to you');
-    }
-
-    if (role === 'MANAGER' && userId && lead.campaign.managerId !== userId) {
-      throw new ForbiddenException('You can only view leads from your campaigns');
     }
 
     return lead;
@@ -180,8 +174,6 @@ export class LeadsService {
     const where: any = { dnd: true };
     if (role === 'USER' && userId) {
       where.doerId = userId;
-    } else if (role === 'MANAGER' && userId) {
-      where.campaign = { managerId: userId };
     }
     // ✅ FIXED: Apply pagination with skip/take
     const skip = pagination?.getSkip() || 0;
@@ -251,15 +243,7 @@ export class LeadsService {
   }
 
   private async ensureCampaignAccess(campaignId: string, userId?: string, role?: string) {
-    if (role !== 'MANAGER' || !userId) return;
-
-    const campaign = await this.prisma.campaign.findFirst({
-      where: { id: campaignId, managerId: userId },
-      select: { id: true },
-    });
-
-    if (!campaign) {
-      throw new ForbiddenException('You can only manage leads from your campaigns');
-    }
+    // MANAGER role removed - only ADMIN and USER exist, no special access checks needed
+    return;
   }
 }

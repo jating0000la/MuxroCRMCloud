@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { dashboardService, UserConversionData } from '../../services/dashboard';
 import { campaignService } from '../../services/campaigns';
 import { DashboardStats, Campaign, Followup } from '../../types';
@@ -10,6 +11,7 @@ import { downloadCsv } from '../../utils/csv';
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { syncWithDelay } = useNotifications();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [recentFollowups, setRecentFollowups] = useState<Followup[]>([]);
@@ -49,6 +51,7 @@ export default function DashboardPage() {
       setCampaigns(campaignsData);
       setRecentFollowups(followupsData.slice(0, 5));
       setLastUpdated(new Date());
+      syncWithDelay(500); // Sync notifications after dashboard data loads
     } catch (error) {
       console.error('Failed to load stats', error);
       setError('Failed to load dashboard data. Please try again.');
@@ -157,7 +160,7 @@ export default function DashboardPage() {
       : []),
   ];
 
-  const roleLabel = user?.role === 'ADMIN' ? 'Administrator' : user?.role === 'MANAGER' ? 'Manager' : 'Team Member';
+  const roleLabel = user?.role === 'ADMIN' ? 'Administrator' : 'Team Member';
   const selectedCampaignName = campaigns.find((c) => c.id === selectedCampaign)?.name;
 
   const applyDatePreset = (preset: 'today' | '7d' | '30d' | 'month') => {
@@ -305,13 +308,15 @@ export default function DashboardPage() {
                   </button>
                 </div>
                 <div className="mb-2 flex justify-end">
-                  <button
-                    onClick={exportUserReport}
-                    disabled={userConversion.length === 0}
-                    className="px-2.5 py-1 text-xs font-semibold border border-indigo-200 rounded-md bg-white text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
-                  >
-                    Export CSV
-                  </button>
+                  {user?.role === 'ADMIN' && (
+                    <button
+                      onClick={exportUserReport}
+                      disabled={userConversion.length === 0}
+                      className="px-2.5 py-1 text-xs font-semibold border border-indigo-200 rounded-md bg-white text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+                    >
+                      Export CSV
+                    </button>
+                  )}
                 </div>
 
                 {analyticsLoading ? (

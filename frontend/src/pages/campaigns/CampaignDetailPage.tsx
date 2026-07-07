@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { campaignService } from '../../services/campaigns';
 import { leadService } from '../../services/leads';
 import { formService } from '../../services/forms';
@@ -25,6 +26,7 @@ const DEFAULT_LEAD_PAGE_SIZE = 50;
 export default function CampaignDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { syncWithDelay } = useNotifications();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [forms, setForms] = useState<Form[]>([]);
@@ -81,7 +83,8 @@ export default function CampaignDetailPage() {
 
       if (canManage) {
         const allUsersData = await userService.getAll();
-        setAllUsers(allUsersData);
+        const filteredUsers = allUsersData.filter((u: User) => u.role === 'USER');
+        setAllUsers(filteredUsers);
       }
     } catch (error: any) {
       if (error.response?.status === 403) {
@@ -165,6 +168,7 @@ export default function CampaignDetailPage() {
       toast.success('Users assigned successfully');
       setShowAssignUsers(false);
       loadData();
+      syncWithDelay(500); // Sync notifications after users assigned
     } catch (error: any) {
       if (error.response?.status === 403) {
         toast.error('You do not have permission to assign users');
@@ -613,7 +617,6 @@ export default function CampaignDetailPage() {
                   </div>
                   <span className={`ml-auto px-2 py-1 text-xs rounded-full ${
                     u.role === 'ADMIN' ? 'bg-red-100 text-red-700' :
-                    u.role === 'MANAGER' ? 'bg-yellow-100 text-yellow-700' :
                     'bg-green-100 text-green-700'
                   }`}>
                     {u.role}

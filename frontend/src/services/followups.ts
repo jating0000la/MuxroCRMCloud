@@ -28,4 +28,9 @@ export const followupService = {
     const { data } = await api.get('/followups/upcoming', { params });
     return data;
   },
+
+  update: async (id: string, payload: { status?: string; remarks?: string; nextCallDate?: string | null }): Promise<Followup> => {
+    const { data } = await api.put(`/followups/${id}`, payload);
+    return data;
+  },
 };

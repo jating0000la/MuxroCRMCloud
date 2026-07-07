@@ -22,8 +22,8 @@ export class CreateUserDto {
   @IsEmail()
   email?: string;
 
-  @ApiPropertyOptional({ enum: ['ADMIN', 'MANAGER', 'USER'] })
+  @ApiPropertyOptional({ enum: ['ADMIN', 'USER'] })
   @IsOptional()
-  @IsEnum(['ADMIN', 'MANAGER', 'USER'])
-  role?: 'ADMIN' | 'MANAGER' | 'USER';
+  @IsEnum(['ADMIN', 'USER'])
+  role?: 'ADMIN' | 'USER';
 }

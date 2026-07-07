@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { campaignService } from '../../services/campaigns';
 import { formService } from '../../services/forms';
 import { userService } from '../../services/users';
@@ -26,6 +27,7 @@ const toFieldName = (value: string, fallback: string) => {
 
 export default function CampaignsPage() {
   const { user } = useAuth();
+  const { syncWithDelay } = useNotifications();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [filteredCampaigns, setFilteredCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,7 +145,8 @@ export default function CampaignsPage() {
     setSelectedUserIds([]);
     try {
       const users = await userService.getAll();
-      setAllUsers(users);
+      const filteredUsers = users.filter((u: User) => u.role === 'USER');
+      setAllUsers(filteredUsers);
     } catch {
       setAllUsers([]);
     }
@@ -212,6 +215,7 @@ export default function CampaignsPage() {
       toast.success('Users assigned successfully');
       closeWizard();
       loadCampaigns();
+      syncWithDelay(500); // Sync notifications after users assigned
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to assign users');
     } finally {

@@ -42,6 +42,7 @@ export class LeadsController {
   }
 
   @Get('stats/:campaignId')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get lead stats by campaign' })
   getStats(@Param('campaignId') campaignId: string) {
     return this.leadsService.getStats(campaignId);

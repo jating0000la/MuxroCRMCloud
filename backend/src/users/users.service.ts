@@ -92,6 +92,19 @@ export class UsersService {
     return { message: 'User deactivated successfully' };
   }
 
+  async resetPassword(id: string, newPassword: string) {
+    await this.findOne(id);
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({ where: { id }, data: { password: hashed } });
+    return { message: 'Password reset successfully' };
+  }
+
+  async permanentDelete(id: string) {
+    await this.findOne(id);
+    await this.prisma.user.delete({ where: { id } });
+    return { message: 'User permanently deleted' };
+  }
+
   async findByUsername(username: string) {
     return this.prisma.user.findUnique({ where: { username } });
   }

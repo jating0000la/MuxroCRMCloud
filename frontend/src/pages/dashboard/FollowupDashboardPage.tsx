@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { dashboardService } from '../../services/dashboard';
 import { campaignService } from '../../services/campaigns';
 import { statusService } from '../../services/statuses';
 import integrationService from '../../services/integrations';
+import { followupService } from '../../services/followups';
 import { Lead, Campaign, CampaignStatus } from '../../types';
 import Layout from '../../components/layout/Layout';
 import Pagination from '../../components/common/Pagination';
@@ -19,6 +21,7 @@ type SortDir = 'asc' | 'desc';
 
 export default function FollowupDashboardPage() {
   const { user } = useAuth();
+  const { notifications, syncWithDelay } = useNotifications();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<string>('');
@@ -35,6 +38,32 @@ export default function FollowupDashboardPage() {
   const [startingFlow, setStartingFlow] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  // Quick reschedule inline state: leadId -> datetime string
+  const [quickReschedule, setQuickReschedule] = useState<{ leadId: string; followupId: string; value: string } | null>(null);
+  const [savingReschedule, setSavingReschedule] = useState(false);
+  const rescheduleRef = useRef<HTMLInputElement>(null);
+
+  // Helper function to get row highlight color based on followup due date
+  const getRowHighlightClass = (lead: Lead): string => {
+    const followup = lead.followups?.[0];
+    if (!followup?.nextCallDate) return '';
+
+    const notif = notifications.find(n => n.followupId === followup.id);
+    if (!notif) return '';
+
+    switch (notif.type) {
+      case 'overdue':
+        return 'bg-red-50 border-l-4 border-red-500';
+      case 'today':
+        return 'bg-yellow-50 border-l-4 border-yellow-500';
+      case 'tomorrow':
+        return 'bg-green-50 border-l-4 border-green-500';
+      default:
+        return '';
+    }
+  };
 
   // Process Sutra settings (loaded from localStorage or settings page)
   const getProcessSutraSettings = () => {
@@ -51,6 +80,34 @@ export default function FollowupDashboardPage() {
     loadData();
   }, [selectedCampaign]);
 
+  // Auto-refresh every 30 seconds so data stays live without browser refresh
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Silent refresh — only update if no dialog is open
+      if (!selectedLead) {
+        refreshSilently();
+      }
+    }, 30 * 1000);
+    return () => clearInterval(interval);
+  }, [selectedCampaign, selectedLead]);
+
+  const refreshSilently = async () => {
+    setIsRefreshing(true);
+    try {
+      const [leadsData, campaignsData] = await Promise.all([
+        dashboardService.getAllLeadsDashboard(selectedCampaign || undefined),
+        campaignService.getAll(),
+      ]);
+      setLeads(leadsData);
+      setCampaigns(campaignsData);
+      setLastRefreshed(new Date());
+    } catch {
+      // Silently fail on background refresh
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     setError(null);
@@ -61,11 +118,50 @@ export default function FollowupDashboardPage() {
       ]);
       setLeads(leadsData);
       setCampaigns(campaignsData);
+      setLastRefreshed(new Date());
     } catch (error) {
       console.error('Failed to load data', error);
       setError('Failed to load dashboard data. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Update browser tab title with pending count
+  useEffect(() => {
+    const overdue = notifications.filter(n => n.type === 'overdue').length;
+    const today = notifications.filter(n => n.type === 'today').length;
+    const total = overdue + today;
+    if (total > 0) {
+      document.title = `(${total}${overdue > 0 ? '🔴' : '⏰'}) Follow-ups`;
+    } else {
+      document.title = 'Follow-ups';
+    }
+    return () => { document.title = 'CRM'; };
+  }, [notifications]);
+
+  // Open quick reschedule input and focus it
+  useEffect(() => {
+    if (quickReschedule && rescheduleRef.current) {
+      rescheduleRef.current.focus();
+    }
+  }, [quickReschedule]);
+
+  const handleQuickReschedule = async () => {
+    if (!quickReschedule?.value) return;
+    setSavingReschedule(true);
+    try {
+      await followupService.update(quickReschedule.followupId, {
+        nextCallDate: new Date(quickReschedule.value).toISOString(),
+      });
+      toast.success('Rescheduled');
+      setQuickReschedule(null);
+      await refreshSilently();
+      syncWithDelay(300);
+    } catch {
+      toast.error('Failed to reschedule');
+    } finally {
+      setSavingReschedule(false);
     }
   };
 
@@ -148,6 +244,16 @@ export default function FollowupDashboardPage() {
       return matchSearch && matchSource && matchDnd && matchDue;
     })
     .sort((a, b) => {
+      // Always pin overdue then today rows to the top
+      const getUrgencyScore = (lead: Lead) => {
+        const notif = notifications.find(n => n.followupId === lead.followups?.[0]?.id);
+        if (notif?.type === 'overdue') return 0;
+        if (notif?.type === 'today') return 1;
+        return 2;
+      };
+      const urgencyDiff = getUrgencyScore(a) - getUrgencyScore(b);
+      if (urgencyDiff !== 0) return urgencyDiff;
+
       let comparison = 0;
       switch (sortField) {
         case 'name':
@@ -252,6 +358,56 @@ export default function FollowupDashboardPage() {
         </div>
       )}
       <div className="sleek-page p-3 lg:p-4">
+        {/* Live indicator bar */}
+        <div className="flex items-center justify-between mb-3 px-1">
+          <div className="flex items-center gap-2">
+            <span className={`flex items-center gap-1.5 text-xs font-medium ${isRefreshing ? 'text-amber-600' : 'text-green-600'}`}>
+              <span className={`w-2 h-2 rounded-full ${isRefreshing ? 'bg-amber-400 animate-pulse' : 'bg-green-400 animate-pulse'}`} />
+              {isRefreshing ? 'Refreshing...' : 'Live'}
+            </span>
+            <span className="text-xs text-slate-400">
+              Updated {format(lastRefreshed, 'h:mm:ss a')}
+            </span>
+          </div>
+          <button
+            onClick={() => { setLoading(false); refreshSilently(); }}
+            disabled={isRefreshing}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 disabled:opacity-50 transition-colors"
+          >
+            <svg className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
+        </div>
+        {/* Pending Notifications Banner */}
+        {notifications.length > 0 && (
+          <div className="mb-4 p-4 bg-gradient-to-r from-red-50 to-yellow-50 border border-red-200 rounded-lg">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <div>
+                  <h3 className="font-semibold text-red-900">
+                    ⚠️ {notifications.length} PENDING FOLLOWUP{notifications.length > 1 ? 'S' : ''}
+                  </h3>
+                  <p className="text-sm text-red-700 mt-1">
+                    {notifications.filter(n => n.type === 'overdue').length > 0 && (
+                      <span>🔴 {notifications.filter(n => n.type === 'overdue').length} OVERDUE  </span>
+                    )}
+                    {notifications.filter(n => n.type === 'today').length > 0 && (
+                      <span>⏰ {notifications.filter(n => n.type === 'today').length} DUE TODAY  </span>
+                    )}
+                    {notifications.filter(n => n.type === 'tomorrow').length > 0 && (
+                      <span>📅 {notifications.filter(n => n.type === 'tomorrow').length} DUE TOMORROW</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -334,12 +490,14 @@ export default function FollowupDashboardPage() {
                   >
                     Clear
                   </button>
-                  <button
-                    onClick={exportToCSV}
-                    className="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
-                  >
-                    Export
-                  </button>
+                  {user?.role === 'ADMIN' && (
+                    <button
+                      onClick={exportToCSV}
+                      className="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                    >
+                      Export
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -408,7 +566,7 @@ export default function FollowupDashboardPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {paginatedLeads.map((lead) => (
-                    <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={lead.id} className={`transition-colors ${getRowHighlightClass(lead)} ${!getRowHighlightClass(lead) ? 'hover:bg-gray-50' : 'hover:opacity-90'}`}>
                       <td className="px-3 py-2 text-xs text-gray-500 font-mono">{lead.id.slice(0, 8)}</td>
                       <td className="px-3 py-2 text-sm text-gray-500 truncate max-w-[120px]">{lead.campaign?.name}</td>
                       <td className="px-3 py-2">
@@ -430,18 +588,63 @@ export default function FollowupDashboardPage() {
                       </td>
                       <td className="px-3 py-2 text-sm text-gray-700">{lead.phone || '-'}</td>
                       <td className="px-3 py-2">
-                        {lead.followups?.[0]?.nextCallDate ? (
-                          <span className={`text-xs font-medium ${
-                            new Date(lead.followups[0].nextCallDate) < new Date()
-                              ? 'text-red-600'
-                              : new Date(lead.followups[0].nextCallDate).toDateString() === new Date().toDateString()
-                                ? 'text-amber-600'
-                                : 'text-gray-900'
-                          }`}>
+                        {quickReschedule?.leadId === lead.id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              ref={rescheduleRef}
+                              type="datetime-local"
+                              value={quickReschedule.value}
+                              onChange={e => setQuickReschedule(q => q ? { ...q, value: e.target.value } : null)}
+                              onKeyDown={e => { if (e.key === 'Enter') handleQuickReschedule(); if (e.key === 'Escape') setQuickReschedule(null); }}
+                              className="text-xs border border-primary-400 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500 w-40"
+                            />
+                            <button
+                              onClick={handleQuickReschedule}
+                              disabled={savingReschedule}
+                              className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
+                              title="Save"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </button>
+                            <button onClick={() => setQuickReschedule(null)} className="p-1 bg-gray-100 text-gray-500 rounded hover:bg-gray-200" title="Cancel">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ) : lead.followups?.[0]?.nextCallDate ? (
+                          <button
+                            onClick={() => setQuickReschedule({
+                              leadId: lead.id,
+                              followupId: lead.followups![0].id,
+                              value: format(new Date(lead.followups![0].nextCallDate!), "yyyy-MM-dd'T'HH:mm"),
+                            })}
+                            className={`text-xs font-medium text-left hover:underline ${
+                              new Date(lead.followups[0].nextCallDate) < new Date()
+                                ? 'text-red-600'
+                                : new Date(lead.followups[0].nextCallDate).toDateString() === new Date().toDateString()
+                                  ? 'text-amber-600'
+                                  : 'text-gray-900'
+                            }`}
+                            title="Click to reschedule"
+                          >
                             {format(new Date(lead.followups[0].nextCallDate), 'MMM d, h:mm a')}
-                          </span>
+                            <span className="block text-[10px] text-gray-400">click to reschedule</span>
+                          </button>
                         ) : (
-                          <span className="text-gray-400 text-xs">-</span>
+                          <button
+                            onClick={() => lead.followups?.[0] && setQuickReschedule({
+                              leadId: lead.id,
+                              followupId: lead.followups[0].id,
+                              value: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+                            })}
+                            className="text-xs text-blue-400 hover:text-blue-600 hover:underline"
+                            title="Set next call date"
+                          >
+                            + Schedule
+                          </button>
                         )}
                       </td>
                       <td className="px-3 py-2 text-xs text-gray-500">{format(new Date(lead.updatedAt), 'MMM d, yyyy')}</td>
@@ -544,6 +747,7 @@ export default function FollowupDashboardPage() {
           onUpdate={() => {
             setSelectedLead(null);
             loadData();
+            syncWithDelay(500); // Sync notifications after lead update
           }}
         />
       )}

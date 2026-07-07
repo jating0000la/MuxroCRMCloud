@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, HttpCode } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -6,6 +6,13 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { IsString, MinLength } from 'class-validator';
+
+class ResetPasswordDto {
+  @IsString()
+  @MinLength(6)
+  password: string;
+}
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -47,5 +54,20 @@ export class UsersController {
   @ApiOperation({ summary: 'Deactivate user (Admin only)' })
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
+  }
+
+  @Patch(':id/reset-password')
+  @Roles('ADMIN')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Reset user password (Admin only)' })
+  resetPassword(@Param('id') id: string, @Body() dto: ResetPasswordDto) {
+    return this.usersService.resetPassword(id, dto.password);
+  }
+
+  @Delete(':id/permanent')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Permanently delete user (Admin only)' })
+  permanentDelete(@Param('id') id: string) {
+    return this.usersService.permanentDelete(id);
   }
 }

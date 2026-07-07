@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { dashboardService } from '../../services/dashboard';
 import { campaignService } from '../../services/campaigns';
 import { Lead, Campaign } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 import Layout from '../../components/layout/Layout';
 import Pagination from '../../components/common/Pagination';
 import StatusUpdateDialog from '../../components/leads/StatusUpdateDialog';
@@ -14,6 +15,7 @@ type SortField = 'name' | 'campaign' | 'status' | 'doer' | 'source' | 'updatedAt
 type SortDir = 'asc' | 'desc';
 
 export default function LeadsDashboardPage() {
+  const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<string>('');
@@ -132,15 +134,17 @@ export default function LeadsDashboardPage() {
           <div>
             <p className="text-gray-500">Manage and track all your leads across campaigns</p>
           </div>
-          <button
-            onClick={exportToCSV}
-            className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm"
-          >
-            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export CSV
-          </button>
+          {user?.role === 'ADMIN' && (
+            <button
+              onClick={exportToCSV}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm"
+            >
+              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Export CSV
+            </button>
+          )}
         </div>
 
         {/* Filters */}

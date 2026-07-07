@@ -46,11 +46,6 @@ const rolePermissions: Record<string, Permission[]> = {
     'user:delete',
     'enquiry:submit',
   ],
-  MANAGER: [
-    'lead:view_assigned',
-    'lead:update_status',
-    'enquiry:submit',
-  ],
   USER: [
     'lead:view_assigned',
     'lead:update_status',
@@ -69,10 +64,6 @@ export function hasAnyPermission(user: User | null, permissions: Permission[]): 
 
 export function isAdmin(user: User | null): boolean {
   return user?.role === 'ADMIN';
-}
-
-export function isManager(user: User | null): boolean {
-  return user?.role === 'MANAGER';
 }
 
 export function isUser(user: User | null): boolean {

@@ -27,8 +27,18 @@ export const userService = {
     return data;
   },
 
+  resetPassword: async (id: string, password: string) => {
+    const { data } = await api.patch(`/users/${id}/reset-password`, { password });
+    return data;
+  },
+
   remove: async (id: string) => {
     const { data } = await api.delete(`/users/${id}`);
+    return data;
+  },
+
+  permanentDelete: async (id: string) => {
+    const { data } = await api.delete(`/users/${id}/permanent`);
     return data;
   },
 };
