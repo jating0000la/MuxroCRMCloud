@@ -4,11 +4,11 @@
 # Single command to setup entire development environment
 # Clones repo, installs dependencies, creates database, builds everything
 #
-# Usage: powershell -NoProfile -ExecutionPolicy Bypass -File setup.ps1 -GitHubUrl "https://github.com/user/repo.git" -ProjectDir "C:\path\to\project"
+# Usage: powershell -NoProfile -ExecutionPolicy Bypass -File setup.ps1 -GitHubUrl "https://github.com/jating0000la/MuxroCRMCloud.git" -ProjectDir "C:\path\to\project"
 # Or: .\setup.ps1
 
 param(
-    [string]$GitHubUrl = "https://github.com/user/repo.git",
+    [string]$GitHubUrl = "https://github.com/jating0000la/MuxroCRMCloud.git",
     [string]$ProjectDir = ".",
     [string]$DbName = "crm_db",
     [string]$DbUser = "postgres",

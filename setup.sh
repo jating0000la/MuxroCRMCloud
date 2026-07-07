@@ -7,7 +7,7 @@
 # Clones repo, installs dependencies, creates database, builds everything
 #
 # Usage: bash setup.sh [github-url] [project-dir]
-# Example: bash setup.sh https://github.com/user/muxro-crm /opt/muxro-crm
+# Example: bash setup.sh https://github.com/jating0000la/MuxroCRMCloud.git /opt/muxro-crm
 ################################################################################
 
 set -e
@@ -20,7 +20,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-GITHUB_URL="${1:-https://github.com/user/repo.git}"
+GITHUB_URL="${1:-https://github.com/jating0000la/MuxroCRMCloud.git}"
 PROJECT_DIR="${2:-.}"
 DB_NAME="crm_db"
 DB_USER="postgres"
