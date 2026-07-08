@@ -35,6 +35,7 @@ export interface CampaignStatus {
   label: string;
   color: string;
   order: number;
+  whatsappMessage?: string;
 }
 
 export interface Lead {

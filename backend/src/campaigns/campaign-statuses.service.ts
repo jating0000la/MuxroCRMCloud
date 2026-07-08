@@ -12,7 +12,7 @@ export class CampaignStatusesService {
     });
   }
 
-  async create(campaignId: string, data: { label: string; color?: string }) {
+  async create(campaignId: string, data: { label: string; color?: string; whatsappMessage?: string }) {
     const maxOrder = await this.prisma.campaignStatus.findFirst({
       where: { campaignId },
       orderBy: { order: 'desc' },
@@ -24,12 +24,13 @@ export class CampaignStatusesService {
         campaignId,
         label: data.label,
         color: data.color || '#3B82F6',
+        whatsappMessage: data.whatsappMessage || null,
         order: (maxOrder?.order ?? -1) + 1,
       },
     });
   }
 
-  async update(id: string, data: { label?: string; color?: string; order?: number }) {
+  async update(id: string, data: { label?: string; color?: string; order?: number; whatsappMessage?: string }) {
     await this.findOne(id);
     return this.prisma.campaignStatus.update({
       where: { id },

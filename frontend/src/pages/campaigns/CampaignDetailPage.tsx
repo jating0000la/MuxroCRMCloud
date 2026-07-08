@@ -53,7 +53,10 @@ export default function CampaignDetailPage() {
   // Status management
   const [newStatusLabel, setNewLabelStatus] = useState('');
   const [newStatusColor, setNewStatusColor] = useState(STATUS_COLORS[0]);
+  const [newStatusWhatsapp, setNewStatusWhatsapp] = useState('');
   const [addingStatus, setAddingStatus] = useState(false);
+  const [editingStatusId, setEditingStatusId] = useState<string | null>(null);
+  const [editStatusWhatsapp, setEditStatusWhatsapp] = useState('');
 
   // Campaign edit
   const [editingCampaign, setEditingCampaign] = useState(false);
@@ -698,10 +701,12 @@ export default function CampaignDetailPage() {
                         await statusService.create(id!, {
                           label: newStatusLabel.trim(),
                           color: newStatusColor,
+                          whatsappMessage: newStatusWhatsapp.trim() || undefined,
                         });
                         toast.success('Status added');
                         setNewLabelStatus('');
                         setNewStatusColor(STATUS_COLORS[0]);
+                        setNewStatusWhatsapp('');
                         loadData();
                       } catch (error) {
                         toast.error('Failed to add status');
@@ -715,6 +720,16 @@ export default function CampaignDetailPage() {
                     {addingStatus ? 'Adding...' : 'Add Status'}
                   </button>
                 </div>
+                <div className="mt-3">
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">WhatsApp Message (optional)</label>
+                  <textarea
+                    value={newStatusWhatsapp}
+                    onChange={(e) => setNewStatusWhatsapp(e.target.value)}
+                    placeholder="e.g., Hi {{name}}, we tried reaching you. Please call us back."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 h-16"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">Auto-send when a lead is moved to this status. Use {'{{name}}'}, {'{{phone}}'}, {'{{email}}'} for field values.</p>
+                </div>
               </div>
 
               {/* Current Statuses */}
@@ -723,41 +738,103 @@ export default function CampaignDetailPage() {
                 <div className="space-y-2">
                   {campaign.statuses?.map((status) => {
                     const leadCount = leads.filter((l) => l.statusId === status.id).length;
+                    const isEditing = editingStatusId === status.id;
                     return (
                       <div
                         key={status.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg dark:bg-gray-900/50"
+                        className="p-3 bg-gray-50 rounded-lg dark:bg-gray-900/50"
                       >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-4 h-4 rounded-full"
-                            style={{ backgroundColor: status.color }}
-                          />
-                          <span className="font-medium text-gray-900 dark:text-gray-100">{status.label}</span>
-                          <span className="text-sm text-gray-500 dark:text-gray-400">({leadCount} leads)</span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-4 h-4 rounded-full"
+                              style={{ backgroundColor: status.color }}
+                            />
+                            <span className="font-medium text-gray-900 dark:text-gray-100">{status.label}</span>
+                            <span className="text-sm text-gray-500 dark:text-gray-400">({leadCount} leads)</span>
+                            {status.whatsappMessage && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">WA</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                if (isEditing) {
+                                  setEditingStatusId(null);
+                                } else {
+                                  setEditingStatusId(status.id);
+                                  setEditStatusWhatsapp(status.whatsappMessage || '');
+                                }
+                              }}
+                              className="p-1.5 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
+                              title="Edit WhatsApp message"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (leadCount > 0) {
+                                  toast.error(`Cannot delete "${status.label}" - ${leadCount} lead(s) are using it`);
+                                  return;
+                                }
+                                if (!confirm(`Delete status "${status.label}"?`)) return;
+                                try {
+                                  await statusService.remove(id!, status.id);
+                                  toast.success('Status deleted');
+                                  loadData();
+                                } catch (error: any) {
+                                  toast.error(error.response?.data?.message || 'Failed to delete status');
+                                }
+                              }}
+                              aria-label="Delete status"
+                              className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
                         </div>
-                        <button
-                          onClick={async () => {
-                            if (leadCount > 0) {
-                              toast.error(`Cannot delete "${status.label}" - ${leadCount} lead(s) are using it`);
-                              return;
-                            }
-                            if (!confirm(`Delete status "${status.label}"?`)) return;
-                            try {
-                              await statusService.remove(id!, status.id);
-                              toast.success('Status deleted');
-                              loadData();
-                            } catch (error: any) {
-                              toast.error(error.response?.data?.message || 'Failed to delete status');
-                            }
-                          }}
-                          aria-label="Delete status"
-                          className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
+                        {isEditing && (
+                          <div className="mt-3 pl-7">
+                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">WhatsApp Message for "{status.label}"</label>
+                            <textarea
+                              value={editStatusWhatsapp}
+                              onChange={(e) => setEditStatusWhatsapp(e.target.value)}
+                              placeholder="e.g., Hi {{name}}, we tried reaching you. Please call us back."
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 h-16"
+                            />
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await statusService.update(id!, status.id, {
+                                      whatsappMessage: editStatusWhatsapp.trim() || undefined,
+                                    });
+                                    toast.success('WhatsApp message saved');
+                                    setEditingStatusId(null);
+                                    loadData();
+                                  } catch (error) {
+                                    toast.error('Failed to save');
+                                  }
+                                }}
+                                className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setEditingStatusId(null)}
+                                className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                            <p className="text-[11px] text-gray-400 mt-1">Use {'{{name}}'}, {'{{phone}}'}, {'{{email}}'} for field values</p>
+                          </div>
+                        )}
+                        {!isEditing && status.whatsappMessage && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-7 truncate">{status.whatsappMessage}</p>
+                        )}
                       </div>
                     );
                   })}

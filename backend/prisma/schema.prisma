@@ -70,14 +70,15 @@ model CampaignUser {
 }
 
 model CampaignStatus {
-  id            String    @id @default(uuid())
-  campaignId    String
-  label         String
-  color         String    @default("#3B82F6")
-  order         Int       @default(0)
+  id              String    @id @default(uuid())
+  campaignId      String
+  label           String
+  color           String    @default("#3B82F6")
+  order           Int       @default(0)
+  whatsappMessage String?
 
-  campaign      Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  leads         Lead[]
+  campaign        Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  leads           Lead[]
 
   @@index([campaignId])
 }

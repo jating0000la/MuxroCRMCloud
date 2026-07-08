@@ -18,6 +18,19 @@ export class FollowupsController {
     return this.followupsService.findByLead(leadId);
   }
 
+  @Get('cross-campaign')
+  @ApiOperation({ summary: 'Find follow-ups across campaigns by phone or email' })
+  @ApiQuery({ name: 'phone', required: false })
+  @ApiQuery({ name: 'email', required: false })
+  @ApiQuery({ name: 'excludeLeadId', required: false })
+  findCrossCampaign(
+    @Query('phone') phone?: string,
+    @Query('email') email?: string,
+    @Query('excludeLeadId') excludeLeadId?: string,
+  ) {
+    return this.followupsService.findCrossCampaign(phone, email, excludeLeadId);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Create a follow-up' })
   create(@Body() dto: CreateFollowupDto, @Request() req) {

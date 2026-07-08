@@ -33,4 +33,9 @@ export const followupService = {
     const { data } = await api.put(`/followups/${id}`, payload);
     return data;
   },
+
+  getCrossCampaign: async (params: { phone?: string; email?: string; excludeLeadId?: string }): Promise<any[]> => {
+    const { data } = await api.get('/followups/cross-campaign', { params });
+    return data;
+  },
 };

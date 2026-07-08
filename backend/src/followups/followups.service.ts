@@ -129,4 +129,50 @@ export class FollowupsService {
 
     return this.prisma.followup.delete({ where: { id } });
   }
+
+  async findCrossCampaign(phone?: string, email?: string, excludeLeadId?: string) {
+    if (!phone && !email) return [];
+
+    const orConditions: any[] = [];
+    if (phone) {
+      const normalized = phone.replace(/\D/g, '');
+      orConditions.push({ phone: normalized });
+      orConditions.push({ phone: { contains: normalized } });
+    }
+    if (email) {
+      orConditions.push({ email: email.toLowerCase() });
+    }
+
+    const leads = await this.prisma.lead.findMany({
+      where: {
+        ...(excludeLeadId ? { id: { not: excludeLeadId } } : {}),
+        OR: orConditions,
+      },
+      select: { id: true, name: true, campaignId: true },
+    });
+
+    if (leads.length === 0) return [];
+
+    const leadIds = leads.map((l) => l.id);
+    const leadMap = new Map(leads.map((l) => [l.id, l]));
+
+    const followups = await this.prisma.followup.findMany({
+      where: { leadId: { in: leadIds } },
+      include: {
+        user: { select: { id: true, name: true, username: true } },
+        lead: {
+          include: {
+            campaign: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return followups.map((f) => ({
+      ...f,
+      crossCampaign: true,
+      matchedLead: leadMap.get(f.leadId),
+    }));
+  }
 }

@@ -25,7 +25,7 @@ export class CampaignStatusesController {
   @ApiOperation({ summary: 'Create a new status' })
   create(
     @Param('campaignId') campaignId: string,
-    @Body() body: { label: string; color?: string },
+    @Body() body: { label: string; color?: string; whatsappMessage?: string },
   ) {
     return this.statusesService.create(campaignId, body);
   }
@@ -35,7 +35,7 @@ export class CampaignStatusesController {
   @ApiOperation({ summary: 'Update a status' })
   update(
     @Param('id') id: string,
-    @Body() body: { label?: string; color?: string; order?: number },
+    @Body() body: { label?: string; color?: string; order?: number; whatsappMessage?: string },
   ) {
     return this.statusesService.update(id, body);
   }

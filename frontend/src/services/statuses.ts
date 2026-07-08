@@ -7,12 +7,12 @@ export const statusService = {
     return data;
   },
 
-  create: async (campaignId: string, statusData: { label: string; color?: string }): Promise<CampaignStatus> => {
+  create: async (campaignId: string, statusData: { label: string; color?: string; whatsappMessage?: string }): Promise<CampaignStatus> => {
     const { data } = await api.post(`/campaigns/${campaignId}/statuses`, statusData);
     return data;
   },
 
-  update: async (campaignId: string, id: string, statusData: { label?: string; color?: string; order?: number }): Promise<CampaignStatus> => {
+  update: async (campaignId: string, id: string, statusData: { label?: string; color?: string; order?: number; whatsappMessage?: string }): Promise<CampaignStatus> => {
     const { data } = await api.put(`/campaigns/${campaignId}/statuses/${id}`, statusData);
     return data;
   },
