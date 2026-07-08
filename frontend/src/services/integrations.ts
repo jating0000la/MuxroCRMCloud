@@ -42,17 +42,17 @@ export interface IndiamartAutoImportResult {
 }
 
 export interface GupshupSendMessagePayload {
-  apiKey: string;
-  source: string;
-  appName: string;
+  apiKey?: string;
+  source?: string;
+  appName?: string;
   destination: string;
   message: string;
   disablePreview?: boolean;
 }
 
 export interface GupshupSendTemplatePayload {
-  apiKey: string;
-  source: string;
+  apiKey?: string;
+  source?: string;
   destination: string;
   templateId: string;
   templateParams?: string[];
@@ -60,9 +60,9 @@ export interface GupshupSendTemplatePayload {
 }
 
 export interface GupshupTestPayload {
-  apiKey: string;
-  source: string;
-  appName: string;
+  apiKey?: string;
+  source?: string;
+  appName?: string;
   testPhone: string;
 }
 
@@ -117,6 +117,11 @@ const integrationService = {
 
   testGupshup: async (payload: GupshupTestPayload): Promise<{ success: boolean; message: string }> => {
     const { data } = await api.post('/integrations/gupshup/test-connection', payload);
+    return data;
+  },
+
+  syncGupshupTemplates: async (): Promise<{ success: boolean; templates: any[]; error?: string }> => {
+    const { data } = await api.post('/integrations/gupshup/sync-templates');
     return data;
   },
 };

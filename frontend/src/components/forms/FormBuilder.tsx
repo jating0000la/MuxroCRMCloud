@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import integrationService from '../../services/integrations';
 
 interface FormBuilderField {
   name: string;
@@ -120,6 +121,34 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
   const [selectedFieldIndex, setSelectedFieldIndex] = useState<number | null>(null);
   const [builderTab, setBuilderTab] = useState<'fields' | 'design' | 'communication'>('fields');
   const [customColorSlots, setCustomColorSlots] = useState<string[]>(EMPTY_CUSTOM_SLOTS);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesError, setTemplatesError] = useState('');
+  const [templatesFetched, setTemplatesFetched] = useState(false);
+
+  const fetchTemplates = useCallback(async () => {
+    setTemplatesLoading(true);
+    setTemplatesError('');
+    try {
+      const result = await integrationService.syncGupshupTemplates();
+      if (result.success) {
+        setTemplates(result.templates || []);
+        setTemplatesFetched(true);
+      } else {
+        setTemplatesError(result.error || 'Failed to fetch templates');
+      }
+    } catch (err: any) {
+      setTemplatesError(err.response?.data?.message || err.message || 'Failed to fetch templates');
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (builderTab === 'communication' && communication.whatsappEnabled && !templatesFetched && !templatesLoading) {
+      fetchTemplates();
+    }
+  }, [builderTab, communication.whatsappEnabled, templatesFetched, templatesLoading, fetchTemplates]);
 
   const normalizeHexColor = (value: string) => {
     const trimmed = value.trim();
@@ -648,15 +677,51 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                 <>
                   <div className="p-4 border border-gray-200 rounded-xl space-y-4">
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Gupshup Template ID</label>
-                      <input
-                        type="text"
-                        value={communication.templateId}
-                        onChange={(e) => setCommunication((prev) => ({ ...prev, templateId: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
-                        placeholder="e.g., c6aecef6-bcb0-4fb1-8100-28c094e3bc6b"
-                      />
-                      <p className="text-xs text-gray-400 mt-1">The template must be approved in your Gupshup console</p>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">WhatsApp Template</label>
+                        <button
+                          type="button"
+                          onClick={fetchTemplates}
+                          disabled={templatesLoading}
+                          className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+                        >
+                          {templatesLoading ? (
+                            <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                          ) : (
+                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                          )}
+                          {templatesLoading ? 'Syncing...' : 'Refresh'}
+                        </button>
+                      </div>
+                      {templates.length > 0 ? (
+                        <select
+                          value={communication.templateId}
+                          onChange={(e) => setCommunication((prev) => ({ ...prev, templateId: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
+                        >
+                          <option value="">Select a template...</option>
+                          {templates.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name} ({t.language}) — {t.status}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={communication.templateId}
+                          onChange={(e) => setCommunication((prev) => ({ ...prev, templateId: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
+                          placeholder="Enter template ID manually"
+                        />
+                      )}
+                      {templatesError && <p className="text-xs text-red-500 mt-1">{templatesError}</p>}
+                      {!templatesError && templates.length === 0 && templatesFetched && (
+                        <p className="text-xs text-amber-600 mt-1">No templates found. Check your Gupshup App ID in Settings.</p>
+                      )}
+                      {templates.length > 0 && (
+                        <p className="text-xs text-gray-400 mt-1">{templates.length} template(s) synced from Gupshup</p>
+                      )}
                     </div>
 
                     <div>

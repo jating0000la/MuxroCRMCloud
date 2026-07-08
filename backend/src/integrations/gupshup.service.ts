@@ -8,7 +8,11 @@ export interface GupshupSessionMessage {
   source: string;
   'src.name': string;
   destination: string;
-  message: string;
+  message: {
+    type: 'text';
+    text: string;
+    previewUrl?: boolean;
+  };
   disablePreview?: boolean;
   encode?: boolean;
 }
@@ -43,8 +47,8 @@ export interface GupshupInboundMessage {
 @Injectable()
 export class GupshupService {
   private readonly logger = new Logger(GupshupService.name);
-  private readonly SESSION_MSG_URL = 'https://api.gupshup.io/sm/api/v1/msg';
-  private readonly TEMPLATE_MSG_URL = 'https://api.gupshup.io/sm/api/v1/template/msg';
+  private readonly SESSION_MSG_URL = 'https://api.gupshup.io/wa/api/v1/msg';
+  private readonly TEMPLATE_MSG_URL = 'https://api.gupshup.io/wa/api/v1/template/msg';
 
   constructor(private http: HttpService) {}
 
@@ -61,27 +65,33 @@ export class GupshupService {
     disablePreview?: boolean,
   ): Promise<GupshupSendResponse> {
     if (!apiKey) throw new BadRequestException('Gupshup API key not configured');
-    if (!source) throw new BadRequestException('Source phone number not configured');
-    if (!destination) throw new BadRequestException('Destination phone number required');
+    const normalizedSource = this.normalizePhone(source);
+    const normalizedDestination = this.normalizePhone(destination);
+    if (!normalizedSource) throw new BadRequestException('Source phone number not configured');
+    if (!normalizedDestination) throw new BadRequestException('Destination phone number required');
 
-    this.logger.log(`Sending session message to ${destination}`);
+    this.logger.log(`Sending session message to ${normalizedDestination}`);
 
     try {
       const params = new URLSearchParams();
       params.append('channel', 'whatsapp');
-      params.append('source', source);
+      params.append('source', normalizedSource);
       params.append('src.name', appName);
-      params.append('destination', destination);
-      params.append('message', message);
+      params.append('destination', normalizedDestination);
+      const messagePayload: GupshupSessionMessage['message'] = {
+        type: 'text',
+        text: message,
+      };
       if (disablePreview !== undefined) {
-        params.append('disablePreview', String(disablePreview));
+        messagePayload.previewUrl = !disablePreview;
       }
+      params.append('message', JSON.stringify(messagePayload));
 
       const response: AxiosResponse = await firstValueFrom(
         this.http.post(this.SESSION_MSG_URL, params.toString(), {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'api_key': apiKey,
+            apikey: apiKey,
           },
           timeout: 30000,
         }),
@@ -108,22 +118,26 @@ export class GupshupService {
   async sendTemplateMessage(
     apiKey: string,
     source: string,
+    appName: string,
     destination: string,
     templateId: string,
     templateParams?: string[],
     mediaMessage?: { type: string; link: string },
   ): Promise<GupshupSendResponse> {
     if (!apiKey) throw new BadRequestException('Gupshup API key not configured');
-    if (!source) throw new BadRequestException('Source phone number not configured');
-    if (!destination) throw new BadRequestException('Destination phone number required');
+    const normalizedSource = this.normalizePhone(source);
+    const normalizedDestination = this.normalizePhone(destination);
+    if (!normalizedSource) throw new BadRequestException('Source phone number not configured');
+    if (!normalizedDestination) throw new BadRequestException('Destination phone number required');
     if (!templateId) throw new BadRequestException('Template ID required');
 
-    this.logger.log(`Sending template message to ${destination}`);
+    this.logger.log(`Sending template message to ${normalizedDestination}`);
 
     try {
       const params = new URLSearchParams();
-      params.append('source', source);
-      params.append('destination', destination);
+      params.append('source', normalizedSource);
+      params.append('destination', normalizedDestination);
+      params.append('src.name', appName);
 
       const templateObj: any = { id: templateId };
       if (templateParams && templateParams.length > 0) {
@@ -141,7 +155,7 @@ export class GupshupService {
         this.http.post(this.TEMPLATE_MSG_URL, params.toString(), {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'Apikey': apiKey,
+            apikey: apiKey,
           },
           timeout: 30000,
         }),
@@ -180,7 +194,7 @@ export class GupshupService {
       );
       return {
         success: true,
-        message: `Connection successful. Message ID: ${result.messageId}`,
+        message: `Request submitted to Gupshup. Message ID: ${result.messageId}. Delivery still depends on session window, opt-in, and webhook status events.`,
       };
     } catch (error: any) {
       return {
@@ -197,16 +211,109 @@ export class GupshupService {
     try {
       if (!payload) return null;
 
+      const eventType = payload.type || 'message';
+      const eventPayload = payload.payload || {};
+
+      if (eventType === 'message') {
+        const inboundPayload = eventPayload.payload || {};
+
+        return {
+          type: eventType,
+          source: eventPayload.source || eventPayload.sender?.phone || '',
+          destination: payload.app || eventPayload.destination || '',
+          message: this.normalizeInboundMessage(eventPayload.type, inboundPayload),
+          timestamp: this.normalizeTimestamp(payload.timestamp),
+          messageId: eventPayload.id || eventPayload.context?.gsId || '',
+        };
+      }
+
       return {
-        type: payload.type || 'message',
-        source: payload.source || '',
-        destination: payload.destination || '',
-        message: payload.message || {},
-        timestamp: payload.timestamp || new Date().toISOString(),
-        messageId: payload.messageId || '',
+        type: eventType,
+        source: eventPayload.source || eventPayload.phone || eventPayload.srcAddr || '',
+        destination: eventPayload.destination || eventPayload.destAddr || payload.app || '',
+        message: eventPayload,
+        timestamp: this.normalizeTimestamp(payload.timestamp),
+        messageId: eventPayload.id || eventPayload.gsId || eventPayload.externalId || '',
       };
     } catch {
       return null;
+    }
+  }
+
+  private normalizeInboundMessage(messageType: string | undefined, payload: any): any {
+    if (messageType === 'text') {
+      return { text: payload?.text || '' };
+    }
+
+    if (messageType === 'button_reply' || messageType === 'list_reply') {
+      return {
+        text: payload?.title || payload?.text || payload?.postbackText || '',
+        ...payload,
+      };
+    }
+
+    return payload || {};
+  }
+
+  private normalizeTimestamp(timestamp: string | number | undefined): string {
+    if (typeof timestamp === 'number') {
+      return new Date(timestamp).toISOString();
+    }
+
+    if (typeof timestamp === 'string') {
+      const numericTimestamp = Number(timestamp);
+      if (!Number.isNaN(numericTimestamp) && timestamp.trim() !== '') {
+        return new Date(numericTimestamp).toISOString();
+      }
+      return timestamp;
+    }
+
+    return new Date().toISOString();
+  }
+
+  private normalizePhone(phone: string): string {
+    return String(phone || '').replace(/\D/g, '');
+  }
+
+  /**
+   * Fetch approved WhatsApp templates from Gupshup
+   */
+  async syncTemplates(
+    apiKey: string,
+    appId: string,
+  ): Promise<{ success: boolean; templates: any[]; error?: string }> {
+    if (!apiKey) throw new BadRequestException('Gupshup API key not configured');
+    if (!appId) throw new BadRequestException('Gupshup App ID required for template sync');
+
+    try {
+      const url = `https://api.gupshup.io/wa/app/${encodeURIComponent(appId)}/template?pageNo=0&pageSize=100`;
+      const response: AxiosResponse = await firstValueFrom(
+        this.http.get(url, {
+          headers: { api_key: apiKey },
+          timeout: 30000,
+        }),
+      );
+
+      const body = response.data as any;
+      const list = body.templates || body.data || body.payload || body.templateList || [];
+      const templates = Array.isArray(list)
+        ? list.map((t: any) => ({
+            id: t.id || t.templateId || '',
+            name: t.elementName || t.name || t.templateName || t.id || '',
+            language: t.languageCode || t.language || '',
+            category: t.category || t.templateCategory || '',
+            type: t.templateType || t.type || '',
+            status: t.status || t.templateStatus || '',
+            body: t.data || t.body || t.content || '',
+          }))
+        : [];
+
+      this.logger.log(`Synced ${templates.length} Gupshup templates`);
+      return { success: true, templates };
+    } catch (error: any) {
+      const msg = error.response?.data?.message || error.message;
+      this.logger.error(`Template sync failed: ${msg}`);
+      return { success: false, templates: [], error: msg };
     }
   }
 }
