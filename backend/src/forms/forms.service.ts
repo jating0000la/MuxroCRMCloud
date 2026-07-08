@@ -5,6 +5,7 @@ import { PaginationDto } from '../common/pagination.dto';
 import { CreateFormDto } from './dto/create-form.dto';
 import { UpdateFormDto } from './dto/update-form.dto';
 import { GupshupService } from '../integrations/gupshup.service';
+import { SettingsService } from '../settings/settings.service';
 import { v4 as uuidv4 } from 'uuid';
 
 type PublicFormField = {
@@ -24,6 +25,7 @@ export class FormsService {
   constructor(
     private prisma: PrismaService,
     private gupshup: GupshupService,
+    private settingsService: SettingsService,
   ) {}
 
   async create(campaignId: string, dto: CreateFormDto) {
@@ -122,8 +124,12 @@ export class FormsService {
       },
     });
 
+    // Extract per-form communication config from meta
+    const metaField = fields.find((f: any) => f.type === '__design_meta' || f.name === '__form_meta');
+    const formComm = (metaField as any)?.meta?.communication || {};
+
     // Send form submission greeting via WhatsApp if configured
-    this.sendFormGreeting(phone, name).catch((err) => {
+    this.sendFormGreeting(phone, name, formComm).catch((err) => {
       this.logger.warn(`Form greeting failed: ${err.message}`);
     });
 
@@ -207,46 +213,69 @@ export class FormsService {
     });
   }
 
-  private async sendFormGreeting(phone: string | null, name: string): Promise<void> {
+  private async sendFormGreeting(phone: string | null, name: string, formComm: Record<string, any> = {}): Promise<void> {
     if (!phone) return;
 
     try {
-      const enabledSetting = await this.prisma.setting.findUnique({ where: { key: 'formGreetingEnabled' } });
-      if (!enabledSetting) return;
+      // Per-form communication config takes precedence
+      const formEnabled = formComm.whatsappEnabled === true;
+      const formTemplateId = formComm.templateId || '';
+      const formGreetingMsg = formComm.greetingMessage || '';
 
-      let enabled = false;
-      if (enabledSetting.isEncrypted) {
-        const decrypted = await this.prisma.setting.findUnique({ where: { key: 'formGreetingEnabled' } });
-        enabled = decrypted?.encryptedValue === 'true';
-      } else {
-        enabled = enabledSetting.encryptedValue === 'true';
-      }
-      if (!enabled) return;
+      if (!formEnabled || !formTemplateId) return;
 
-      const getVal = async (key: string): Promise<string> => {
-        const s = await this.prisma.setting.findUnique({ where: { key } });
-        if (!s) return '';
-        return s.encryptedValue || '';
-      };
+      const apiKey = await this.getSettingValue('gupshupApiKey');
+      const source = await this.getSettingValue('gupshupSource');
+      const appName = await this.getSettingValue('gupshupAppName');
 
-      const apiKey = await getVal('gupshupApiKey');
-      const source = await getVal('gupshupSource');
-      const appName = await getVal('gupshupAppName');
-      const templateId = await getVal('formGreetingTemplateId');
-
-      if (!apiKey || !source || !appName || !templateId) {
-        this.logger.warn('Form greeting skipped: missing Gupshup config');
+      const normalizedPhone = String(phone).replace(/\D/g, '');
+      if (!normalizedPhone) {
+        this.logger.warn('Form greeting skipped: submitted phone number is invalid');
         return;
       }
 
-      const greetingMsg = await getVal('formGreetingMessage');
-      const params = [name, greetingMsg || 'Thank you for your inquiry!'];
+      const missingSettings = [
+        !apiKey ? 'gupshupApiKey' : '',
+        !source ? 'gupshupSource' : '',
+        !appName ? 'gupshupAppName' : '',
+      ].filter(Boolean);
 
-      await this.gupshup.sendTemplateMessage(apiKey, source, phone, templateId, params);
-      this.logger.log(`Form greeting sent to ${phone}`);
+      if (missingSettings.length > 0) {
+        this.logger.warn(`Form greeting skipped: missing settings ${missingSettings.join(', ')}`);
+        return;
+      }
+
+      const params = [name, formGreetingMsg || 'Thank you for your inquiry!'];
+
+      const result = await this.gupshup.sendTemplateMessage(apiKey, source, appName, normalizedPhone, formTemplateId, params);
+      this.logger.log(`Form greeting submitted to Gupshup for ${normalizedPhone}: ${result.messageId}`);
     } catch (error: any) {
-      this.logger.error(`Form greeting error: ${error.message}`);
+      this.logger.error(`Form greeting failed: ${this.getErrorMessage(error)}`);
     }
+  }
+
+  private async getSettingValue(key: string): Promise<string> {
+    try {
+      return await this.settingsService.getSettingForUse(key);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        return '';
+      }
+      throw error;
+    }
+  }
+
+  private getErrorMessage(error: any): string {
+    if (error?.response?.data) {
+      if (typeof error.response.data === 'string') {
+        return error.response.data;
+      }
+
+      const apiMessage = error.response.data.message || error.response.data.status || JSON.stringify(error.response.data);
+      return `${error.response.status || 'Gupshup error'} - ${apiMessage}`;
+    }
+
+    return error?.message || 'Unknown error';
   }
 
   private validateSubmissionData(fields: PublicFormField[], data: Record<string, any>) {
