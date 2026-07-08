@@ -46,7 +46,6 @@ export class DashboardController {
   }
 
   @Get('user-conversion')
-  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get user-wise conversion ratio' })
   @ApiQuery({ name: 'campaignId', required: false })
   @ApiQuery({ name: 'startDate', required: false, description: 'YYYY-MM-DD' })

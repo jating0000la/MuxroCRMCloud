@@ -25,7 +25,6 @@ export class CampaignsController {
   }
 
   @Get()
-  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get all campaigns (role-based)' })
   findAll(@Request() req) {
     return this.campaignsService.findAll(req.user.id, req.user.role);

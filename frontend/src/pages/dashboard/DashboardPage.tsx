@@ -42,16 +42,23 @@ export default function DashboardPage() {
     setRefreshing(true);
     setError(null);
     try {
-      const [statsData, campaignsData, followupsData] = await Promise.all([
+      const results = await Promise.allSettled([
         dashboardService.getOverview(),
         campaignService.getAll(),
         dashboardService.getFollowupDashboard(),
       ]);
-      setStats(statsData);
-      setCampaigns(campaignsData);
-      setRecentFollowups(followupsData.slice(0, 5));
+      const [statsResult, campaignsResult, followupsResult] = results;
+
+      if (statsResult.status === 'fulfilled') setStats(statsResult.value);
+      if (campaignsResult.status === 'fulfilled') setCampaigns(campaignsResult.value);
+      if (followupsResult.status === 'fulfilled') setRecentFollowups(followupsResult.value.slice(0, 5));
+
+      const anyFailed = results.some((r) => r.status === 'rejected');
+      if (anyFailed && statsResult.status === 'rejected') {
+        setError('Failed to load dashboard data. Please try again.');
+      }
       setLastUpdated(new Date());
-      syncWithDelay(500); // Sync notifications after dashboard data loads
+      syncWithDelay(500);
     } catch (error) {
       console.error('Failed to load stats', error);
       setError('Failed to load dashboard data. Please try again.');
