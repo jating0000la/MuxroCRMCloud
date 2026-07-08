@@ -73,7 +73,7 @@ export default function LoginPage() {
               <img
                 src={branding.appLogoUrl}
                 alt="App logo"
-                className="w-16 h-16 rounded-2xl object-cover mx-auto mb-4 shadow-lg border border-primary-100 bg-white"
+                className="h-16 max-w-[200px] rounded-2xl object-contain mx-auto mb-4 shadow-lg border border-primary-100 bg-white"
               />
             ) : (
               <div className="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">

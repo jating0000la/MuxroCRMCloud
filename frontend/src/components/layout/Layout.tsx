@@ -170,7 +170,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     <img
                       src={branding.appLogoUrl}
                       alt="App logo"
-                      className="h-8 w-8 rounded-lg object-cover border border-primary-100 bg-white"
+                      className="h-8 max-w-[120px] rounded-lg object-contain border border-primary-100 bg-white"
                     />
                   ) : (
                     <div className="h-8 w-8 rounded-lg bg-primary-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
