@@ -12,7 +12,18 @@ export class FollowupsService {
     private notificationsService: NotificationsService,
   ) {}
 
-  async findByLead(leadId: string) {
+  async findByLead(leadId: string, userId?: string, role?: string) {
+    if (role === 'USER' && userId) {
+      const lead = await this.prisma.lead.findUnique({
+        where: { id: leadId },
+        select: { doerId: true },
+      });
+
+      if (!lead || lead.doerId !== userId) {
+        throw new NotFoundException('Lead not found');
+      }
+    }
+
     return this.prisma.followup.findMany({
       where: { leadId },
       include: { user: { select: { id: true, name: true, username: true } } },
@@ -86,21 +97,25 @@ export class FollowupsService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, userId?: string, role?: string) {
     const followup = await this.prisma.followup.findUnique({
       where: { id },
       include: {
-        lead: true,
+        lead: { select: { doerId: true } },
         user: { select: { name: true } },
       },
     });
     if (!followup) throw new NotFoundException('Followup not found');
+
+    if (role === 'USER' && userId && followup.lead?.doerId !== userId) {
+      throw new NotFoundException('Followup not found');
+    }
+
     return followup;
   }
 
-  async update(id: string, dto: UpdateFollowupDto) {
-    const followup = await this.prisma.followup.findUnique({ where: { id } });
-    if (!followup) throw new NotFoundException('Followup not found');
+  async update(id: string, dto: UpdateFollowupDto, userId?: string, role?: string) {
+    const followup = await this.findOne(id, userId, role);
 
     const updated = await this.prisma.followup.update({
       where: { id },
@@ -123,14 +138,13 @@ export class FollowupsService {
     return updated;
   }
 
-  async remove(id: string) {
-    const followup = await this.prisma.followup.findUnique({ where: { id } });
-    if (!followup) throw new NotFoundException('Followup not found');
+  async remove(id: string, userId?: string, role?: string) {
+    await this.findOne(id, userId, role);
 
     return this.prisma.followup.delete({ where: { id } });
   }
 
-  async findCrossCampaign(phone?: string, email?: string, excludeLeadId?: string) {
+  async findCrossCampaign(phone?: string, email?: string, excludeLeadId?: string, userId?: string, role?: string) {
     if (!phone && !email) return [];
 
     const orConditions: any[] = [];
@@ -146,6 +160,7 @@ export class FollowupsService {
     const leads = await this.prisma.lead.findMany({
       where: {
         ...(excludeLeadId ? { id: { not: excludeLeadId } } : {}),
+        ...(role === 'USER' && userId ? { doerId: userId } : {}),
         OR: orConditions,
       },
       select: { id: true, name: true, campaignId: true },

@@ -49,13 +49,14 @@ export default function SettingsPage() {
   const [gupshupApiKey, setGupshupApiKey] = useState('');
   const [gupshupSource, setGupshupSource] = useState('');
   const [gupshupAppName, setGupshupAppName] = useState('');
+  const [gupshupAppId, setGupshupAppId] = useState('');
+  const [gupshupTestPhone, setGupshupTestPhone] = useState('');
   const [gupshupWebhookUrl, setGupshupWebhookUrl] = useState('');
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
   const [autoReplyMessage, setAutoReplyMessage] = useState('Thank you for reaching out! We will get back to you shortly.');
   const [formGreetingEnabled, setFormGreetingEnabled] = useState(true);
   const [formGreetingMessage, setFormGreetingMessage] = useState('Thank you for your inquiry! Our team will contact you within 24 hours.');
-  const [welcomeTemplateId, setWelcomeTemplateId] = useState('');
-  const [followupTemplateId, setFollowupTemplateId] = useState('');
+  const [formGreetingTemplateId, setFormGreetingTemplateId] = useState('');
 
   // UI state
   const [saving, setSaving] = useState(false);
@@ -117,13 +118,15 @@ export default function SettingsPage() {
           case 'gupshupApiKey': setGupshupApiKey(setting.value); break;
           case 'gupshupSource': setGupshupSource(setting.value); break;
           case 'gupshupAppName': setGupshupAppName(setting.value); break;
+          case 'gupshupAppId': setGupshupAppId(setting.value); break;
+          case 'gupshupTestPhone': setGupshupTestPhone(setting.value); break;
           case 'gupshupWebhookUrl': setGupshupWebhookUrl(setting.value); break;
           case 'autoReplyEnabled': setAutoReplyEnabled(setting.value === 'true'); break;
           case 'autoReplyMessage': setAutoReplyMessage(setting.value); break;
           case 'formGreetingEnabled': setFormGreetingEnabled(setting.value !== 'false'); break;
           case 'formGreetingMessage': setFormGreetingMessage(setting.value); break;
-          case 'welcomeTemplateId': setWelcomeTemplateId(setting.value); break;
-          case 'followupTemplateId': setFollowupTemplateId(setting.value); break;
+          case 'formGreetingTemplateId': setFormGreetingTemplateId(setting.value); break;
+          case 'welcomeTemplateId': if (!formGreetingTemplateId) setFormGreetingTemplateId(setting.value); break;
         }
       });
       try {
@@ -212,13 +215,14 @@ export default function SettingsPage() {
         { key: 'gupshupApiKey', value: isMasked(gupshupApiKey) ? '' : gupshupApiKey },
         { key: 'gupshupSource', value: gupshupSource },
         { key: 'gupshupAppName', value: gupshupAppName },
+        { key: 'gupshupAppId', value: gupshupAppId },
+        { key: 'gupshupTestPhone', value: gupshupTestPhone },
         { key: 'gupshupWebhookUrl', value: gupshupWebhookUrl },
         { key: 'autoReplyEnabled', value: String(autoReplyEnabled) },
         { key: 'autoReplyMessage', value: autoReplyMessage },
         { key: 'formGreetingEnabled', value: String(formGreetingEnabled) },
         { key: 'formGreetingMessage', value: formGreetingMessage },
-        { key: 'welcomeTemplateId', value: welcomeTemplateId },
-        { key: 'followupTemplateId', value: followupTemplateId },
+        { key: 'formGreetingTemplateId', value: formGreetingTemplateId },
       ]);
       toast.success('Communication settings saved');
     } catch (error: any) {
@@ -288,10 +292,11 @@ export default function SettingsPage() {
 
   const handleTestGupshup = async () => {
     if (!gupshupApiKey || !gupshupSource || !gupshupAppName) { toast.error('Enter Gupshup API key, source, and app name'); return; }
+    if (!gupshupTestPhone) { toast.error('Enter a test recipient phone number'); return; }
     setTestingGupshup(true);
     try {
       const key = gupshupApiKey.includes('•') ? await settingsService.getSettingUnmasked('gupshupApiKey') : gupshupApiKey;
-      const result = await integrationService.testGupshup({ apiKey: key, source: gupshupSource, appName: gupshupAppName, testPhone: gupshupSource });
+      const result = await integrationService.testGupshup({ apiKey: key, source: gupshupSource, appName: gupshupAppName, testPhone: gupshupTestPhone });
       if (result.success) {
         toast.success(result.message);
         await settingsService.updateSetting('gupshupApiKey', { value: key, lastTestedAt: new Date().toISOString(), reason: 'Test OK' }).catch(() => {});
@@ -526,7 +531,7 @@ export default function SettingsPage() {
                       <p className="text-xs text-gray-500 dark:text-gray-400">Configure your WhatsApp Business API connection</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div>
                       <label className={labelCls}>API Key</label>
                       <div className="relative">
@@ -542,7 +547,16 @@ export default function SettingsPage() {
                       <label className={labelCls}>App Name</label>
                       <input type="text" value={gupshupAppName} onChange={(e) => setGupshupAppName(e.target.value)} className={inputCls} placeholder="MyBusinessApp" />
                     </div>
+                    <div>
+                      <label className={labelCls}>App ID</label>
+                      <input type="text" value={gupshupAppId} onChange={(e) => setGupshupAppId(e.target.value)} className={inputCls} placeholder="Optional for template sync" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Test Recipient Phone</label>
+                      <input type="text" value={gupshupTestPhone} onChange={(e) => setGupshupTestPhone(e.target.value)} className={inputCls} placeholder="919876543210" />
+                    </div>
                   </div>
+                  <p className={hintCls}>API key, source number, and app name are required for sending. App ID is only needed for template sync APIs.</p>
                   <div>
                     <label className={labelCls}>Gupshup Webhook URL (for inbound messages)</label>
                     <div className="flex gap-2">
@@ -551,7 +565,7 @@ export default function SettingsPage() {
                     </div>
                     <p className={hintCls}>Paste this in Gupshup Console &gt; Settings &gt; Webhooks</p>
                   </div>
-                  <button onClick={handleTestGupshup} disabled={testingGupshup || !gupshupApiKey || !gupshupSource || !gupshupAppName} className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium">
+                  <button onClick={handleTestGupshup} disabled={testingGupshup || !gupshupApiKey || !gupshupSource || !gupshupAppName || !gupshupTestPhone} className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium">
                     {testingGupshup ? <><svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Testing...</> : 'Test Connection'}
                   </button>
                 </div>
@@ -563,20 +577,18 @@ export default function SettingsPage() {
                       <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">Message Templates</h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Gupshup approved template IDs for automated messages</p>
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">Greeting Template</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Approved Gupshup template used only after form submission</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className={labelCls}>Welcome Template ID</label>
-                      <input type="text" value={welcomeTemplateId} onChange={(e) => setWelcomeTemplateId(e.target.value)} className={inputCls} placeholder="c6aecef6-bcb0-4fb1-8100-28c094e3bc6b" />
-                      <p className={hintCls}>Sent when a new lead is created</p>
+                      <label className={labelCls}>Form Greeting Template ID</label>
+                      <input type="text" value={formGreetingTemplateId} onChange={(e) => setFormGreetingTemplateId(e.target.value)} className={inputCls} placeholder="c6aecef6-bcb0-4fb1-8100-28c094e3bc6b" />
+                      <p className={hintCls}>Used for the single WhatsApp greeting sent after a public form submission</p>
                     </div>
-                    <div>
-                      <label className={labelCls}>Follow-up Template ID</label>
-                      <input type="text" value={followupTemplateId} onChange={(e) => setFollowupTemplateId(e.target.value)} className={inputCls} placeholder="c6aecef6-bcb0-4fb1-8100-28c094e3bc6b" />
-                      <p className={hintCls}>Sent during follow-up reminders</p>
+                    <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-4 text-sm text-gray-500 dark:text-gray-400">
+                      Manual WhatsApp sends and follow-up templates are not part of the supported CRM flow anymore. Keep this integration limited to post-form greeting only.
                     </div>
                   </div>
                 </div>

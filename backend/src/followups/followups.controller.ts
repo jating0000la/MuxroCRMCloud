@@ -14,8 +14,8 @@ export class FollowupsController {
 
   @Get('lead/:leadId')
   @ApiOperation({ summary: 'Get follow-ups for a lead' })
-  findByLead(@Param('leadId') leadId: string) {
-    return this.followupsService.findByLead(leadId);
+  findByLead(@Param('leadId') leadId: string, @Request() req) {
+    return this.followupsService.findByLead(leadId, req.user.id, req.user.role);
   }
 
   @Get('cross-campaign')
@@ -27,8 +27,9 @@ export class FollowupsController {
     @Query('phone') phone?: string,
     @Query('email') email?: string,
     @Query('excludeLeadId') excludeLeadId?: string,
+    @Request() req?: any,
   ) {
-    return this.followupsService.findCrossCampaign(phone, email, excludeLeadId);
+    return this.followupsService.findCrossCampaign(phone, email, excludeLeadId, req?.user?.id, req?.user?.role);
   }
 
   @Post()
@@ -53,13 +54,13 @@ export class FollowupsController {
 
   @Put(':id')
   @ApiOperation({ summary: 'Update a follow-up' })
-  update(@Param('id') id: string, @Body() dto: UpdateFollowupDto) {
-    return this.followupsService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateFollowupDto, @Request() req) {
+    return this.followupsService.update(id, dto, req.user.id, req.user.role);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a follow-up' })
-  remove(@Param('id') id: string) {
-    return this.followupsService.remove(id);
+  remove(@Param('id') id: string, @Request() req) {
+    return this.followupsService.remove(id, req.user.id, req.user.role);
   }
 }

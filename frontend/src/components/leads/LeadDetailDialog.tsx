@@ -3,6 +3,7 @@ import { Lead, CampaignStatus, Followup } from '../../types';
 import { leadService } from '../../services/leads';
 import { followupService } from '../../services/followups';
 import integrationService from '../../services/integrations';
+import { useAuth } from '../../context/AuthContext';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -14,6 +15,8 @@ interface Props {
 }
 
 export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }: Props) {
+  const { user } = useAuth();
+  const canSendWhatsapp = user?.role === 'ADMIN';
   const [lead, setLead] = useState<Lead | null>(null);
   const [followups, setFollowups] = useState<Followup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +28,7 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
   const [nextCallDate, setNextCallDate] = useState('');
   const [dnd, setDnd] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [sendWhatsapp, setSendWhatsapp] = useState(true);
+  const [sendWhatsapp, setSendWhatsapp] = useState(false);
 
   // Cross-campaign history
   const [crossCampaignFollowups, setCrossCampaignFollowups] = useState<any[]>([]);
@@ -34,6 +37,10 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
   useEffect(() => {
     loadLead();
   }, [leadId]);
+
+  useEffect(() => {
+    setSendWhatsapp(canSendWhatsapp);
+  }, [canSendWhatsapp]);
 
   const loadLead = async () => {
     try {
@@ -83,7 +90,7 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
       });
 
       // Send WhatsApp if status has a message and lead has a phone
-      if (sendWhatsapp && selectedStatus?.whatsappMessage && lead?.phone) {
+      if (canSendWhatsapp && sendWhatsapp && selectedStatus?.whatsappMessage && lead?.phone) {
         const message = selectedStatus.whatsappMessage
           .replace(/\{\{name\}\}/g, lead.name || '')
           .replace(/\{\{phone\}\}/g, lead.phone || '')
@@ -418,7 +425,7 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
               </div>
 
               {/* WhatsApp preview when status has message */}
-              {statusId && (() => {
+              {canSendWhatsapp && statusId && (() => {
                 const sel = statuses.find((s) => s.id === statusId);
                 if (!sel?.whatsappMessage) return null;
                 const preview = sel.whatsappMessage

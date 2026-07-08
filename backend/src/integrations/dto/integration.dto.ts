@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsArray } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SaveIntegrationSettingsDto {
@@ -104,19 +104,19 @@ export class AutoImportIndiamartDto {
 }
 
 export class SendGupshupMessageDto {
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   apiKey: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   source: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   appName: string;
 
   @ApiProperty()
@@ -136,14 +136,14 @@ export class SendGupshupMessageDto {
 }
 
 export class SendGupshupTemplateDto {
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   apiKey: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   source: string;
 
   @ApiProperty()
@@ -158,6 +158,7 @@ export class SendGupshupTemplateDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsArray()
   templateParams?: string[];
 
   @ApiPropertyOptional()
@@ -166,19 +167,19 @@ export class SendGupshupTemplateDto {
 }
 
 export class TestGupshupDto {
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   apiKey: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   source: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   appName: string;
 
   @ApiProperty()

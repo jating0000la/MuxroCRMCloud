@@ -8,7 +8,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   // Validate critical environment variables before app startup
-  const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'APP_ENCRYPTION_KEY'];
+  const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'APP_ENCRYPTION_KEY', 'ENCRYPTION_SALT'];
   const missingVars = requiredEnvVars.filter(v => !process.env[v]);
   
   if (missingVars.length > 0) {

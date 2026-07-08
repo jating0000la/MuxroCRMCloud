@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Param, Body, Req, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { FormsService } from './forms.service';
 
@@ -27,6 +28,7 @@ export class PublicFormsController implements OnModuleInit {
   }
 
   @Post(':slug/submit')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: 'Submit public form' })
   submitForm(@Param('slug') slug: string, @Body() body: { data: Record<string, any> }, @Req() req) {
     if (!this.enabled) {

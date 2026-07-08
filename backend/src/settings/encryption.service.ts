@@ -19,9 +19,13 @@ export class EncryptionService {
     }
 
     // Salt is also mandatory for key derivation
-    this.encryptionSalt = process.env.ENCRYPTION_SALT || 'default-salt';
-    if (this.encryptionSalt === 'default-salt') {
-      console.warn('⚠️  WARNING: Using default ENCRYPTION_SALT. Set ENCRYPTION_SALT in .env for production.');
+    this.encryptionSalt = process.env.ENCRYPTION_SALT || '';
+    if (!this.encryptionSalt) {
+      throw new Error(
+        'ENCRYPTION_SALT environment variable is required.\n' +
+        'Generate with: openssl rand -hex 16\n' +
+        'Add to .env: ENCRYPTION_SALT=<generated-salt>'
+      );
     }
 
     // Derive 32-byte key from string using scrypt
