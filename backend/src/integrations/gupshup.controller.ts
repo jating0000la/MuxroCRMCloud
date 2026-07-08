@@ -66,14 +66,4 @@ export class GupshupController {
     );
   }
 
-  @Post('webhook')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Receive inbound WhatsApp messages from Gupshup' })
-  async handleWebhook(@Body() payload: any) {
-    this.logger.log('Received Gupshup webhook');
-    const message = this.gupshup.parseInboundWebhook(payload);
-    // Webhook handling - log and acknowledge
-    // In production, this would create followups, update lead status, etc.
-    return { status: 'ok' };
-  }
 }

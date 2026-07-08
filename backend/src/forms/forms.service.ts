@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationDto } from '../common/pagination.dto';
 import { CreateFormDto } from './dto/create-form.dto';
 import { UpdateFormDto } from './dto/update-form.dto';
+import { GupshupService } from '../integrations/gupshup.service';
 import { v4 as uuidv4 } from 'uuid';
 
 type PublicFormField = {
@@ -18,7 +19,12 @@ type PublicFormField = {
 
 @Injectable()
 export class FormsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(FormsService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private gupshup: GupshupService,
+  ) {}
 
   async create(campaignId: string, dto: CreateFormDto) {
     // Check if campaign already has a form
@@ -116,6 +122,11 @@ export class FormsService {
       },
     });
 
+    // Send form submission greeting via WhatsApp if configured
+    this.sendFormGreeting(phone, name).catch((err) => {
+      this.logger.warn(`Form greeting failed: ${err.message}`);
+    });
+
     return { submission, lead };
   }
 
@@ -194,6 +205,48 @@ export class FormsService {
       skip,
       take,
     });
+  }
+
+  private async sendFormGreeting(phone: string | null, name: string): Promise<void> {
+    if (!phone) return;
+
+    try {
+      const enabledSetting = await this.prisma.setting.findUnique({ where: { key: 'formGreetingEnabled' } });
+      if (!enabledSetting) return;
+
+      let enabled = false;
+      if (enabledSetting.isEncrypted) {
+        const decrypted = await this.prisma.setting.findUnique({ where: { key: 'formGreetingEnabled' } });
+        enabled = decrypted?.encryptedValue === 'true';
+      } else {
+        enabled = enabledSetting.encryptedValue === 'true';
+      }
+      if (!enabled) return;
+
+      const getVal = async (key: string): Promise<string> => {
+        const s = await this.prisma.setting.findUnique({ where: { key } });
+        if (!s) return '';
+        return s.encryptedValue || '';
+      };
+
+      const apiKey = await getVal('gupshupApiKey');
+      const source = await getVal('gupshupSource');
+      const appName = await getVal('gupshupAppName');
+      const templateId = await getVal('formGreetingTemplateId');
+
+      if (!apiKey || !source || !appName || !templateId) {
+        this.logger.warn('Form greeting skipped: missing Gupshup config');
+        return;
+      }
+
+      const greetingMsg = await getVal('formGreetingMessage');
+      const params = [name, greetingMsg || 'Thank you for your inquiry!'];
+
+      await this.gupshup.sendTemplateMessage(apiKey, source, phone, templateId, params);
+      this.logger.log(`Form greeting sent to ${phone}`);
+    } catch (error: any) {
+      this.logger.error(`Form greeting error: ${error.message}`);
+    }
   }
 
   private validateSubmissionData(fields: PublicFormField[], data: Record<string, any>) {
