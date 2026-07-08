@@ -114,25 +114,26 @@ model Enquiry {
 }
 
 model Lead {
-  id            String    @id @default(uuid())
-  campaignId    String
-  enquiryId     String?   @unique
-  name          String
-  email         String?
-  phone         String?
-  source        String    @default("manual")
-  customData    Json?
-  dnd           Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String    @id @default(uuid())
+  campaignId      String
+  enquiryId       String?   @unique
+  indiamartQueryId String?  @unique
+  name            String
+  email           String?
+  phone           String?
+  source          String    @default("manual")
+  customData      Json?
+  dnd             Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  campaign      Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  enquiry       Enquiry?      @relation(fields: [enquiryId], references: [id])
-  doerId        String?
-  doer          User?         @relation("Doer", fields: [doerId], references: [id])
-  statusId      String?
-  status        CampaignStatus? @relation(fields: [statusId], references: [id])
-  followups     Followup[]
+  campaign        Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  enquiry         Enquiry?      @relation(fields: [enquiryId], references: [id])
+  doerId          String?
+  doer            User?         @relation("Doer", fields: [doerId], references: [id])
+  statusId        String?
+  status          CampaignStatus? @relation(fields: [statusId], references: [id])
+  followups       Followup[]
 
   @@index([campaignId])
   @@index([doerId])

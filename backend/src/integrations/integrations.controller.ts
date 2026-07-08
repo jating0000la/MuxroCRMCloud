@@ -1,11 +1,11 @@
-import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus, Logger } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus, Logger, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ProcessSutraService } from './process-sutra.service';
 import { IndiamartService } from './indiamart.service';
-import { StartFlowDto, FetchIndiamartDto } from './dto/integration.dto';
+import { StartFlowDto, FetchIndiamartDto, AutoImportIndiamartDto } from './dto/integration.dto';
 
 @ApiTags('Integrations')
 @ApiBearerAuth()
@@ -43,26 +43,47 @@ export class IntegrationsController {
   @Post('indiamart/fetch-leads')
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Fetch recent leads from Indiamart' })
+  @ApiOperation({ summary: 'Fetch recent leads from IndiaMART (Pull API v2)' })
   @ApiResponse({ status: 200, description: 'Leads fetched successfully' })
   @ApiResponse({ status: 400, description: 'Invalid request' })
   async fetchIndiamartLeads(@Body() dto: FetchIndiamartDto) {
-    this.logger.log('Fetching Indiamart leads');
-    return this.indiamart.fetchLeads(dto.apiKey, dto.webappUrl || '');
+    this.logger.log('Fetching IndiaMART leads');
+    return this.indiamart.fetchLeads(dto.apiKey, dto.startTime, dto.endTime);
+  }
+
+  @Post('indiamart/auto-import')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Auto-import IndiaMART leads into a campaign' })
+  @ApiResponse({ status: 200, description: 'Leads imported successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid request' })
+  async autoImportIndiamartLeads(@Body() dto: AutoImportIndiamartDto) {
+    this.logger.log(`Auto-importing IndiaMART leads to campaign: ${dto.campaignId}`);
+    const result = await this.indiamart.autoImportLeads(
+      dto.campaignId,
+      dto.apiKey,
+      dto.startTime,
+      dto.endTime,
+    );
+
+    // Update last fetch time
+    await this.indiamart.updateLastFetchTime(new Date().toISOString());
+
+    return result;
   }
 
   @Post('indiamart/test-connection')
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Test Indiamart API connection' })
+  @ApiOperation({ summary: 'Test IndiaMART API connection' })
   @ApiResponse({ status: 200, description: 'Connection test result' })
   async testIndiamartConnection(@Body() dto: FetchIndiamartDto) {
-    this.logger.log('Testing Indiamart connection');
+    this.logger.log('Testing IndiaMART connection');
     try {
-      const result = await this.indiamart.fetchLeads(dto.apiKey, dto.webappUrl || '');
+      const result = await this.indiamart.fetchLeads(dto.apiKey, dto.startTime, dto.endTime);
       return {
         success: true,
-        message: `Connected. Found ${result.count} recent leads.`,
+        message: `Connected. Found ${result.count} leads.`,
         data: result,
       };
     } catch (error: any) {
@@ -71,6 +92,14 @@ export class IntegrationsController {
         message: error.message,
       };
     }
+  }
+
+  @Get('indiamart/last-fetch')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get last IndiaMART fetch time' })
+  async getLastFetchTime() {
+    const lastFetchTime = await this.indiamart.getLastFetchTime();
+    return { lastFetchTime };
   }
 
   @Post('process-sutra/test-connection')

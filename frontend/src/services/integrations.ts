@@ -20,7 +20,25 @@ export interface StartFlowPayload {
 
 export interface IndiamartFetchPayload {
   apiKey: string;
-  webappUrl?: string;
+  startTime?: string;
+  endTime?: string;
+}
+
+export interface IndiamartAutoImportPayload {
+  campaignId: string;
+  apiKey: string;
+  startTime?: string;
+  endTime?: string;
+}
+
+export interface IndiamartAutoImportResult {
+  success: boolean;
+  fetched: number;
+  imported: number;
+  duplicates: number;
+  errors: number;
+  leads: any[];
+  message?: string;
 }
 
 const integrationService = {
@@ -43,6 +61,16 @@ const integrationService = {
 
   testIndiamart: async (payload: IndiamartFetchPayload) => {
     const { data } = await api.post('/integrations/indiamart/test-connection', payload);
+    return data;
+  },
+
+  autoImportLeads: async (payload: IndiamartAutoImportPayload): Promise<IndiamartAutoImportResult> => {
+    const { data } = await api.post('/integrations/indiamart/auto-import', payload);
+    return data;
+  },
+
+  getLastFetchTime: async (): Promise<{ lastFetchTime: string | null }> => {
+    const { data } = await api.get('/integrations/indiamart/last-fetch');
     return data;
   },
 };

@@ -73,5 +73,32 @@ export class FetchIndiamartDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  webappUrl?: string;
+  startTime?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  endTime?: string;
+}
+
+export class AutoImportIndiamartDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  campaignId: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  apiKey: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  startTime?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  endTime?: string;
 }
