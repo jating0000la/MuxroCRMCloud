@@ -1,5 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import integrationService from '../../services/integrations';
+import React, { useState, useMemo } from 'react';
 
 interface FormBuilderField {
   name: string;
@@ -121,34 +120,12 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
   const [selectedFieldIndex, setSelectedFieldIndex] = useState<number | null>(null);
   const [builderTab, setBuilderTab] = useState<'fields' | 'design' | 'communication'>('fields');
   const [customColorSlots, setCustomColorSlots] = useState<string[]>(EMPTY_CUSTOM_SLOTS);
-  const [templates, setTemplates] = useState<any[]>([]);
-  const [templatesLoading, setTemplatesLoading] = useState(false);
-  const [templatesError, setTemplatesError] = useState('');
-  const [templatesFetched, setTemplatesFetched] = useState(false);
 
-  const fetchTemplates = useCallback(async () => {
-    setTemplatesLoading(true);
-    setTemplatesError('');
-    try {
-      const result = await integrationService.syncGupshupTemplates();
-      if (result.success) {
-        setTemplates(result.templates || []);
-        setTemplatesFetched(true);
-      } else {
-        setTemplatesError(result.error || 'Failed to fetch templates');
-      }
-    } catch (err: any) {
-      setTemplatesError(err.response?.data?.message || err.message || 'Failed to fetch templates');
-    } finally {
-      setTemplatesLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (builderTab === 'communication' && communication.whatsappEnabled && !templatesFetched && !templatesLoading) {
-      fetchTemplates();
-    }
-  }, [builderTab, communication.whatsappEnabled, templatesFetched, templatesLoading, fetchTemplates]);
+  const availableTags = useMemo(() => {
+    return fields
+      .filter((f) => ['text', 'textarea', 'select', 'radio', 'email', 'phone', 'number'].includes(f.type))
+      .map((f) => ({ tag: f.name, label: f.label }));
+  }, [fields]);
 
   const normalizeHexColor = (value: string) => {
     const trimmed = value.trim();
@@ -677,63 +654,41 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                 <>
                   <div className="p-4 border border-gray-200 rounded-xl space-y-4">
                     <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">WhatsApp Template</label>
-                        <button
-                          type="button"
-                          onClick={fetchTemplates}
-                          disabled={templatesLoading}
-                          className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
-                        >
-                          {templatesLoading ? (
-                            <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                          ) : (
-                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                          )}
-                          {templatesLoading ? 'Syncing...' : 'Refresh'}
-                        </button>
-                      </div>
-                      {templates.length > 0 ? (
-                        <select
-                          value={communication.templateId}
-                          onChange={(e) => setCommunication((prev) => ({ ...prev, templateId: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
-                        >
-                          <option value="">Select a template...</option>
-                          {templates.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.name} ({t.language}) — {t.status}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          type="text"
-                          value={communication.templateId}
-                          onChange={(e) => setCommunication((prev) => ({ ...prev, templateId: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
-                          placeholder="Enter template ID manually"
-                        />
-                      )}
-                      {templatesError && <p className="text-xs text-red-500 mt-1">{templatesError}</p>}
-                      {!templatesError && templates.length === 0 && templatesFetched && (
-                        <p className="text-xs text-amber-600 mt-1">No templates found. Check your Gupshup App ID in Settings.</p>
-                      )}
-                      {templates.length > 0 && (
-                        <p className="text-xs text-gray-400 mt-1">{templates.length} template(s) synced from Gupshup</p>
-                      )}
-                    </div>
-
-                    <div>
                       <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Greeting Message</label>
                       <textarea
                         value={communication.greetingMessage}
                         onChange={(e) => setCommunication((prev) => ({ ...prev, greetingMessage: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm h-24 focus:ring-2 focus:ring-primary-500"
-                        placeholder="Thank you for your inquiry, {{name}}! We will get back to you shortly."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm h-28 focus:ring-2 focus:ring-primary-500 font-mono"
+                        placeholder="Hi {{name}}, thank you for your inquiry! We'll get back to you at {{email}} shortly."
                       />
-                      <p className="text-xs text-gray-400 mt-1">Use {'{{name}}'} to insert the submitter's name. This is sent as the first template parameter.</p>
+                      <p className="text-xs text-gray-400 mt-1">Type <code className="bg-gray-100 px-1 rounded">{'{{field_name}}'}</code> to insert form answers. Uses WhatsApp session message (free within 24h of submission).</p>
                     </div>
+
+                    {availableTags.length > 0 && (
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Available Tags</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {availableTags.map((t) => (
+                            <button
+                              key={t.tag}
+                              type="button"
+                              onClick={() => {
+                                const tag = `{{${t.tag}}}`;
+                                setCommunication((prev) => ({
+                                  ...prev,
+                                  greetingMessage: prev.greetingMessage + (prev.greetingMessage && !prev.greetingMessage.endsWith(' ') ? ' ' : '') + tag,
+                                }));
+                              }}
+                              className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border border-gray-200 font-mono transition-colors"
+                              title={`Insert ${t.label}`}
+                            >
+                              {`{{${t.tag}}}`}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Click a tag to insert it into the message</p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="bg-green-50 border border-green-200 rounded-xl p-4">
@@ -749,55 +704,32 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-green-500 mt-0.5">3.</span>
-                        <span>WhatsApp template is sent to the lead's phone number</span>
+                        <span>Tags like {'{{name}}'} are replaced with the lead's form answers</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-green-500 mt-0.5">4.</span>
-                        <span>Gupshup global config (API key, source, app name) is used from Settings</span>
+                        <span>Personalized WhatsApp message is sent instantly</span>
                       </li>
                     </ul>
                   </div>
 
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                    <h4 className="text-sm font-semibold text-blue-900 mb-2">Template Preview</h4>
-                    {(() => {
-                      const selected = templates.find((t) => t.id === communication.templateId);
-                      if (!selected && !communication.greetingMessage) {
-                        return (
-                          <p className="text-xs text-blue-600">Select a template above to see a preview.</p>
-                        );
-                      }
-                      return (
-                        <div className="space-y-3">
-                          {selected && (
-                            <div className="bg-white rounded-lg border border-gray-200 p-3">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Template</span>
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{selected.language}</span>
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${selected.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{selected.status}</span>
-                              </div>
-                              {selected.body && (
-                                <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{selected.body}</p>
-                              )}
-                              {!selected.body && (
-                                <p className="text-xs text-gray-400 italic">Template body not available in API response</p>
-                              )}
-                            </div>
-                          )}
-                          <div className="bg-white rounded-lg border border-gray-200 p-3">
-                            <div className="flex items-center gap-2 mb-2">
-                              <svg className="w-4 h-4 text-green-500" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                              <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">WhatsApp Message</span>
-                            </div>
-                            <p className="text-xs text-gray-700">
-                              {communication.greetingMessage
-                                ? communication.greetingMessage.replace(/\{\{name\}\}/g, 'John Doe')
-                                : 'Thank you for your inquiry, John Doe! We will get back to you shortly.'}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                    <h4 className="text-sm font-semibold text-blue-900 mb-2">Message Preview</h4>
+                    <div className="bg-white rounded-lg border border-gray-200 p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-4 h-4 text-green-500" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">WhatsApp Message</span>
+                      </div>
+                      <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">
+                        {communication.greetingMessage
+                          ? communication.greetingMessage
+                              .replace(/\{\{name\}\}/g, 'John Doe')
+                              .replace(/\{\{email\}\}/g, 'john@example.com')
+                              .replace(/\{\{phone\}\}/g, '+91 98765 43210')
+                              .replace(/\{\{(\w+)\}\}/g, (_, field) => `[${field}]`)
+                          : 'Hi John Doe, thank you for your inquiry! We\'ll get back to you at john@example.com shortly.'}
+                      </p>
+                    </div>
                   </div>
                 </>
               )}

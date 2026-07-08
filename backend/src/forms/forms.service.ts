@@ -129,7 +129,7 @@ export class FormsService {
     const formComm = (metaField as any)?.meta?.communication || {};
 
     // Send form submission greeting via WhatsApp if configured
-    this.sendFormGreeting(phone, name, formComm).catch((err) => {
+    this.sendFormGreeting(phone, name, formComm, data).catch((err) => {
       this.logger.warn(`Form greeting failed: ${err.message}`);
     });
 
@@ -213,16 +213,19 @@ export class FormsService {
     });
   }
 
-  private async sendFormGreeting(phone: string | null, name: string, formComm: Record<string, any> = {}): Promise<void> {
+  private async sendFormGreeting(
+    phone: string | null,
+    name: string,
+    formComm: Record<string, any> = {},
+    formData: Record<string, any> = {},
+  ): Promise<void> {
     if (!phone) return;
 
     try {
-      // Per-form communication config takes precedence
       const formEnabled = formComm.whatsappEnabled === true;
-      const formTemplateId = formComm.templateId || '';
-      const formGreetingMsg = formComm.greetingMessage || '';
+      const rawMessage = formComm.greetingMessage || '';
 
-      if (!formEnabled || !formTemplateId) return;
+      if (!formEnabled || !rawMessage) return;
 
       const apiKey = await this.getSettingValue('gupshupApiKey');
       const source = await this.getSettingValue('gupshupSource');
@@ -234,21 +237,22 @@ export class FormsService {
         return;
       }
 
-      const missingSettings = [
-        !apiKey ? 'gupshupApiKey' : '',
-        !source ? 'gupshupSource' : '',
-        !appName ? 'gupshupAppName' : '',
-      ].filter(Boolean);
-
-      if (missingSettings.length > 0) {
-        this.logger.warn(`Form greeting skipped: missing settings ${missingSettings.join(', ')}`);
+      if (!apiKey || !source || !appName) {
+        this.logger.warn('Form greeting skipped: missing Gupshup global config');
         return;
       }
 
-      const params = [name, formGreetingMsg || 'Thank you for your inquiry!'];
+      // Replace {{field}} tags with actual form data
+      const message = rawMessage.replace(/\{\{(\w+)\}\}/g, (_, field) => {
+        const value = formData[field];
+        if (value === undefined || value === null) return '';
+        return String(value);
+      });
 
-      const result = await this.gupshup.sendTemplateMessage(apiKey, source, appName, normalizedPhone, formTemplateId, params);
-      this.logger.log(`Form greeting submitted to Gupshup for ${normalizedPhone}: ${result.messageId}`);
+      if (!message.trim()) return;
+
+      const result = await this.gupshup.sendSessionMessage(apiKey, source, appName, normalizedPhone, message);
+      this.logger.log(`Form greeting sent to ${normalizedPhone}: ${result.messageId}`);
     } catch (error: any) {
       this.logger.error(`Form greeting failed: ${this.getErrorMessage(error)}`);
     }
