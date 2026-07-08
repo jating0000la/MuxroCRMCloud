@@ -248,7 +248,7 @@ export default function SettingsPage() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              <p className="text-gray-600">Loading settings...</p>
+              <p className="text-gray-600 dark:text-gray-300">Loading settings...</p>
             </div>
           </div>
         </div>
@@ -260,59 +260,59 @@ export default function SettingsPage() {
     <Layout>
       <div className="sleek-page p-6 max-w-4xl mx-auto space-y-6">
         <div>
-          <p className="text-gray-500">Manage integrations and company details</p>
+          <p className="text-gray-500 dark:text-gray-400">Manage integrations and company details</p>
         </div>
 
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800">
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300">
           ✓ Integration keys are now encrypted and stored securely on the server. Your browser no longer stores sensitive credentials.
         </div>
 
         {/* Company Details */}
-        <div className="bg-white rounded-xl shadow-sm border p-6">
+        <div className="bg-white rounded-xl shadow-sm border p-6 dark:bg-gray-800 dark:border-gray-700">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center dark:bg-blue-900/30">
               <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Company Details</h2>
-              <p className="text-sm text-gray-500">Your company information</p>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Company Details</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Your company information</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tool Name</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tool Name</label>
               <input
                 type="text"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                 placeholder="Enter tool name"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tool Logo URL</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tool Logo URL</label>
               <input
                 type="text"
                 inputMode="url"
                 value={appLogoUrl}
                 onChange={(e) => setAppLogoUrl(e.target.value)}
                 onBlur={() => setAppLogoUrl((value) => normalizeUrl(value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                 placeholder="https://your-domain.com/logo.png"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Website Link</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Website Link</label>
               <input
                 type="text"
                 inputMode="url"
                 value={websiteLink}
                 onChange={(e) => setWebsiteLink(e.target.value)}
                 onBlur={() => setWebsiteLink((value) => normalizeUrl(value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                 placeholder="https://your-company.com"
               />
             </div>
@@ -320,52 +320,52 @@ export default function SettingsPage() {
         </div>
 
         {/* Indiamart Integration */}
-        <div className="bg-white rounded-xl shadow-sm border p-6">
+        <div className="bg-white rounded-xl shadow-sm border p-6 dark:bg-gray-800 dark:border-gray-700">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center dark:bg-orange-900/30">
               <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Indiamart Integration</h2>
-              <p className="text-sm text-gray-500">Connect your Indiamart account to fetch leads</p>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Indiamart Integration</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Connect your Indiamart account to fetch leads</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Indiamart API Key</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Indiamart API Key</label>
               <div className="relative">
                 <input
                   type={showIndiamartApiKey ? 'text' : 'password'}
                   value={indiamartApiKey}
                   onChange={(e) => setIndiamartApiKey(e.target.value)}
-                  className="w-full px-3 py-2 pr-16 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-3 py-2 pr-16 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                   placeholder="Enter your Indiamart API key"
                 />
                 <button
                   type="button"
                   onClick={() => setShowIndiamartApiKey((value) => !value)}
-                  className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-gray-500 hover:text-gray-700"
+                  className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                 >
                   {showIndiamartApiKey ? 'Hide' : 'Show'}
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-1">Found in your Indiamart seller dashboard</p>
+              <p className="text-xs text-gray-400 mt-1 dark:text-gray-500">Found in your Indiamart seller dashboard</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Webapp URL</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Webapp URL</label>
               <input
                 type="text"
                 inputMode="url"
                 value={webappUrl}
                 onChange={(e) => setWebappUrl(e.target.value)}
                 onBlur={() => setWebappUrl((value) => normalizeUrl(value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                 placeholder="https://your-webapp.com"
               />
-              <p className="text-xs text-gray-400 mt-1">Callback URL for Indiamart leads</p>
+              <p className="text-xs text-gray-400 mt-1 dark:text-gray-500">Callback URL for Indiamart leads</p>
             </div>
           </div>
 
@@ -396,50 +396,50 @@ export default function SettingsPage() {
         </div>
 
         {/* Process Sutra Integration */}
-        <div className="bg-white rounded-xl shadow-sm border p-6">
+        <div className="bg-white rounded-xl shadow-sm border p-6 dark:bg-gray-800 dark:border-gray-700">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center dark:bg-purple-900/30">
               <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Process Sutra Integration</h2>
-              <p className="text-sm text-gray-500">Connect your Process Sutra account</p>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Process Sutra Integration</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Connect your Process Sutra account</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Process Sutra API Key</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Process Sutra API Key</label>
               <div className="relative">
                 <input
                   type={showProcessSutraApiKey ? 'text' : 'password'}
                   value={processSutraApiKey}
                   onChange={(e) => setProcessSutraApiKey(e.target.value)}
-                  className="w-full px-3 py-2 pr-16 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-3 py-2 pr-16 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                   placeholder="Enter your Process Sutra API key"
                 />
                 <button
                   type="button"
                   onClick={() => setShowProcessSutraApiKey((value) => !value)}
-                  className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-gray-500 hover:text-gray-700"
+                  className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                 >
                   {showProcessSutraApiKey ? 'Hide' : 'Show'}
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-1">Found in your Process Sutra admin panel</p>
+              <p className="text-xs text-gray-400 mt-1 dark:text-gray-500">Found in your Process Sutra admin panel</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Process Sutra System Name</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Process Sutra System Name</label>
               <input
                 type="text"
                 value={processSutraSystemName}
                 onChange={(e) => setProcessSutraSystemName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                 placeholder="Enter system name"
               />
-              <p className="text-xs text-gray-400 mt-1">Unique identifier for this CRM instance</p>
+              <p className="text-xs text-gray-400 mt-1 dark:text-gray-500">Unique identifier for this CRM instance</p>
             </div>
           </div>
 

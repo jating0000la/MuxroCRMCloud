@@ -124,14 +124,14 @@ export default function DndPage() {
     <Layout>
       {error && (
         <div className="p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between dark:bg-red-900/20 dark:border-red-800">
             <div className="flex items-center">
               <svg className="w-5 h-5 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className="text-red-700">{error}</span>
+              <span className="text-red-700 dark:text-red-400">{error}</span>
             </div>
-            <button onClick={loadData} className="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium">
+            <button onClick={loadData} className="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium dark:bg-red-900/30 dark:text-red-400">
               Retry
             </button>
           </div>
@@ -144,23 +144,23 @@ export default function DndPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
           </div>
         ) : filteredLeads.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl border">
-            <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="text-center py-12 bg-white rounded-xl border dark:bg-gray-800 dark:border-gray-700">
+            <svg className="w-12 h-12 text-gray-400 mx-auto mb-4 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
             </svg>
-            <h3 className="text-lg font-medium text-gray-900">No DND leads</h3>
-            <p className="text-gray-500 mt-1">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No DND leads</h3>
+            <p className="text-gray-500 mt-1 dark:text-gray-400">
               {search || selectedCampaign
                 ? 'Try adjusting your filters'
                 : 'No leads have been marked as DND'}
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-            <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2">
+          <div className="bg-white rounded-xl shadow-sm border overflow-hidden dark:bg-gray-800 dark:border-gray-700">
+            <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2 dark:border-b dark:border-gray-700 dark:bg-gray-900/50">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
                 <div className="lg:col-span-4 relative">
-                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                   <input
@@ -168,14 +168,14 @@ export default function DndPage() {
                     placeholder="Search lead"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:border-gray-600"
                   />
                 </div>
 
                 <select
                   value={selectedCampaign}
                   onChange={(e) => setSelectedCampaign(e.target.value)}
-                  className="lg:col-span-3 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                  className="lg:col-span-3 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:border-gray-600"
                 >
                   <option value="">All campaigns</option>
                   {campaigns.map((c) => (
@@ -187,7 +187,7 @@ export default function DndPage() {
                   <select
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                    className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:border-gray-600"
                   >
                     <option value={25}>25</option>
                     <option value={50}>50</option>
@@ -195,20 +195,20 @@ export default function DndPage() {
                   </select>
                   <button
                     onClick={clearFilters}
-                    className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                    className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                   >
                     Clear
                   </button>
                   <button
                     onClick={loadData}
-                    className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                    className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                   >
                     Refresh
                   </button>
                   {user?.role === 'ADMIN' && (
                     <button
                       onClick={exportToCSV}
-                      className="inline-flex items-center px-2.5 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 text-xs font-semibold"
+                      className="inline-flex items-center px-2.5 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 text-xs font-semibold dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                     >
                       <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -218,53 +218,53 @@ export default function DndPage() {
                   )}
                 </div>
               </div>
-              <div className="mt-2 text-xs text-gray-500">
+              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 Showing {paginatedLeads.length} of {filteredLeads.length} filtered DND leads ({leads.length} total)
               </div>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900/50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Lead</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Campaign</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Doer</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Lead</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Contact</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Campaign</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Doer</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Source</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Date</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {paginatedLeads.map((lead) => (
-                    <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={lead.id} className="hover:bg-gray-50 transition-colors dark:hover:bg-gray-700/50">
                       <td className="px-3 py-2.5">
                         <div className="flex items-center">
-                          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center dark:bg-red-900/30">
                             <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                             </svg>
                           </div>
-                          <span className="ml-2.5 font-medium text-gray-900 text-sm">{lead.name}</span>
+                          <span className="ml-2.5 font-medium text-gray-900 text-sm dark:text-gray-100">{lead.name}</span>
                         </div>
                       </td>
                       <td className="px-3 py-2.5">
-                        <div className="text-sm text-gray-900 leading-tight">{lead.email || '-'}</div>
-                        <div className="text-xs text-gray-500">{lead.phone || '-'}</div>
+                        <div className="text-sm text-gray-900 leading-tight dark:text-gray-100">{lead.email || '-'}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{lead.phone || '-'}</div>
                       </td>
-                      <td className="px-3 py-2.5 text-sm text-gray-500">{lead.campaign?.name}</td>
-                      <td className="px-3 py-2.5 text-sm text-gray-500">{lead.doer?.name || '-'}</td>
+                      <td className="px-3 py-2.5 text-sm text-gray-500 dark:text-gray-400">{lead.campaign?.name}</td>
+                      <td className="px-3 py-2.5 text-sm text-gray-500 dark:text-gray-400">{lead.doer?.name || '-'}</td>
                       <td className="px-3 py-2.5">
                         <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                          lead.source === 'form' ? 'bg-blue-100 text-blue-700' :
-                          lead.source === 'bulk' ? 'bg-purple-100 text-purple-700' :
-                          'bg-gray-100 text-gray-700'
+                          lead.source === 'form' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                          lead.source === 'bulk' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                          'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
                         }`}>
                           {lead.source}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 text-sm text-gray-500">
+                      <td className="px-3 py-2.5 text-sm text-gray-500 dark:text-gray-400">
                         {format(new Date(lead.createdAt), 'MMM d, yyyy')}
                       </td>
                       <td className="px-3 py-2.5">

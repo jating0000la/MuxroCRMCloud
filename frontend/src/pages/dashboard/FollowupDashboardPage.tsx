@@ -40,12 +40,10 @@ export default function FollowupDashboardPage() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
-  // Quick reschedule inline state: leadId -> datetime string
   const [quickReschedule, setQuickReschedule] = useState<{ leadId: string; followupId: string; value: string } | null>(null);
   const [savingReschedule, setSavingReschedule] = useState(false);
   const rescheduleRef = useRef<HTMLInputElement>(null);
 
-  // Helper function to get row highlight color based on followup due date
   const getRowHighlightClass = (lead: Lead): string => {
     const followup = lead.followups?.[0];
     if (!followup?.nextCallDate) return '';
@@ -55,23 +53,21 @@ export default function FollowupDashboardPage() {
 
     switch (notif.type) {
       case 'overdue':
-        return 'bg-red-50 border-l-4 border-red-500';
+        return 'bg-red-50 border-l-4 border-red-500 dark:bg-red-900/20';
       case 'today':
-        return 'bg-yellow-50 border-l-4 border-yellow-500';
+        return 'bg-yellow-50 border-l-4 border-yellow-500 dark:bg-yellow-900/20';
       case 'tomorrow':
-        return 'bg-green-50 border-l-4 border-green-500';
+        return 'bg-green-50 border-l-4 border-green-500 dark:bg-green-900/20';
       default:
         return '';
     }
   };
 
-  // Process Sutra settings (loaded from localStorage or settings page)
   const getProcessSutraSettings = () => {
     try {
       const saved = localStorage.getItem('processSutraSettings');
       if (saved) return JSON.parse(saved);
     } catch {
-      // Ignore corrupted data
     }
     return { apiKey: '', systemName: '' };
   };
@@ -80,10 +76,8 @@ export default function FollowupDashboardPage() {
     loadData();
   }, [selectedCampaign]);
 
-  // Auto-refresh every 30 seconds so data stays live without browser refresh
   useEffect(() => {
     const interval = setInterval(() => {
-      // Silent refresh — only update if no dialog is open
       if (!selectedLead) {
         refreshSilently();
       }
@@ -102,7 +96,6 @@ export default function FollowupDashboardPage() {
       setCampaigns(campaignsData);
       setLastRefreshed(new Date());
     } catch {
-      // Silently fail on background refresh
     } finally {
       setIsRefreshing(false);
     }
@@ -127,7 +120,6 @@ export default function FollowupDashboardPage() {
     }
   };
 
-  // Update browser tab title with pending count
   useEffect(() => {
     const overdue = notifications.filter(n => n.type === 'overdue').length;
     const today = notifications.filter(n => n.type === 'today').length;
@@ -140,7 +132,6 @@ export default function FollowupDashboardPage() {
     return () => { document.title = 'CRM'; };
   }, [notifications]);
 
-  // Open quick reschedule input and focus it
   useEffect(() => {
     if (quickReschedule && rescheduleRef.current) {
       rescheduleRef.current.focus();
@@ -244,7 +235,6 @@ export default function FollowupDashboardPage() {
       return matchSearch && matchSource && matchDnd && matchDue;
     })
     .sort((a, b) => {
-      // Always pin overdue then today rows to the top
       const getUrgencyScore = (lead: Lead) => {
         const notif = notifications.find(n => n.followupId === lead.followups?.[0]?.id);
         if (notif?.type === 'overdue') return 0;
@@ -301,7 +291,7 @@ export default function FollowupDashboardPage() {
   };
 
   const SortIcon = ({ field }: { field: SortField }) => (
-    <svg className={`w-4 h-4 inline-block ml-1 ${sortField === field ? 'text-primary-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className={`w-4 h-4 inline-block ml-1 ${sortField === field ? 'text-primary-600' : 'text-gray-400 dark:text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       {sortField === field && sortDir === 'desc' ? (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
       ) : (
@@ -344,35 +334,34 @@ export default function FollowupDashboardPage() {
     <Layout>
       {error && (
         <div className="p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between dark:bg-red-900/20 dark:border-red-800">
             <div className="flex items-center">
               <svg className="w-5 h-5 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className="text-red-700">{error}</span>
+              <span className="text-red-700 dark:text-red-400">{error}</span>
             </div>
-            <button onClick={loadData} className="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium">
+            <button onClick={loadData} className="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/40">
               Retry
             </button>
           </div>
         </div>
       )}
       <div className="sleek-page p-3 lg:p-4">
-        {/* Live indicator bar */}
         <div className="flex items-center justify-between mb-3 px-1">
           <div className="flex items-center gap-2">
             <span className={`flex items-center gap-1.5 text-xs font-medium ${isRefreshing ? 'text-amber-600' : 'text-green-600'}`}>
               <span className={`w-2 h-2 rounded-full ${isRefreshing ? 'bg-amber-400 animate-pulse' : 'bg-green-400 animate-pulse'}`} />
               {isRefreshing ? 'Refreshing...' : 'Live'}
             </span>
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-slate-400 dark:text-gray-500">
               Updated {format(lastRefreshed, 'h:mm:ss a')}
             </span>
           </div>
           <button
             onClick={() => { setLoading(false); refreshSilently(); }}
             disabled={isRefreshing}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 disabled:opacity-50 transition-colors dark:text-gray-300 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700"
           >
             <svg className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -380,19 +369,18 @@ export default function FollowupDashboardPage() {
             Refresh
           </button>
         </div>
-        {/* Pending Notifications Banner */}
         {notifications.length > 0 && (
-          <div className="mb-4 p-4 bg-gradient-to-r from-red-50 to-yellow-50 border border-red-200 rounded-lg">
+          <div className="mb-4 p-4 bg-gradient-to-r from-red-50 to-yellow-50 border border-red-200 rounded-lg dark:from-red-900/20 dark:to-yellow-900/20 dark:border-red-800">
             <div className="flex items-start justify-between">
               <div className="flex items-start gap-3">
                 <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
                 <div>
-                  <h3 className="font-semibold text-red-900">
+                  <h3 className="font-semibold text-red-900 dark:text-red-300">
                     ⚠️ {notifications.length} PENDING FOLLOWUP{notifications.length > 1 ? 'S' : ''}
                   </h3>
-                  <p className="text-sm text-red-700 mt-1">
+                  <p className="text-sm text-red-700 mt-1 dark:text-red-400">
                     {notifications.filter(n => n.type === 'overdue').length > 0 && (
                       <span>🔴 {notifications.filter(n => n.type === 'overdue').length} OVERDUE  </span>
                     )}
@@ -414,23 +402,23 @@ export default function FollowupDashboardPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
           </div>
         ) : filteredLeads.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl border">
-            <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="text-center py-12 bg-white rounded-xl border dark:bg-gray-800 dark:border-gray-700">
+            <svg className="w-12 h-12 text-gray-400 mx-auto mb-4 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <h3 className="text-lg font-medium text-gray-900">No leads found</h3>
-            <p className="text-gray-500 mt-1">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No leads found</h3>
+            <p className="text-gray-500 mt-1 dark:text-gray-400">
               {search || selectedCampaign || sourceFilter || dndFilter !== 'all'
                 ? 'Try adjusting your filters'
                 : 'Import leads to get started'}
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-            <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2">
+          <div className="bg-white rounded-xl shadow-sm border overflow-hidden dark:bg-gray-800 dark:border-gray-700">
+            <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/50">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
                 <div className="lg:col-span-3 relative">
-                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                   <input
@@ -438,14 +426,14 @@ export default function FollowupDashboardPage() {
                     placeholder="Search lead"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:border-gray-600"
                   />
                 </div>
 
                 <select
                   value={selectedCampaign}
                   onChange={(e) => setSelectedCampaign(e.target.value)}
-                  className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                  className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:border-gray-600"
                 >
                   <option value="">Campaign</option>
                   {campaigns.map((c) => (
@@ -456,7 +444,7 @@ export default function FollowupDashboardPage() {
                 <select
                   value={sourceFilter}
                   onChange={(e) => setSourceFilter(e.target.value)}
-                  className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                  className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:border-gray-600"
                 >
                   <option value="">Source</option>
                   {uniqueSources.map((s) => (
@@ -467,7 +455,7 @@ export default function FollowupDashboardPage() {
                 <select
                   value={dndFilter}
                   onChange={(e) => setDndFilter(e.target.value as any)}
-                  className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                  className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:border-gray-600"
                 >
                   <option value="all">All</option>
                   <option value="no_dnd">Non-DND</option>
@@ -478,7 +466,7 @@ export default function FollowupDashboardPage() {
                   <select
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                    className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:border-gray-600"
                   >
                     <option value={25}>25</option>
                     <option value={50}>50</option>
@@ -486,14 +474,14 @@ export default function FollowupDashboardPage() {
                   </select>
                   <button
                     onClick={clearFilters}
-                    className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                    className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                   >
                     Clear
                   </button>
                   {user?.role === 'ADMIN' && (
                     <button
                       onClick={exportToCSV}
-                      className="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                      className="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                     >
                       Export
                     </button>
@@ -513,80 +501,80 @@ export default function FollowupDashboardPage() {
                     key={chip.key}
                     type="button"
                     onClick={() => setDueFilter(chip.key as any)}
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-md border ${dueFilter === chip.key ? 'border-primary-300 bg-primary-100 text-primary-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'}`}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md border ${dueFilter === chip.key ? 'border-primary-300 bg-primary-100 text-primary-700 dark:border-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'}`}
                   >
                     {chip.label}
                   </button>
                 ))}
               </div>
 
-              <div className="mt-2 text-xs text-gray-500">
+              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 Showing {paginatedLeads.length} of {filteredLeads.length} filtered leads ({leads.length} total)
               </div>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900/50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Lead ID</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Lead ID</th>
                     <th
                       onClick={() => handleSort('campaign')}
-                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                     >
                       Campaign <SortIcon field="campaign" />
                     </th>
                     <th
                       onClick={() => handleSort('name')}
-                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                     >
                       Name <SortIcon field="name" />
                     </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Phone</th>
                     <th
                       onClick={() => handleSort('dueDate')}
-                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                     >
                       Due Date <SortIcon field="dueDate" />
                     </th>
                     <th
                       onClick={() => handleSort('updatedAt')}
-                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                     >
                       Updated <SortIcon field="updatedAt" />
                     </th>
                     <th
                       onClick={() => handleSort('status')}
-                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                     >
                       Status <SortIcon field="status" />
                     </th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {paginatedLeads.map((lead) => (
-                    <tr key={lead.id} className={`transition-colors ${getRowHighlightClass(lead)} ${!getRowHighlightClass(lead) ? 'hover:bg-gray-50' : 'hover:opacity-90'}`}>
-                      <td className="px-3 py-2 text-xs text-gray-500 font-mono">{lead.id.slice(0, 8)}</td>
-                      <td className="px-3 py-2 text-sm text-gray-500 truncate max-w-[120px]">{lead.campaign?.name}</td>
+                    <tr key={lead.id} className={`transition-colors ${getRowHighlightClass(lead)} ${!getRowHighlightClass(lead) ? 'hover:bg-gray-50 dark:hover:bg-gray-700/50' : 'hover:opacity-90'}`}>
+                      <td className="px-3 py-2 text-xs text-gray-500 font-mono dark:text-gray-400">{lead.id.slice(0, 8)}</td>
+                      <td className="px-3 py-2 text-sm text-gray-500 truncate max-w-[120px] dark:text-gray-400">{lead.campaign?.name}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center">
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${lead.dnd ? 'bg-red-100' : 'bg-primary-100'}`}>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${lead.dnd ? 'bg-red-100 dark:bg-red-900/30' : 'bg-primary-100 dark:bg-primary-900/30'}`}>
                             {lead.dnd ? (
                               <svg className="w-3 h-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                               </svg>
                             ) : (
-                              <span className="text-xs font-medium text-primary-700">{lead.name.charAt(0)}</span>
+                              <span className="text-xs font-medium text-primary-700 dark:text-primary-300">{lead.name.charAt(0)}</span>
                             )}
                           </div>
                           <div className="ml-2 min-w-0">
-                            <p className="font-medium text-gray-900 truncate text-sm leading-tight">{lead.name}</p>
+                            <p className="font-medium text-gray-900 truncate text-sm leading-tight dark:text-gray-100">{lead.name}</p>
                             {lead.dnd && <span className="text-xs text-red-600 font-medium">DND</span>}
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-sm text-gray-700">{lead.phone || '-'}</td>
+                      <td className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300">{lead.phone || '-'}</td>
                       <td className="px-3 py-2">
                         {quickReschedule?.leadId === lead.id ? (
                           <div className="flex items-center gap-1">
@@ -596,19 +584,19 @@ export default function FollowupDashboardPage() {
                               value={quickReschedule.value}
                               onChange={e => setQuickReschedule(q => q ? { ...q, value: e.target.value } : null)}
                               onKeyDown={e => { if (e.key === 'Enter') handleQuickReschedule(); if (e.key === 'Escape') setQuickReschedule(null); }}
-                              className="text-xs border border-primary-400 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500 w-40"
+                              className="text-xs border border-primary-400 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500 w-40 dark:border-primary-600"
                             />
                             <button
                               onClick={handleQuickReschedule}
                               disabled={savingReschedule}
-                              className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
+                              className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/40"
                               title="Save"
                             >
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
                             </button>
-                            <button onClick={() => setQuickReschedule(null)} className="p-1 bg-gray-100 text-gray-500 rounded hover:bg-gray-200" title="Cancel">
+                            <button onClick={() => setQuickReschedule(null)} className="p-1 bg-gray-100 text-gray-500 rounded hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600" title="Cancel">
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                               </svg>
@@ -626,12 +614,12 @@ export default function FollowupDashboardPage() {
                                 ? 'text-red-600'
                                 : new Date(lead.followups[0].nextCallDate).toDateString() === new Date().toDateString()
                                   ? 'text-amber-600'
-                                  : 'text-gray-900'
+                                  : 'text-gray-900 dark:text-gray-100'
                             }`}
                             title="Click to reschedule"
                           >
                             {format(new Date(lead.followups[0].nextCallDate), 'MMM d, h:mm a')}
-                            <span className="block text-[10px] text-gray-400">click to reschedule</span>
+                            <span className="block text-[10px] text-gray-400 dark:text-gray-500">click to reschedule</span>
                           </button>
                         ) : (
                           <button
@@ -647,7 +635,7 @@ export default function FollowupDashboardPage() {
                           </button>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-xs text-gray-500">{format(new Date(lead.updatedAt), 'MMM d, yyyy')}</td>
+                      <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{format(new Date(lead.updatedAt), 'MMM d, yyyy')}</td>
                       <td className="px-3 py-2">
                         {lead.status ? (
                           <span
@@ -657,7 +645,7 @@ export default function FollowupDashboardPage() {
                             {lead.status.label}
                           </span>
                         ) : (
-                          <span className="text-gray-400 text-xs">-</span>
+                          <span className="text-gray-400 text-xs dark:text-gray-500">-</span>
                         )}
                       </td>
                       <td className="px-3 py-2">
@@ -667,7 +655,7 @@ export default function FollowupDashboardPage() {
                                href={`https://api.whatsapp.com/send/?phone=91${encodeURIComponent(lead.phone.replace(/[^0-9]/g, ''))}&text=${encodeURIComponent(`Dear ${lead.name}`)}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center w-7 h-7 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                              className="inline-flex items-center justify-center w-7 h-7 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/40"
                               title="WhatsApp"
                             >
                               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
@@ -680,7 +668,7 @@ export default function FollowupDashboardPage() {
                                href={`https://mail.google.com/mail/u/0/?to=${encodeURIComponent(lead.email)}&body=${encodeURIComponent(`Dear ${lead.name}`)}&fs=1&tf=cm`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center w-7 h-7 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                              className="inline-flex items-center justify-center w-7 h-7 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/40"
                               title="Email"
                             >
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -694,7 +682,7 @@ export default function FollowupDashboardPage() {
                             className={`inline-flex items-center justify-center w-7 h-7 rounded transition-colors ${
                               startingFlow === lead.id
                                 ? 'bg-purple-200 text-purple-400 cursor-wait'
-                                : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                                : 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/40'
                             }`}
                             title="Start Process Sutra Flow"
                             aria-label="Start flow"
@@ -712,7 +700,7 @@ export default function FollowupDashboardPage() {
                           </button>
                           <button
                             onClick={() => handleViewLead(lead)}
-                            className="inline-flex items-center justify-center w-7 h-7 bg-primary-100 text-primary-700 rounded hover:bg-primary-200 transition-colors"
+                            className="inline-flex items-center justify-center w-7 h-7 bg-primary-100 text-primary-700 rounded hover:bg-primary-200 transition-colors dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/30"
                             title="View Details"
                             aria-label="View details"
                           >
@@ -738,7 +726,6 @@ export default function FollowupDashboardPage() {
         )}
       </div>
 
-      {/* Lead Detail Dialog */}
       {selectedLead && (
         <LeadDetailDialog
           leadId={selectedLead.id}
@@ -747,7 +734,7 @@ export default function FollowupDashboardPage() {
           onUpdate={() => {
             setSelectedLead(null);
             loadData();
-            syncWithDelay(500); // Sync notifications after lead update
+            syncWithDelay(500);
           }}
         />
       )}

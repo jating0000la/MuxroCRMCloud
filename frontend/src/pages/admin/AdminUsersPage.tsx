@@ -11,13 +11,13 @@ const DEFAULT_PAGE_SIZE = 50;
 type ModalMode = 'create' | 'edit' | 'reset-password' | 'delete' | null;
 
 const roleColors: Record<string, string> = {
-  ADMIN: 'bg-red-100 text-red-700 ring-1 ring-red-200',
-  USER: 'bg-green-100 text-green-700 ring-1 ring-green-200',
+  ADMIN: 'bg-red-100 text-red-700 ring-1 ring-red-200 dark:bg-red-900/30 dark:text-red-400 dark:ring-red-800',
+  USER: 'bg-green-100 text-green-700 ring-1 ring-green-200 dark:bg-green-900/30 dark:text-green-400 dark:ring-green-800',
 };
 
 const roleAvatarColors: Record<string, string> = {
-  ADMIN: 'bg-red-100 text-red-700',
-  USER: 'bg-primary-100 text-primary-700',
+  ADMIN: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  USER: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300',
 };
 
 export default function AdminUsersPage() {
@@ -130,11 +130,11 @@ export default function AdminUsersPage() {
         {!loading && users.length > 0 && (
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {[
-              { label: 'Total', value: stats.total, cls: 'bg-slate-50 border-slate-200 text-slate-700' },
-              { label: 'Active', value: stats.active, cls: 'bg-green-50 border-green-200 text-green-700' },
-              { label: 'Inactive', value: stats.inactive, cls: 'bg-gray-50 border-gray-200 text-gray-500' },
-              { label: 'Admins', value: stats.admins, cls: 'bg-red-50 border-red-200 text-red-700' },
-              { label: 'Users', value: stats.teamUsers, cls: 'bg-primary-50 border-primary-200 text-primary-700' },
+              { label: 'Total', value: stats.total, cls: 'bg-slate-50 border-slate-200 text-slate-700 dark:bg-gray-900/50 dark:border-gray-700 dark:text-gray-300' },
+              { label: 'Active', value: stats.active, cls: 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400' },
+              { label: 'Inactive', value: stats.inactive, cls: 'bg-gray-50 border-gray-200 text-gray-500 dark:bg-gray-900/50 dark:border-gray-700 dark:text-gray-400' },
+              { label: 'Admins', value: stats.admins, cls: 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400' },
+              { label: 'Users', value: stats.teamUsers, cls: 'bg-primary-50 border-primary-200 text-primary-700 dark:bg-primary-900/20 dark:border-primary-800 dark:text-primary-400' },
             ].map(s => (
               <div key={s.label} className={`${s.cls} rounded-xl border px-3 py-3 text-center`}>
                 <div className="text-2xl font-bold">{s.value}</div>
@@ -145,9 +145,9 @@ export default function AdminUsersPage() {
         )}
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between">
-            <span className="text-red-700 text-sm">{error}</span>
-            <button onClick={loadUsers} className="px-3 py-1 bg-red-100 text-red-700 rounded text-sm">Retry</button>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between dark:bg-red-900/20 dark:border-red-800">
+            <span className="text-red-700 text-sm dark:text-red-400">{error}</span>
+            <button onClick={loadUsers} className="px-3 py-1 bg-red-100 text-red-700 rounded text-sm dark:bg-red-900/30 dark:text-red-400">Retry</button>
           </div>
         )}
 
@@ -156,33 +156,33 @@ export default function AdminUsersPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-            <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2">
+          <div className="bg-white rounded-xl shadow-sm border overflow-hidden dark:bg-gray-800 dark:border-gray-700">
+            <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2 dark:border-b dark:border-gray-700 dark:bg-gray-900/50">
               <div className="flex flex-wrap gap-2 items-center">
                 <div className="relative flex-1 min-w-[180px]">
-                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                   <input type="text" placeholder="Search name, username, email" value={search} onChange={e => setSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500" />
+                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-400" />
                 </div>
-                <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500">
+                <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
                   <option value="">All Roles</option>
                   <option value="ADMIN">Admin</option>
                   <option value="USER">User</option>
                 </select>
-                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500">
+                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
                   <option value="">All Status</option>
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
-                <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))} className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500">
+                <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))} className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
                   <option value={25}>25/page</option>
                   <option value={50}>50/page</option>
                   <option value={100}>100/page</option>
                 </select>
-                <button onClick={() => { setSearch(''); setRoleFilter(''); setStatusFilter(''); }} className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md text-gray-600 hover:bg-gray-100">Clear</button>
-                <button onClick={loadUsers} className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md text-gray-600 hover:bg-gray-100 flex items-center gap-1">
+                <button onClick={() => { setSearch(''); setRoleFilter(''); setStatusFilter(''); }} className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">Clear</button>
+                <button onClick={loadUsers} className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md text-gray-600 hover:bg-gray-100 flex items-center gap-1 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                   Refresh
                 </button>
@@ -191,49 +191,49 @@ export default function AdminUsersPage() {
                   Add User
                 </button>
               </div>
-              <div className="mt-2 text-xs text-gray-500">{paginatedUsers.length} of {filteredUsers.length} users ({users.length} total)</div>
+              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{paginatedUsers.length} of {filteredUsers.length} users ({users.length} total)</div>
             </div>
 
             {filteredUsers.length === 0 ? (
-              <div className="text-center py-12 text-gray-400 text-sm">No users match filters</div>
+              <div className="text-center py-12 text-gray-400 text-sm dark:text-gray-500">No users match filters</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-100">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-900/50">
                     <tr>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">User</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Email</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Role</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Joined</th>
-                      <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase dark:text-gray-400">User</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase dark:text-gray-400">Email</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase dark:text-gray-400">Role</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase dark:text-gray-400">Status</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase dark:text-gray-400">Joined</th>
+                      <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase dark:text-gray-400">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                     {paginatedUsers.map(u => (
-                      <tr key={u.id} className={`hover:bg-gray-50/70 transition-colors ${!u.isActive ? 'opacity-55' : ''}`}>
+                      <tr key={u.id} className={`hover:bg-gray-50/70 transition-colors dark:hover:bg-gray-700/50 ${!u.isActive ? 'opacity-55' : ''}`}>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-2.5">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${roleAvatarColors[u.role] || 'bg-gray-100 text-gray-600'}`}>
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${roleAvatarColors[u.role] || 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
                               {u.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <p className="font-semibold text-gray-900 text-sm">{u.name}</p>
-                              <p className="text-xs text-gray-400">@{u.username}</p>
+                              <p className="font-semibold text-gray-900 text-sm dark:text-gray-100">{u.name}</p>
+                              <p className="text-xs text-gray-400 dark:text-gray-500">@{u.username}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-2.5 text-sm text-gray-600">{u.email || <span className="text-gray-300">—</span>}</td>
+                        <td className="px-3 py-2.5 text-sm text-gray-600 dark:text-gray-300">{u.email || <span className="text-gray-300 dark:text-gray-600">—</span>}</td>
                         <td className="px-3 py-2.5">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${roleColors[u.role]}`}>{u.role}</span>
                         </td>
                         <td className="px-3 py-2.5">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${u.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-gray-400'}`} />
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${u.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-green-500' : 'bg-gray-400 dark:bg-gray-500'}`} />
                             {u.isActive ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td className="px-3 py-2.5 text-xs text-gray-500">{format(new Date(u.createdAt), 'MMM d, yyyy')}</td>
+                        <td className="px-3 py-2.5 text-xs text-gray-500 dark:text-gray-400">{format(new Date(u.createdAt), 'MMM d, yyyy')}</td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center justify-end gap-1">
                             <ActionBtn onClick={() => openEdit(u)} title="Edit user" color="blue">
@@ -302,13 +302,13 @@ export default function AdminUsersPage() {
       {modalMode === 'reset-password' && selectedUser && (
         <Modal title={`Reset Password — ${selectedUser.name}`} onClose={closeModal}>
           <form onSubmit={handleResetPassword} className="space-y-4">
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300">
               Resetting password for <strong>@{selectedUser.username}</strong>. They must use the new password to log in.
             </div>
             <Field label="New Password *">
               <div className="relative">
                 <input type={showNewPwd ? 'text' : 'password'} value={newPassword} onChange={e => setNewPassword(e.target.value)} className="input pr-10" placeholder="Min 6 characters" required minLength={6} />
-                <button type="button" onClick={() => setShowNewPwd(p => !p)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <button type="button" onClick={() => setShowNewPwd(p => !p)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     {showNewPwd
                       ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
@@ -320,8 +320,8 @@ export default function AdminUsersPage() {
             </Field>
             <Field label="Confirm Password *">
               <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                className={`input ${confirmPassword && confirmPassword !== newPassword ? 'border-red-400' : ''}`} placeholder="Repeat password" required />
-              {confirmPassword && confirmPassword !== newPassword && <p className="text-xs text-red-600 mt-1">Passwords do not match</p>}
+                className={`input ${confirmPassword && confirmPassword !== newPassword ? 'border-red-400 dark:border-red-500' : ''}`} placeholder="Repeat password" required />
+              {confirmPassword && confirmPassword !== newPassword && <p className="text-xs text-red-600 mt-1 dark:text-red-400">Passwords do not match</p>}
             </Field>
             <ModalFooter onCancel={closeModal} saving={saving} label="Reset Password" disabled={!newPassword || newPassword !== confirmPassword} />
           </form>
@@ -331,15 +331,15 @@ export default function AdminUsersPage() {
       {modalMode === 'delete' && selectedUser && (
         <Modal title="Delete User Permanently" onClose={closeModal}>
           <div className="space-y-4">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3 dark:bg-red-900/20 dark:border-red-800">
               <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
               <div>
-                <p className="font-semibold text-red-900 text-sm">This cannot be undone!</p>
-                <p className="text-sm text-red-700 mt-1"><strong>{selectedUser.name}</strong> (@{selectedUser.username}) and all their data will be permanently deleted. Consider <strong>Deactivating</strong> instead.</p>
+                <p className="font-semibold text-red-900 text-sm dark:text-red-300">This cannot be undone!</p>
+                <p className="text-sm text-red-700 mt-1 dark:text-red-400"><strong>{selectedUser.name}</strong> (@{selectedUser.username}) and all their data will be permanently deleted. Consider <strong>Deactivating</strong> instead.</p>
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button onClick={closeModal} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium">Cancel — Keep User</button>
+              <button onClick={closeModal} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">Cancel — Keep User</button>
               <button onClick={handlePermanentDelete} disabled={saving} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold disabled:opacity-50">
                 {saving ? 'Deleting...' : 'Yes, Delete Permanently'}
               </button>
@@ -353,11 +353,11 @@ export default function AdminUsersPage() {
 
 function ActionBtn({ onClick, title, color, children, disabled }: { onClick: () => void; title: string; color: string; children: React.ReactNode; disabled?: boolean }) {
   const colorMap: Record<string, string> = {
-    blue: 'bg-blue-50 text-blue-600 hover:bg-blue-100',
-    amber: 'bg-amber-50 text-amber-600 hover:bg-amber-100',
-    orange: 'bg-orange-50 text-orange-600 hover:bg-orange-100',
-    green: 'bg-green-50 text-green-600 hover:bg-green-100',
-    red: 'bg-red-50 text-red-600 hover:bg-red-100',
+    blue: 'bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/40',
+    amber: 'bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/40',
+    orange: 'bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/40',
+    green: 'bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/40',
+    red: 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/40',
   };
   return (
     <button onClick={onClick} title={title} disabled={disabled}
@@ -370,10 +370,10 @@ function ActionBtn({ onClick, title, color, children, disabled }: { onClick: () 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-900">{title}</h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl dark:bg-gray-800">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 dark:border-b dark:border-gray-700">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">{title}</h2>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 dark:hover:bg-gray-700 dark:text-gray-400">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
@@ -384,13 +384,13 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>{children}</div>;
+  return <div><label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">{label}</label>{children}</div>;
 }
 
 function ModalFooter({ onCancel, saving, label, disabled }: { onCancel: () => void; saving: boolean; label: string; disabled?: boolean }) {
   return (
-    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-      <button type="button" onClick={onCancel} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium">Cancel</button>
+    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-t dark:border-gray-700">
+      <button type="button" onClick={onCancel} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">Cancel</button>
       <button type="submit" disabled={saving || disabled} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm font-semibold">{saving ? 'Saving...' : label}</button>
     </div>
   );

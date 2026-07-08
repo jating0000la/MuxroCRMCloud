@@ -13,8 +13,8 @@ export default function Pagination({ page, pageSize, totalItems, onPageChange }:
   if (totalItems <= pageSize) return null;
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-gray-100 bg-gray-50 px-4 py-3">
-      <p className="text-sm text-gray-500">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-gray-100 dark:border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-4 py-3">
+      <p className="text-sm text-gray-500 dark:text-gray-400">
         Showing {startItem}-{endItem} of {totalItems}
       </p>
       <div className="flex items-center gap-2">
@@ -22,18 +22,18 @@ export default function Pagination({ page, pageSize, totalItems, onPageChange }:
           type="button"
           onClick={() => onPageChange(Math.max(1, page - 1))}
           disabled={page === 1}
-          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Previous
         </button>
-        <span className="text-sm text-gray-600">
+        <span className="text-sm text-gray-600 dark:text-gray-400">
           Page {page} of {totalPages}
         </span>
         <button
           type="button"
           onClick={() => onPageChange(Math.min(totalPages, page + 1))}
           disabled={page === totalPages}
-          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Next
         </button>

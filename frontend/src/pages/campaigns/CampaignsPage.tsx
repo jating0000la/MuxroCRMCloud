@@ -298,7 +298,7 @@ export default function CampaignsPage() {
   };
 
   const SortIcon = ({ field }: { field: SortField }) => (
-    <svg className={`w-4 h-4 inline-block ml-1 ${sortField === field ? 'text-primary-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className={`w-4 h-4 inline-block ml-1 ${sortField === field ? 'text-primary-600' : 'text-gray-400 dark:text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       {sortField === field && sortDir === 'desc' ? (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
       ) : (
@@ -311,11 +311,11 @@ export default function CampaignsPage() {
     <Layout>
       <div className="sleek-page p-3 lg:p-4">
 
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden mb-3">
-          <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2">
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden mb-3 dark:bg-gray-800 dark:border-gray-700">
+          <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/50">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
               <div className="lg:col-span-4 relative">
-                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
@@ -323,24 +323,24 @@ export default function CampaignsPage() {
                   placeholder="Search campaign"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:border-gray-600"
                 />
               </div>
 
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value as any)}
-                className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:border-gray-600"
               >
                 <option value="all">All status</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
 
-              <div className="lg:col-span-2 flex border border-gray-300 rounded-md overflow-hidden w-fit">
+              <div className="lg:col-span-2 flex border border-gray-300 rounded-md overflow-hidden w-fit dark:border-gray-600">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`px-2 py-1.5 ${viewMode === 'grid' ? 'bg-primary-50 text-primary-700' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                  className={`px-2 py-1.5 ${viewMode === 'grid' ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-700/50'}`}
                   aria-label="Grid view"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -349,7 +349,7 @@ export default function CampaignsPage() {
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`px-2 py-1.5 ${viewMode === 'list' ? 'bg-primary-50 text-primary-700' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                  className={`px-2 py-1.5 ${viewMode === 'list' ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-700/50'}`}
                   aria-label="List view"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -362,7 +362,7 @@ export default function CampaignsPage() {
                 <select
                   value={pageSize}
                   onChange={(e) => setPageSize(Number(e.target.value))}
-                  className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                  className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:border-gray-600"
                 >
                   <option value={12}>12</option>
                   <option value={24}>24</option>
@@ -370,7 +370,7 @@ export default function CampaignsPage() {
                 </select>
                 <button
                   onClick={clearFilters}
-                  className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                  className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                 >
                   Clear
                 </button>
@@ -385,7 +385,7 @@ export default function CampaignsPage() {
               </div>
             </div>
 
-            <div className="mt-2 text-xs text-gray-500">
+            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
               Showing {paginatedCampaigns.length} of {filteredCampaigns.length} filtered campaigns ({campaigns.length} total)
             </div>
           </div>
@@ -397,12 +397,12 @@ export default function CampaignsPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
           </div>
         ) : filteredCampaigns.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl border">
-            <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="text-center py-12 bg-white rounded-xl border dark:bg-gray-800 dark:border-gray-700">
+            <svg className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
-            <h3 className="text-lg font-medium text-gray-900 mb-1">No campaigns found</h3>
-            <p className="text-gray-500 mb-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-1">No campaigns found</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">
               {search ? 'Try a different search term' : 'Get started by creating your first campaign'}
             </p>
             {canManage && !search && (
@@ -424,28 +424,28 @@ export default function CampaignsPage() {
                 <Link
                   key={campaign.id}
                   to={`/campaigns/${campaign.id}`}
-                  className="bg-white rounded-xl shadow-sm border p-4 hover:shadow-md transition-all group"
+                  className="bg-white rounded-xl shadow-sm border p-4 hover:shadow-md transition-all group dark:bg-gray-800 dark:border-gray-700"
                 >
                 <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center group-hover:bg-primary-100 transition-colors">
-                    <span className="text-lg font-semibold text-primary-700">
+                  <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center group-hover:bg-primary-100 transition-colors dark:bg-primary-900/30 dark:group-hover:bg-primary-900/30">
+                    <span className="text-lg font-semibold text-primary-700 dark:text-primary-300">
                       {campaign.name.charAt(0)}
                     </span>
                   </div>
                   <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
-                    campaign.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    campaign.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
                   }`}>
                     {campaign.isActive ? 'Active' : 'Inactive'}
                   </span>
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-primary-600 transition-colors">
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1 group-hover:text-primary-600 transition-colors">
                   {campaign.name}
                 </h3>
                 {campaign.description && (
-                  <p className="text-sm text-gray-500 mb-3 line-clamp-2">{campaign.description}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{campaign.description}</p>
                 )}
-                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                  <div className="flex items-center space-x-4 text-sm text-gray-500">
+                <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-t dark:border-gray-700">
+                  <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
                     <span className="flex items-center">
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -459,14 +459,14 @@ export default function CampaignsPage() {
                       {campaign._count?.forms || 0}
                     </span>
                   </div>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
                     {campaign.manager?.name}
                   </span>
                 </div>
                 </Link>
               ))}
             </div>
-            <div className="mt-3 bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div className="mt-3 bg-white rounded-xl shadow-sm border overflow-hidden dark:bg-gray-800 dark:border-gray-700">
               <Pagination
                 page={currentPage}
                 pageSize={pageSize}
@@ -476,34 +476,34 @@ export default function CampaignsPage() {
             </div>
           </>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="bg-white rounded-xl shadow-sm border overflow-hidden dark:bg-gray-800 dark:border-gray-700">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                  <th onClick={() => handleSort('name')} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">Campaign <SortIcon field="name" /></th>
-                  <th onClick={() => handleSort('manager')} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">Manager <SortIcon field="manager" /></th>
-                  <th onClick={() => handleSort('leads')} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">Leads <SortIcon field="leads" /></th>
-                  <th onClick={() => handleSort('forms')} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">Forms <SortIcon field="forms" /></th>
-                  <th onClick={() => handleSort('status')} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">Status <SortIcon field="status" /></th>
+                  <th onClick={() => handleSort('name')} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/50">Campaign <SortIcon field="name" /></th>
+                  <th onClick={() => handleSort('manager')} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/50">Manager <SortIcon field="manager" /></th>
+                  <th onClick={() => handleSort('leads')} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/50">Leads <SortIcon field="leads" /></th>
+                  <th onClick={() => handleSort('forms')} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/50">Forms <SortIcon field="forms" /></th>
+                  <th onClick={() => handleSort('status')} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/50">Status <SortIcon field="status" /></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {paginatedCampaigns.map((campaign) => (
-                  <tr key={campaign.id} className="hover:bg-gray-50">
+                  <tr key={campaign.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-3 py-2.5">
-                      <Link to={`/campaigns/${campaign.id}`} className="font-medium text-gray-900 hover:text-primary-600">
+                      <Link to={`/campaigns/${campaign.id}`} className="font-medium text-gray-900 hover:text-primary-600 dark:text-gray-100">
                         {campaign.name}
                       </Link>
                       {campaign.description && (
-                        <p className="text-xs text-gray-500 mt-0.5">{campaign.description}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{campaign.description}</p>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-sm text-gray-500">{campaign.manager?.name}</td>
-                    <td className="px-3 py-2.5 text-sm text-gray-500">{campaign._count?.leads || 0}</td>
-                    <td className="px-3 py-2.5 text-sm text-gray-500">{campaign._count?.forms || 0}</td>
+                    <td className="px-3 py-2.5 text-sm text-gray-500 dark:text-gray-400">{campaign.manager?.name}</td>
+                    <td className="px-3 py-2.5 text-sm text-gray-500 dark:text-gray-400">{campaign._count?.leads || 0}</td>
+                    <td className="px-3 py-2.5 text-sm text-gray-500 dark:text-gray-400">{campaign._count?.forms || 0}</td>
                     <td className="px-3 py-2.5">
                       <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
-                        campaign.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                        campaign.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
                       }`}>
                         {campaign.isActive ? 'Active' : 'Inactive'}
                       </span>
@@ -524,13 +524,13 @@ export default function CampaignsPage() {
         {/* 3-Step Wizard Modal */}
         {showWizard && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto dark:bg-gray-800">
               {/* Header */}
               <div className="p-6 pb-0">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">Create Campaign</h2>
-                  <button onClick={closeWizard} className="p-2 hover:bg-gray-100 rounded-lg" aria-label="Close wizard">
-                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Create Campaign</h2>
+                  <button onClick={closeWizard} className="p-2 hover:bg-gray-100 rounded-lg dark:hover:bg-gray-700" aria-label="Close wizard">
+                    <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
@@ -547,7 +547,7 @@ export default function CampaignsPage() {
                               ? 'bg-green-500 text-white'
                               : currentStepIndex === i
                               ? 'bg-primary-600 text-white'
-                              : 'bg-gray-200 text-gray-500'
+                              : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
                           }`}
                         >
                           {currentStepIndex > i ? (
@@ -559,14 +559,14 @@ export default function CampaignsPage() {
                           )}
                         </div>
                         <span className={`ml-2 text-sm font-medium hidden sm:inline ${
-                          currentStepIndex >= i ? 'text-gray-900' : 'text-gray-400'
+                          currentStepIndex >= i ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'
                         }`}>
                           {step.label}
                         </span>
                       </div>
                       {i < steps.length - 1 && (
                         <div className={`flex-1 h-0.5 mx-3 ${
-                          currentStepIndex > i ? 'bg-green-500' : 'bg-gray-200'
+                          currentStepIndex > i ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'
                         }`} />
                       )}
                     </React.Fragment>
@@ -578,23 +578,23 @@ export default function CampaignsPage() {
                 {/* Step 1: Campaign */}
                 {wizardStep === 'campaign' && (
                   <div className="space-y-4">
-                    <p className="text-sm text-gray-500">Enter the basic details for your campaign.</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Enter the basic details for your campaign.</p>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Campaign Name *</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Campaign Name *</label>
                       <input
                         type="text"
                         value={campaignName}
                         onChange={(e) => setCampaignName(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:border-gray-600"
                         placeholder="e.g., Summer Sale 2026"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
                       <textarea
                         value={campaignDescription}
                         onChange={(e) => setCampaignDescription(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:border-gray-600"
                         rows={3}
                         placeholder="Brief description of the campaign"
                       />
@@ -614,20 +614,20 @@ export default function CampaignsPage() {
                 {/* Step 2: Form */}
                 {wizardStep === 'form' && (
                   <div className="space-y-4">
-                    <p className="text-sm text-gray-500">Create a form to collect enquiries for this campaign.</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Create a form to collect enquiries for this campaign.</p>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Form Title *</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Form Title *</label>
                       <input
                         type="text"
                         value={formTitle}
                         onChange={(e) => setFormTitle(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:border-gray-600"
                         placeholder="e.g., Contact Form"
                       />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <label className="text-sm font-medium text-gray-700">Form Fields</label>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Form Fields</label>
                         <button
                           type="button"
                           onClick={addFormField}
@@ -638,19 +638,19 @@ export default function CampaignsPage() {
                       </div>
                       <div className="space-y-2 max-h-48 overflow-y-auto">
                         {formFields.map((field, i) => (
-                          <div key={i} className="bg-gray-50 rounded-lg p-2 space-y-2">
+                          <div key={i} className="bg-gray-50 rounded-lg p-2 space-y-2 dark:bg-gray-900/50">
                             <div className="flex items-center gap-2">
                               <input
                                 type="text"
                                 value={field.label}
                                 onChange={(e) => updateFormField(i, 'label', e.target.value)}
                                 placeholder="Label"
-                                className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded dark:border-gray-600"
                               />
                               <select
                                 value={field.type}
                                 onChange={(e) => updateFormField(i, 'type', e.target.value)}
-                                className="px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                className="px-2 py-1.5 text-sm border border-gray-300 rounded dark:border-gray-600"
                               >
                                 <option value="text">Text</option>
                                 <option value="email">Email</option>
@@ -659,7 +659,7 @@ export default function CampaignsPage() {
                                 <option value="textarea">Textarea</option>
                                 <option value="select">Dropdown</option>
                               </select>
-                              <label className="flex items-center text-xs text-gray-500">
+                              <label className="flex items-center text-xs text-gray-500 dark:text-gray-400">
                                 <input
                                   type="checkbox"
                                   checked={field.required}
@@ -687,7 +687,7 @@ export default function CampaignsPage() {
                                 value={field.options?.join(', ') || ''}
                                 onChange={(e) => updateFormField(i, 'options', e.target.value.split(','))}
                                 placeholder="Dropdown options separated by commas"
-                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded dark:border-gray-600"
                               />
                             )}
                           </div>
@@ -697,7 +697,7 @@ export default function CampaignsPage() {
                     <div className="flex justify-between pt-2">
                       <button
                         onClick={handleSkipForm}
-                        className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                        className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/50"
                       >
                         Skip for now
                       </button>
@@ -715,9 +715,9 @@ export default function CampaignsPage() {
                 {/* Step 3: Users */}
                 {wizardStep === 'users' && (
                   <div className="space-y-4">
-                    <p className="text-sm text-gray-500">Assign users to this campaign so they can manage leads.</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Assign users to this campaign so they can manage leads.</p>
                     {allUsers.length === 0 ? (
-                      <p className="text-sm text-gray-400 text-center py-4">No users available to assign.</p>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">No users available to assign.</p>
                     ) : (
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {allUsers.map((u) => (
@@ -725,8 +725,8 @@ export default function CampaignsPage() {
                             key={u.id}
                             className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors ${
                               selectedUserIds.includes(u.id)
-                                ? 'bg-primary-50 border-primary-300'
-                                : 'bg-white border-gray-200 hover:bg-gray-50'
+                                ? 'bg-primary-50 border-primary-300 dark:bg-primary-900/30 dark:border-primary-700'
+                                : 'bg-white border-gray-200 hover:bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600'
                             }`}
                           >
                             <input
@@ -736,8 +736,8 @@ export default function CampaignsPage() {
                               className="rounded text-primary-600 mr-3"
                             />
                             <div>
-                              <p className="text-sm font-medium text-gray-900">{u.name}</p>
-                              <p className="text-xs text-gray-500">{u.role}</p>
+                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{u.name}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{u.role}</p>
                             </div>
                           </label>
                         ))}

@@ -253,7 +253,7 @@ export default function CampaignDetailPage() {
     return (
       <Layout>
         <div className="p-8 text-center">
-          <h2 className="text-xl font-semibold text-gray-900">Campaign not found</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Campaign not found</h2>
         </div>
       </Layout>
     );
@@ -264,16 +264,16 @@ export default function CampaignDetailPage() {
       <div className="sleek-page p-3 lg:p-4">
         {/* Header */}
         <div className="mb-3">
-          <div className="flex items-center space-x-2 text-xs text-gray-500 mb-1">
+          <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mb-1">
             <span>Campaigns</span>
             <span>/</span>
-            <span className="text-gray-900">{campaign.name}</span>
+            <span className="text-gray-900 dark:text-gray-100">{campaign.name}</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-xl font-bold text-gray-900">{campaign.name}</h1>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{campaign.name}</h1>
               {campaign.description && (
-                <p className="text-sm text-gray-500 mt-0.5">{campaign.description}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{campaign.description}</p>
               )}
             </div>
             {canManage && (
@@ -285,7 +285,7 @@ export default function CampaignDetailPage() {
                     setEditIsActive(campaign.isActive);
                     setEditingCampaign(true);
                   }}
-                  className="inline-flex items-center px-2.5 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-xs font-semibold"
+                  className="inline-flex items-center px-2.5 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/50 text-xs font-semibold"
                 >
                   <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -327,7 +327,7 @@ export default function CampaignDetailPage() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200 mb-3">
+        <div className="border-b border-gray-200 dark:border-b dark:border-gray-700 mb-3">
           <nav className="flex space-x-8">
             {([
               { key: 'leads' as const, label: 'Leads', count: leads.length },
@@ -341,13 +341,13 @@ export default function CampaignDetailPage() {
                 className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === tab.key
                     ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
                 {tab.label}
                 {tab.key !== 'settings' && (
                   <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
-                    activeTab === tab.key ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500'
+                    activeTab === tab.key ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
                   }`}>
                     {tab.count}
                   </span>
@@ -361,11 +361,11 @@ export default function CampaignDetailPage() {
         {activeTab === 'leads' && (
           <div>
             {/* Leads Table */}
-            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-              <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2">
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden dark:bg-gray-800 dark:border-gray-700">
+              <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2 dark:border-b dark:border-gray-700 dark:bg-gray-900/50">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
                   <div className="lg:col-span-5 relative">
-                    <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     <input
@@ -373,13 +373,13 @@ export default function CampaignDetailPage() {
                       placeholder="Search leads"
                       value={leadSearch}
                       onChange={(e) => setLeadSearch(e.target.value)}
-                      className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                      className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                     />
                   </div>
                   <select
                     value={leadStatusFilter}
                     onChange={(e) => setLeadStatusFilter(e.target.value)}
-                    className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                    className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                   >
                     <option value="">All status</option>
                     {campaign.statuses?.map((s) => (
@@ -390,7 +390,7 @@ export default function CampaignDetailPage() {
                     <select
                       value={leadPageSize}
                       onChange={(e) => setLeadPageSize(Number(e.target.value))}
-                      className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+                      className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                     >
                       <option value={25}>25</option>
                       <option value={50}>50</option>
@@ -398,51 +398,51 @@ export default function CampaignDetailPage() {
                     </select>
                     <button
                       onClick={clearLeadFilters}
-                      className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                      className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                     >
                       Clear
                     </button>
                     <button
                       onClick={loadData}
-                      className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                      className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                     >
                       Refresh
                     </button>
                   </div>
                 </div>
-                <div className="mt-2 text-xs text-gray-500">
+                <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   Showing {paginatedLeads.length} of {filteredLeads.length} filtered leads ({leads.length} total)
                 </div>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-900/50">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Doer</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Contact</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Doer</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Source</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {paginatedLeads.map((lead) => (
-                      <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                      <tr key={lead.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                         <td className="px-3 py-2.5">
                           <div className="flex items-center">
-                            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                              <span className="text-sm font-medium text-primary-700">{lead.name.charAt(0)}</span>
+                            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center dark:bg-primary-900/30">
+                              <span className="text-sm font-medium text-primary-700 dark:text-primary-300">{lead.name.charAt(0)}</span>
                             </div>
-                            <span className="ml-2.5 font-medium text-gray-900 text-sm">{lead.name}</span>
+                            <span className="ml-2.5 font-medium text-gray-900 dark:text-gray-100 text-sm">{lead.name}</span>
                           </div>
                         </td>
                         <td className="px-3 py-2.5">
-                          <div className="text-sm text-gray-900 leading-tight">{lead.email || '-'}</div>
-                          <div className="text-xs text-gray-500">{lead.phone || '-'}</div>
+                          <div className="text-sm text-gray-900 dark:text-gray-100 leading-tight">{lead.email || '-'}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">{lead.phone || '-'}</div>
                         </td>
-                        <td className="px-3 py-2.5 text-sm text-gray-500">
+                        <td className="px-3 py-2.5 text-sm text-gray-500 dark:text-gray-400">
                           {lead.doer?.name || <span className="text-gray-400 italic">Unassigned</span>}
                         </td>
                         <td className="px-3 py-2.5">
@@ -454,14 +454,14 @@ export default function CampaignDetailPage() {
                               {lead.status.label}
                             </span>
                           ) : (
-                            <span className="text-gray-400 text-sm">No status</span>
+                            <span className="text-gray-400 dark:text-gray-500 text-sm">No status</span>
                           )}
                         </td>
                           <td className="px-3 py-2.5">
                           <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                            lead.source === 'form' ? 'bg-blue-100 text-blue-700' :
-                            lead.source === 'bulk' ? 'bg-purple-100 text-purple-700' :
-                            'bg-gray-100 text-gray-700'
+                            lead.source === 'form' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                            lead.source === 'bulk' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                            'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
                           }`}>
                             {lead.source}
                           </span>
@@ -487,11 +487,11 @@ export default function CampaignDetailPage() {
               />
               {filteredLeads.length === 0 && (
                 <div className="text-center py-12">
-                  <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <h3 className="text-lg font-medium text-gray-900">No leads found</h3>
-                  <p className="text-gray-500 mt-1">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No leads found</h3>
+                  <p className="text-gray-500 dark:text-gray-400 mt-1">
                     {leadSearch || leadStatusFilter ? 'Try adjusting your filters' : 'Import leads or create a form to get started'}
                   </p>
                 </div>
@@ -504,21 +504,21 @@ export default function CampaignDetailPage() {
         {activeTab === 'forms' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {forms.map((form) => (
-              <div key={form.id} className="bg-white rounded-xl shadow-sm border p-5">
+              <div key={form.id} className="bg-white rounded-xl shadow-sm border p-5 dark:bg-gray-800 dark:border-gray-700">
                 <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
+                  <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center dark:bg-purple-900/30">
                     <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
                   <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
-                    form.isPublished ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    form.isPublished ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
                   }`}>
                     {form.isPublished ? 'Published' : 'Draft'}
                   </span>
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-1">{form.title}</h3>
-                <p className="text-sm text-gray-500 mb-4">
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">{form.title}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                   {form._count?.submissions || 0} submissions · {form.fields?.length || 0} fields
                 </p>
                 {canManage && (
@@ -528,7 +528,7 @@ export default function CampaignDetailPage() {
                         setEditingForm(form);
                         setShowFormBuilder(true);
                       }}
-                      className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                      className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/50 text-sm font-medium"
                     >
                       <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -547,7 +547,7 @@ export default function CampaignDetailPage() {
                         }
                       }}
                       aria-label="Delete form"
-                      className="px-3 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-sm font-medium"
+                      className="px-3 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -556,8 +556,8 @@ export default function CampaignDetailPage() {
                   </div>
                 )}
                 {form.isPublished && (
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <label className="text-xs font-medium text-gray-500 block mb-1">Public Link</label>
+                  <div className="bg-gray-50 rounded-lg p-3 dark:bg-gray-900/50">
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1">Public Link</label>
                     <div className="flex items-center space-x-2">
                       <input
                         type="text"
@@ -571,9 +571,9 @@ export default function CampaignDetailPage() {
                           toast.success('Link copied!');
                         }}
                         aria-label="Copy link"
-                        className="p-1.5 hover:bg-gray-200 rounded"
+                        className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
                       >
-                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                         </svg>
                       </button>
@@ -583,12 +583,12 @@ export default function CampaignDetailPage() {
               </div>
             ))}
             {forms.length === 0 && (
-              <div className="col-span-full text-center py-12 bg-white rounded-xl border">
-                <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="col-span-full text-center py-12 bg-white rounded-xl border dark:bg-gray-800 dark:border-gray-700">
+                <svg className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <h3 className="text-lg font-medium text-gray-900">No form yet</h3>
-                <p className="text-gray-500 mt-1 mb-4">Create a form to collect enquiries. Each campaign can have one form.</p>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No form yet</h3>
+                <p className="text-gray-500 dark:text-gray-400 mt-1 mb-4">Create a form to collect enquiries. Each campaign can have one form.</p>
             {canManage && (
                   <button
                     onClick={() => setShowFormBuilder(true)}
@@ -604,20 +604,20 @@ export default function CampaignDetailPage() {
 
         {/* Users Tab */}
         {activeTab === 'users' && (
-          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <div className="bg-white rounded-xl shadow-sm border overflow-hidden dark:bg-gray-800 dark:border-gray-700">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
               {users.map((u) => (
-                <div key={u.id} className="flex items-center p-4 bg-gray-50 rounded-xl">
-                  <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-primary-700">{u.name.charAt(0)}</span>
+                <div key={u.id} className="flex items-center p-4 bg-gray-50 rounded-xl dark:bg-gray-900/50">
+                  <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center dark:bg-primary-900/30">
+                    <span className="text-sm font-medium text-primary-700 dark:text-primary-300">{u.name.charAt(0)}</span>
                   </div>
                   <div className="ml-3">
-                    <p className="font-medium text-gray-900">{u.name}</p>
-                    <p className="text-sm text-gray-500">{u.username}</p>
+                    <p className="font-medium text-gray-900 dark:text-gray-100">{u.name}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{u.username}</p>
                   </div>
                   <span className={`ml-auto px-2 py-1 text-xs rounded-full ${
-                    u.role === 'ADMIN' ? 'bg-red-100 text-red-700' :
-                    'bg-green-100 text-green-700'
+                    u.role === 'ADMIN' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                    'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                   }`}>
                     {u.role}
                   </span>
@@ -626,11 +626,11 @@ export default function CampaignDetailPage() {
             </div>
             {users.length === 0 && (
               <div className="text-center py-12">
-                <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <h3 className="text-lg font-medium text-gray-900">No team members</h3>
-                <p className="text-gray-500 mt-1">Assign users to this campaign</p>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No team members</h3>
+                <p className="text-gray-500 dark:text-gray-400 mt-1">Assign users to this campaign</p>
               </div>
             )}
           </div>
@@ -640,36 +640,36 @@ export default function CampaignDetailPage() {
         {activeTab === 'settings' && canManage && (
           <div className="space-y-6">
             {/* Status Management */}
-            <div className="bg-white rounded-xl shadow-sm border p-6">
+            <div className="bg-white rounded-xl shadow-sm border p-6 dark:bg-gray-800 dark:border-gray-700">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Lead Statuses</h3>
-                  <p className="text-sm text-gray-500">Customize the status options for leads in this campaign</p>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Lead Statuses</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Customize the status options for leads in this campaign</p>
                 </div>
               </div>
 
               {/* Add New Status */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Add New Status</h4>
+              <div className="bg-gray-50 rounded-lg p-4 mb-6 dark:bg-gray-900/50">
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Add New Status</h4>
                 <div className="flex items-end gap-3">
                   <div className="flex-1">
-                    <label className="block text-xs text-gray-500 mb-1">Status Label</label>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Status Label</label>
                     <input
                       type="text"
                       value={newStatusLabel}
                       onChange={(e) => setNewLabelStatus(e.target.value)}
                       placeholder="e.g., Qualified, Proposal Sent"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Color</label>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Color</label>
                     <div className="flex items-center gap-2">
                       <input
                         type="color"
                         value={newStatusColor}
                         onChange={(e) => setNewStatusColor(e.target.value)}
-                        className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer"
+                        className="w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer"
                       />
                       <div className="flex flex-wrap gap-1">
                         {STATUS_COLORS.slice(0, 5).map((color) => (
@@ -718,22 +718,22 @@ export default function CampaignDetailPage() {
 
               {/* Current Statuses */}
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Current Statuses</h4>
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Current Statuses</h4>
                 <div className="space-y-2">
                   {campaign.statuses?.map((status) => {
                     const leadCount = leads.filter((l) => l.statusId === status.id).length;
                     return (
                       <div
                         key={status.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg dark:bg-gray-900/50"
                       >
                         <div className="flex items-center gap-3">
                           <div
                             className="w-4 h-4 rounded-full"
                             style={{ backgroundColor: status.color }}
                           />
-                          <span className="font-medium text-gray-900">{status.label}</span>
-                          <span className="text-sm text-gray-500">({leadCount} leads)</span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{status.label}</span>
+                          <span className="text-sm text-gray-500 dark:text-gray-400">({leadCount} leads)</span>
                         </div>
                         <button
                           onClick={async () => {
@@ -751,7 +751,7 @@ export default function CampaignDetailPage() {
                             }
                           }}
                           aria-label="Delete status"
-                          className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                          className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -761,7 +761,7 @@ export default function CampaignDetailPage() {
                     );
                   })}
                   {(!campaign.statuses || campaign.statuses.length === 0) && (
-                    <p className="text-gray-500 text-sm py-4">No statuses defined</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm py-4">No statuses defined</p>
                   )}
                 </div>
               </div>
@@ -772,12 +772,12 @@ export default function CampaignDetailPage() {
         {/* Bulk Import Modal */}
         {editingCampaign && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl dark:bg-gray-800">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">Edit Campaign</h2>
-                  <button onClick={() => setEditingCampaign(false)} aria-label="Close" className="p-2 hover:bg-gray-100 rounded-lg">
-                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Edit Campaign</h2>
+                  <button onClick={() => setEditingCampaign(false)} aria-label="Close" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
@@ -785,41 +785,41 @@ export default function CampaignDetailPage() {
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Campaign Name *</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Campaign Name *</label>
                     <input
                       type="text"
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                       placeholder="Enter campaign name"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
                     <textarea
                       value={editDescription}
                       onChange={(e) => setEditDescription(e.target.value)}
                       rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                       placeholder="Enter campaign description (optional)"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg dark:bg-gray-900/50">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">Active Status</p>
-                      <p className="text-xs text-gray-500">Inactive campaigns hide leads from telecallers</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Active Status</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Inactive campaigns hide leads from telecallers</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setEditIsActive(!editIsActive)}
                       className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        editIsActive ? 'bg-primary-600' : 'bg-gray-300'
+                        editIsActive ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
                       }`}
                     >
                       <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-100 shadow ring-0 transition duration-200 ease-in-out ${
                           editIsActive ? 'translate-x-5' : 'translate-x-0'
                         }`}
                       />
@@ -830,7 +830,7 @@ export default function CampaignDetailPage() {
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     onClick={() => setEditingCampaign(false)}
-                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/50"
                   >
                     Cancel
                   </button>
@@ -850,12 +850,12 @@ export default function CampaignDetailPage() {
         {/* Bulk Import Modal */}
         {showBulkImport && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl dark:bg-gray-800">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">Import Leads</h2>
-                  <button onClick={() => { setShowBulkImport(false); setFile(null); }} aria-label="Close" className="p-2 hover:bg-gray-100 rounded-lg">
-                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Import Leads</h2>
+                  <button onClick={() => { setShowBulkImport(false); setFile(null); }} aria-label="Close" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
@@ -867,7 +867,7 @@ export default function CampaignDetailPage() {
                   onDragOver={handleDrag}
                   onDrop={handleDrop}
                   className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
-                    dragActive ? 'border-primary-500 bg-primary-50' : 'border-gray-300'
+                    dragActive ? 'border-primary-500 bg-primary-50' : 'border-gray-300 dark:border-gray-600'
                   }`}
                 >
                   <input
@@ -877,17 +877,17 @@ export default function CampaignDetailPage() {
                     onChange={(e) => setFile(e.target.files?.[0] || null)}
                     className="hidden"
                   />
-                  <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
                   {file ? (
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{file.name}</p>
-                      <p className="text-xs text-gray-500 mt-1">{(file.size / 1024).toFixed(1)} KB</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{file.name}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{(file.size / 1024).toFixed(1)} KB</p>
                     </div>
                   ) : (
                     <div>
-                      <p className="text-sm text-gray-600">Drag & drop a CSV file here, or</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">Drag & drop a CSV file here, or</p>
                       <button
                         onClick={() => fileInputRef.current?.click()}
                         className="mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
@@ -898,14 +898,14 @@ export default function CampaignDetailPage() {
                   )}
                 </div>
 
-                <p className="text-xs text-gray-500 mt-3">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
                   CSV should have columns: name, email, phone
                 </p>
 
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     onClick={() => { setShowBulkImport(false); setFile(null); }}
-                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/50"
                   >
                     Cancel
                   </button>
@@ -925,7 +925,7 @@ export default function CampaignDetailPage() {
         {/* Form Builder Modal */}
         {showFormBuilder && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
-            <div className="bg-white rounded-2xl w-full max-w-7xl h-[95vh] overflow-hidden shadow-xl">
+            <div className="bg-white rounded-2xl w-full max-w-7xl h-[95vh] overflow-hidden shadow-xl dark:bg-gray-800">
               <FormBuilder
                 initialForm={editingForm || undefined}
                 onSubmit={editingForm ? handleUpdateForm : handleCreateForm}
@@ -938,12 +938,12 @@ export default function CampaignDetailPage() {
         {/* Assign Users Modal */}
         {showAssignUsers && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl dark:bg-gray-800">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">Assign Users</h2>
-                  <button onClick={() => setShowAssignUsers(false)} aria-label="Close" className="p-2 hover:bg-gray-100 rounded-lg">
-                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Assign Users</h2>
+                  <button onClick={() => setShowAssignUsers(false)} aria-label="Close" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
@@ -955,7 +955,7 @@ export default function CampaignDetailPage() {
                       <label
                         key={u.id}
                         className={`flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                          isAssigned ? 'bg-primary-50' : 'hover:bg-gray-50'
+                          isAssigned ? 'bg-primary-50 dark:bg-primary-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
                         }`}
                       >
                         <input
@@ -964,24 +964,24 @@ export default function CampaignDetailPage() {
                           onChange={() => toggleAssignUser(u.id)}
                           className="user-checkbox w-4 h-4 text-primary-600 rounded"
                         />
-                        <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-gray-600">{u.name.charAt(0)}</span>
+                        <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center dark:bg-gray-700">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{u.name.charAt(0)}</span>
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">{u.name}</p>
-                          <p className="text-xs text-gray-500">{u.role}</p>
+                          <p className="font-medium text-gray-900 dark:text-gray-100">{u.name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{u.role}</p>
                         </div>
                       </label>
                     );
                   })}
                   {allUsers.filter((u) => u.isActive).length === 0 && (
-                    <p className="text-sm text-gray-500 text-center py-6">No active users available.</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-6">No active users available.</p>
                   )}
                 </div>
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     onClick={() => setShowAssignUsers(false)}
-                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/50"
                   >
                     Cancel
                   </button>
