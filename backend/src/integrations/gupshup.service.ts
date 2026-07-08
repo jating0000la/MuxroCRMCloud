@@ -287,9 +287,13 @@ export class GupshupService {
 
     try {
       const url = `https://api.gupshup.io/wa/app/${encodeURIComponent(appId)}/template?pageNo=0&pageSize=100`;
+      this.logger.log(`Syncing templates from: ${url}`);
       const response: AxiosResponse = await firstValueFrom(
         this.http.get(url, {
-          headers: { api_key: apiKey },
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: apiKey,
+          },
           timeout: 30000,
         }),
       );
@@ -311,9 +315,11 @@ export class GupshupService {
       this.logger.log(`Synced ${templates.length} Gupshup templates`);
       return { success: true, templates };
     } catch (error: any) {
-      const msg = error.response?.data?.message || error.message;
-      this.logger.error(`Template sync failed: ${msg}`);
-      return { success: false, templates: [], error: msg };
+      const status = error.response?.status;
+      const body = error.response?.data;
+      const msg = body?.message || body?.status || error.message;
+      this.logger.error(`Template sync failed [${status}]: ${JSON.stringify(body || msg)}`);
+      return { success: false, templates: [], error: `[${status}] ${msg}` };
     }
   }
 }
