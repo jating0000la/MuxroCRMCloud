@@ -41,6 +41,36 @@ export interface IndiamartAutoImportResult {
   message?: string;
 }
 
+export interface GupshupSendMessagePayload {
+  apiKey: string;
+  source: string;
+  appName: string;
+  destination: string;
+  message: string;
+  disablePreview?: boolean;
+}
+
+export interface GupshupSendTemplatePayload {
+  apiKey: string;
+  source: string;
+  destination: string;
+  templateId: string;
+  templateParams?: string[];
+  mediaMessage?: { type: string; link: string };
+}
+
+export interface GupshupTestPayload {
+  apiKey: string;
+  source: string;
+  appName: string;
+  testPhone: string;
+}
+
+export interface GupshupSendResponse {
+  status: string;
+  messageId: string;
+}
+
 const integrationService = {
   // Process Sutra
   startFlow: async (payload: StartFlowPayload) => {
@@ -71,6 +101,22 @@ const integrationService = {
 
   getLastFetchTime: async (): Promise<{ lastFetchTime: string | null }> => {
     const { data } = await api.get('/integrations/indiamart/last-fetch');
+    return data;
+  },
+
+  // Gupshup WhatsApp
+  sendGupshupMessage: async (payload: GupshupSendMessagePayload): Promise<GupshupSendResponse> => {
+    const { data } = await api.post('/integrations/gupshup/send-message', payload);
+    return data;
+  },
+
+  sendGupshupTemplate: async (payload: GupshupSendTemplatePayload): Promise<GupshupSendResponse> => {
+    const { data } = await api.post('/integrations/gupshup/send-template', payload);
+    return data;
+  },
+
+  testGupshup: async (payload: GupshupTestPayload): Promise<{ success: boolean; message: string }> => {
+    const { data } = await api.post('/integrations/gupshup/test-connection', payload);
     return data;
   },
 };

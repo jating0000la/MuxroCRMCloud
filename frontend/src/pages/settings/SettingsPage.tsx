@@ -40,6 +40,13 @@ export default function SettingsPage() {
   const [processSutraApiKey, setProcessSutraApiKey] = useState('');
   const [processSutraSystemName, setProcessSutraSystemName] = useState('');
 
+  // Gupshup WhatsApp settings
+  const [gupshupApiKey, setGupshupApiKey] = useState('');
+  const [gupshupSource, setGupshupSource] = useState('');
+  const [gupshupAppName, setGupshupAppName] = useState('');
+  const [testingGupshup, setTestingGupshup] = useState(false);
+  const [showGupshupApiKey, setShowGupshupApiKey] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [testingIndiamart, setTestingIndiamart] = useState(false);
@@ -115,6 +122,15 @@ export default function SettingsPage() {
           case 'processSutraSystemName':
             setProcessSutraSystemName(setting.value);
             break;
+          case 'gupshupApiKey':
+            setGupshupApiKey(setting.value);
+            break;
+          case 'gupshupSource':
+            setGupshupSource(setting.value);
+            break;
+          case 'gupshupAppName':
+            setGupshupAppName(setting.value);
+            break;
         }
       });
 
@@ -159,6 +175,13 @@ export default function SettingsPage() {
         reason: 'Updated via Settings page',
       },
       { key: 'processSutraSystemName', value: processSutraSystemName, reason: 'Updated via Settings page' },
+      {
+        key: 'gupshupApiKey',
+        value: isMaskedPlaceholder(gupshupApiKey) ? '' : gupshupApiKey,
+        reason: 'Updated via Settings page',
+      },
+      { key: 'gupshupSource', value: gupshupSource, reason: 'Updated via Settings page' },
+      { key: 'gupshupAppName', value: gupshupAppName, reason: 'Updated via Settings page' },
     ];
 
     try {
@@ -312,6 +335,44 @@ export default function SettingsPage() {
       toast.error(error.response?.data?.message || 'Test failed');
     } finally {
       setTestingProcessSutra(false);
+    }
+  };
+
+  const handleTestGupshup = async () => {
+    if (!gupshupApiKey || !gupshupSource || !gupshupAppName) {
+      toast.error('Enter Gupshup API key, source number, and app name first');
+      return;
+    }
+
+    setTestingGupshup(true);
+    try {
+      const unmaskedKey = gupshupApiKey.includes('•')
+        ? await settingsService.getSettingUnmasked('gupshupApiKey')
+        : gupshupApiKey;
+
+      const result = await integrationService.testGupshup({
+        apiKey: unmaskedKey,
+        source: gupshupSource,
+        appName: gupshupAppName,
+        testPhone: gupshupSource, // Test with own number
+      });
+
+      if (result.success) {
+        toast.success(result.message);
+        try {
+          await settingsService.updateSetting('gupshupApiKey', {
+            value: unmaskedKey,
+            lastTestedAt: new Date().toISOString(),
+            reason: 'Connection test successful',
+          });
+        } catch (e) {}
+      } else {
+        toast.error(result.message || 'Connection failed');
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Test failed');
+    } finally {
+      setTestingGupshup(false);
     }
   };
 
@@ -598,6 +659,91 @@ export default function SettingsPage() {
               className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm font-medium"
             >
               {testingProcessSutra ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Testing...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Test Connection
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Gupshup WhatsApp Integration */}
+        <div className="bg-white rounded-xl shadow-sm border p-6 dark:bg-gray-800 dark:border-gray-700">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center dark:bg-green-900/30">
+              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">WhatsApp (Gupshup)</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Send WhatsApp messages to leads via Gupshup Business API</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Gupshup API Key</label>
+              <div className="relative">
+                <input
+                  type={showGupshupApiKey ? 'text' : 'password'}
+                  value={gupshupApiKey}
+                  onChange={(e) => setGupshupApiKey(e.target.value)}
+                  className="w-full px-3 py-2 pr-16 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                  placeholder="Enter your Gupshup API key"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowGupshupApiKey((v) => !v)}
+                  className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                >
+                  {showGupshupApiKey ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-1 dark:text-gray-500">Found in Gupshup Console &gt; Settings &gt; API Keys</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Source Phone Number</label>
+              <input
+                type="text"
+                value={gupshupSource}
+                onChange={(e) => setGupshupSource(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                placeholder="917834811114"
+              />
+              <p className="text-xs text-gray-400 mt-1 dark:text-gray-500">Your WhatsApp Business number in E.164 format</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Gupshup App Name</label>
+              <input
+                type="text"
+                value={gupshupAppName}
+                onChange={(e) => setGupshupAppName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                placeholder="MyBusinessApp"
+              />
+              <p className="text-xs text-gray-400 mt-1 dark:text-gray-500">Your Gupshup app name registered against the phone number</p>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <button
+              onClick={handleTestGupshup}
+              disabled={testingGupshup || !gupshupApiKey || !gupshupSource || !gupshupAppName}
+              className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+            >
+              {testingGupshup ? (
                 <>
                   <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

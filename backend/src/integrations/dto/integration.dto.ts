@@ -102,3 +102,87 @@ export class AutoImportIndiamartDto {
   @IsString()
   endTime?: string;
 }
+
+export class SendGupshupMessageDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  apiKey: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  source: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  appName: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  destination: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  message: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  disablePreview?: boolean;
+}
+
+export class SendGupshupTemplateDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  apiKey: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  source: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  destination: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  templateId: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  templateParams?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  mediaMessage?: { type: string; link: string };
+}
+
+export class TestGupshupDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  apiKey: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  source: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  appName: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  testPhone: string;
+}
