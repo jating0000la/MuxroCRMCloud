@@ -3,13 +3,13 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
-COPY prisma ./prisma/
+COPY drizzle.config.ts ./
+COPY src/db ./src/db
 
 RUN npm ci
 
 COPY . .
 
-RUN npx prisma generate
 RUN npm run build
 
 # Production stage
@@ -22,8 +22,8 @@ WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/drizzle.config.ts ./
+COPY --from=builder /app/src/db ./src/db
 
 RUN npm prune --production
 RUN chown -R appuser:appgroup /app
@@ -32,4 +32,4 @@ USER appuser
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+CMD ["sh", "-c", "npx drizzle-kit migrate && node dist/main"]

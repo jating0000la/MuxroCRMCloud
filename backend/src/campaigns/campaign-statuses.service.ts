@@ -1,62 +1,76 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { eq, and, desc, asc, sql } from 'drizzle-orm';
+import { DatabaseService } from '../db/database.service';
+import { campaignStatuses, leads } from '../db/schema';
 
 @Injectable()
 export class CampaignStatusesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private database: DatabaseService) {}
 
   async findAll(campaignId: string) {
-    return this.prisma.campaignStatus.findMany({
-      where: { campaignId },
-      orderBy: { order: 'asc' },
-    });
+    return this.database.db
+      .select()
+      .from(campaignStatuses)
+      .where(eq(campaignStatuses.campaignId, campaignId))
+      .orderBy(asc(campaignStatuses.order));
   }
 
   async create(campaignId: string, data: { label: string; color?: string; whatsappMessage?: string }) {
-    const maxOrder = await this.prisma.campaignStatus.findFirst({
-      where: { campaignId },
-      orderBy: { order: 'desc' },
-      select: { order: true },
-    });
+    const [maxOrder] = await this.database.db
+      .select({ order: campaignStatuses.order })
+      .from(campaignStatuses)
+      .where(eq(campaignStatuses.campaignId, campaignId))
+      .orderBy(desc(campaignStatuses.order))
+      .limit(1);
 
-    return this.prisma.campaignStatus.create({
-      data: {
+    const [created] = await this.database.db
+      .insert(campaignStatuses)
+      .values({
         campaignId,
         label: data.label,
         color: data.color || '#3B82F6',
         whatsappMessage: data.whatsappMessage || null,
         order: (maxOrder?.order ?? -1) + 1,
-      },
-    });
+      })
+      .returning();
+
+    return created;
   }
 
   async update(id: string, data: { label?: string; color?: string; order?: number; whatsappMessage?: string }) {
     await this.findOne(id);
-    return this.prisma.campaignStatus.update({
-      where: { id },
-      data,
-    });
+    const [updated] = await this.database.db
+      .update(campaignStatuses)
+      .set(data)
+      .where(eq(campaignStatuses.id, id))
+      .returning();
+    return updated;
   }
 
   async remove(id: string) {
     const status = await this.findOne(id);
 
     // Check if any leads are using this status
-    const leadsUsingStatus = await this.prisma.lead.count({
-      where: { statusId: id },
-    });
+    const [{ count }] = await this.database.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(leads)
+      .where(eq(leads.statusId, id));
 
-    if (leadsUsingStatus > 0) {
+    if (count > 0) {
       throw new ForbiddenException(
-        `Cannot delete status "${status.label}" - ${leadsUsingStatus} lead(s) are using it. Reassign them first.`
+        `Cannot delete status "${status.label}" - ${count} lead(s) are using it. Reassign them first.`,
       );
     }
 
-    return this.prisma.campaignStatus.delete({ where: { id } });
+    await this.database.db.delete(campaignStatuses).where(eq(campaignStatuses.id, id));
   }
 
   private async findOne(id: string) {
-    const status = await this.prisma.campaignStatus.findUnique({ where: { id } });
+    const [status] = await this.database.db
+      .select()
+      .from(campaignStatuses)
+      .where(eq(campaignStatuses.id, id))
+      .limit(1);
     if (!status) throw new NotFoundException('Status not found');
     return status;
   }

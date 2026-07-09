@@ -1,30 +1,32 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { eq, desc } from 'drizzle-orm';
+import { DatabaseService } from '../db/database.service';
+import { settings, settingAuditLogs } from '../db/schema';
 import { EncryptionService } from './encryption.service';
 import { CreateSettingDto, UpdateSettingDto, SettingResponseDto } from './dto/setting.dto';
 
 @Injectable()
 export class SettingsService {
   constructor(
-    private prisma: PrismaService,
+    private database: DatabaseService,
     private encryption: EncryptionService,
   ) {}
 
   private shouldMaskKey(key: string): boolean {
-    // Only sensitive credentials should be masked in API responses.
     return /(apikey|api_key|token|secret|password|passphrase|privatekey|private_key)/i.test(key);
   }
 
   async getSetting(key: string, showMasked: boolean = true): Promise<SettingResponseDto> {
-    const setting = await this.prisma.setting.findUnique({
-      where: { key },
-    });
+    const [setting] = await this.database.db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, key))
+      .limit(1);
 
     if (!setting) {
       throw new NotFoundException(`Setting with key "${key}" not found`);
     }
 
-    // Decrypt the value
     let decryptedValue = setting.encryptedValue;
     if (setting.isEncrypted) {
       try {
@@ -46,11 +48,12 @@ export class SettingsService {
   }
 
   async getAllSettings(showMasked: boolean = true): Promise<SettingResponseDto[]> {
-    const settings = await this.prisma.setting.findMany({
-      orderBy: { key: 'asc' },
-    });
+    const allSettings = await this.database.db
+      .select()
+      .from(settings)
+      .orderBy(settings.key);
 
-    return settings.map((setting) => {
+    return allSettings.map((setting) => {
       let decryptedValue = setting.encryptedValue;
       if (setting.isEncrypted) {
         try {
@@ -74,35 +77,33 @@ export class SettingsService {
   }
 
   async createSetting(dto: CreateSettingDto, userId?: string): Promise<SettingResponseDto> {
-    // Check if setting already exists
-    const existing = await this.prisma.setting.findUnique({
-      where: { key: dto.key },
-    });
+    const [existing] = await this.database.db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, dto.key))
+      .limit(1);
 
     if (existing) {
       throw new Error(`Setting with key "${dto.key}" already exists`);
     }
 
-    // Encrypt the value
     const encryptedValue = this.encryption.encrypt(dto.value);
 
-    const setting = await this.prisma.setting.create({
-      data: {
+    const [setting] = await this.database.db
+      .insert(settings)
+      .values({
         key: dto.key,
         encryptedValue,
         isEncrypted: true,
-      },
-    });
+      })
+      .returning();
 
-    // Log the audit trail
-    await this.prisma.settingAuditLog.create({
-      data: {
-        settingId: setting.id,
-        action: 'create',
-        changedBy: userId,
-        newValue: this.encryption.maskValue(dto.value),
-        reason: dto.reason,
-      },
+    await this.database.db.insert(settingAuditLogs).values({
+      settingId: setting.id,
+      action: 'create',
+      changedBy: userId,
+      newValue: this.encryption.maskValue(dto.value),
+      reason: dto.reason,
     });
 
     const isMasked = this.shouldMaskKey(setting.key);
@@ -116,15 +117,16 @@ export class SettingsService {
   }
 
   async updateSetting(key: string, dto: UpdateSettingDto, userId?: string): Promise<SettingResponseDto> {
-    const setting = await this.prisma.setting.findUnique({
-      where: { key },
-    });
+    const [setting] = await this.database.db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, key))
+      .limit(1);
 
     if (!setting) {
       throw new NotFoundException(`Setting with key "${key}" not found`);
     }
 
-    // Get old value for audit log
     let oldValue = setting.encryptedValue;
     if (setting.isEncrypted) {
       try {
@@ -134,29 +136,26 @@ export class SettingsService {
       }
     }
 
-    // Encrypt the new value
     const encryptedValue = this.encryption.encrypt(dto.value);
 
-    const updated = await this.prisma.setting.update({
-      where: { key },
-      data: {
+    const [updated] = await this.database.db
+      .update(settings)
+      .set({
         encryptedValue,
         isEncrypted: true,
         updatedAt: new Date(),
         lastTestedAt: dto.lastTestedAt ? new Date(dto.lastTestedAt) : undefined,
-      },
-    });
+      })
+      .where(eq(settings.key, key))
+      .returning();
 
-    // Log the audit trail
-    await this.prisma.settingAuditLog.create({
-      data: {
-        settingId: setting.id,
-        action: 'update',
-        changedBy: userId,
-        oldValue: this.encryption.maskValue(oldValue),
-        newValue: this.encryption.maskValue(dto.value),
-        reason: dto.reason,
-      },
+    await this.database.db.insert(settingAuditLogs).values({
+      settingId: setting.id,
+      action: 'update',
+      changedBy: userId,
+      oldValue: this.encryption.maskValue(oldValue),
+      newValue: this.encryption.maskValue(dto.value),
+      reason: dto.reason,
     });
 
     const isMasked = this.shouldMaskKey(updated.key);
@@ -170,9 +169,11 @@ export class SettingsService {
   }
 
   async getSettingForUse(key: string): Promise<string> {
-    const setting = await this.prisma.setting.findUnique({
-      where: { key },
-    });
+    const [setting] = await this.database.db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, key))
+      .limit(1);
 
     if (!setting) {
       throw new NotFoundException(`Setting with key "${key}" not found`);
@@ -192,15 +193,20 @@ export class SettingsService {
   }
 
   async getAuditLog(key: string): Promise<any[]> {
-    const setting = await this.prisma.setting.findUnique({
-      where: { key },
-      include: { auditLogs: { orderBy: { createdAt: 'desc' } } },
-    });
+    const [setting] = await this.database.db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, key))
+      .limit(1);
 
     if (!setting) {
       throw new NotFoundException(`Setting with key "${key}" not found`);
     }
 
-    return setting.auditLogs;
+    return this.database.db
+      .select()
+      .from(settingAuditLogs)
+      .where(eq(settingAuditLogs.settingId, setting.id))
+      .orderBy(desc(settingAuditLogs.createdAt));
   }
 }

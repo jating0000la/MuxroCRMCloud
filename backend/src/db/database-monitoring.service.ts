@@ -1,12 +1,9 @@
-/**
- * Database Performance Monitoring Service
- * Tracks query performance and provides optimization recommendations
- */
-
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from './prisma.service';
+import { sql } from 'drizzle-orm';
+import { DatabaseService } from './database.service';
 
 interface QueryStats {
+  [key: string]: unknown;
   query: string;
   avgExecutionMs: number;
   calls: number;
@@ -14,6 +11,7 @@ interface QueryStats {
 }
 
 interface ConnectionStats {
+  [key: string]: unknown;
   database: string;
   activeConnections: number;
   longestQuerySeconds: number;
@@ -23,26 +21,23 @@ interface ConnectionStats {
 export class DatabaseMonitoringService {
   private logger = new Logger('DatabaseMonitoring');
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private database: DatabaseService) {}
 
-  /**
-   * Get top slow queries
-   * Identifies which queries need optimization
-   */
   async getSlowQueries(limit = 10): Promise<QueryStats[]> {
     try {
-      const stats = await this.prisma.$queryRaw<QueryStats[]>`
-        SELECT 
+      const result = await this.database.db.execute<QueryStats>(
+        sql`SELECT 
           query,
           mean_exec_time as "avgExecutionMs",
           calls,
           total_exec_time as "totalExecutionMs"
         FROM pg_stat_statements
         ORDER BY mean_exec_time DESC
-        LIMIT ${limit};
-      `;
+        LIMIT ${limit}`
+      );
 
-      // Log recommendations
+      const stats = result.rows;
+
       stats.forEach((stat) => {
         if (stat.avgExecutionMs > 500) {
           this.logger.warn(
@@ -58,22 +53,20 @@ export class DatabaseMonitoringService {
     }
   }
 
-  /**
-   * Get current connection statistics
-   * Ensures we're not exceeding connection limits
-   */
   async getConnectionStats(): Promise<ConnectionStats[]> {
     try {
-      const stats = await this.prisma.$queryRaw<ConnectionStats[]>`
-        SELECT 
+      const result = await this.database.db.execute<ConnectionStats>(
+        sql`SELECT 
           datname as database,
           count(*) as "activeConnections",
           COALESCE(max(EXTRACT(epoch FROM (now() - query_start))), 0) as "longestQuerySeconds"
         FROM pg_stat_activity
         WHERE datname IS NOT NULL
         GROUP BY datname
-        ORDER BY "activeConnections" DESC;
-      `;
+        ORDER BY "activeConnections" DESC`
+      );
+
+      const stats = result.rows;
 
       stats.forEach((stat) => {
         if (stat.activeConnections > 15) {
@@ -90,66 +83,55 @@ export class DatabaseMonitoringService {
     }
   }
 
-  /**
-   * Get database size information
-   * Helps identify when to archive old data
-   */
   async getDatabaseSize() {
     try {
-      const size = await this.prisma.$queryRaw<any>`
-        SELECT 
+      const result = await this.database.db.execute<any>(
+        sql`SELECT 
           sum(pg_total_relation_size(schemaname||'.'||tablename)) / 1024 / 1024 as "totalSizeMB",
           sum(pg_relation_size(schemaname||'.'||tablename)) / 1024 / 1024 as "dataSizeMB",
           sum(pg_indexes_size(schemaname||'.'||tablename)) / 1024 / 1024 as "indexSizeMB"
         FROM pg_tables
-        WHERE schemaname = 'public';
-      `;
-
-      this.logger.log(
-        `Database size - Total: ${size[0].totalSizeMB.toFixed(2)}MB, ` +
-        `Data: ${size[0].dataSizeMB.toFixed(2)}MB, ` +
-        `Indexes: ${size[0].indexSizeMB.toFixed(2)}MB`,
+        WHERE schemaname = 'public'`
       );
 
-      return size[0];
+      const size = result.rows[0];
+      this.logger.log(
+        `Database size - Total: ${size.totalSizeMB.toFixed(2)}MB, ` +
+        `Data: ${size.dataSizeMB.toFixed(2)}MB, ` +
+        `Indexes: ${size.indexSizeMB.toFixed(2)}MB`,
+      );
+
+      return size;
     } catch (error) {
       this.logger.error('Failed to fetch database size');
       return null;
     }
   }
 
-  /**
-   * Get table statistics
-   * Shows which tables have the most rows/queries
-   */
   async getTableStats() {
     try {
-      const stats = await this.prisma.$queryRaw<any>`
-        SELECT 
+      const result = await this.database.db.execute<any>(
+        sql`SELECT 
           relname as table_name,
           n_live_tup as row_count,
           round(pg_total_relation_size(relid) / 1024 / 1024, 2) as size_mb,
           seq_scan as sequential_scans,
           idx_scan as index_scans
         FROM pg_stat_user_tables
-        ORDER BY n_live_tup DESC;
-      `;
+        ORDER BY n_live_tup DESC`
+      );
 
-      return stats;
+      return result.rows;
     } catch (error) {
       this.logger.error('Failed to fetch table stats');
       return [];
     }
   }
 
-  /**
-   * Get missing index recommendations
-   * Shows which indexes would improve performance
-   */
   async getMissingIndexes() {
     try {
-      const recommendations = await this.prisma.$queryRaw<any>`
-        SELECT 
+      const result = await this.database.db.execute<any>(
+        sql`SELECT 
           schemaname,
           tablename,
           attname as column_name,
@@ -161,19 +143,16 @@ export class DatabaseMonitoringService {
         AND n_distinct > 100
         AND correlation < 0.1
         ORDER BY n_distinct DESC
-        LIMIT 20;
-      `;
+        LIMIT 20`
+      );
 
-      return recommendations;
+      return result.rows;
     } catch (error) {
       this.logger.error('Failed to fetch index recommendations');
       return [];
     }
   }
 
-  /**
-   * Generate a performance report
-   */
   async generatePerformanceReport() {
     this.logger.log('=== Database Performance Report ===');
 

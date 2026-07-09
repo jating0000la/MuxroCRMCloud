@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import { eq, and, desc, asc, sql } from 'drizzle-orm';
+import { DatabaseService } from '../db/database.service';
+import { forms, enquiries, leads, campaignStatuses, campaignUsers, users, followups, campaigns } from '../db/schema';
 import { PaginationDto } from '../common/pagination.dto';
 import { CreateFormDto } from './dto/create-form.dto';
 import { UpdateFormDto } from './dto/update-form.dto';
@@ -23,54 +24,71 @@ export class FormsService {
   private readonly logger = new Logger(FormsService.name);
 
   constructor(
-    private prisma: PrismaService,
+    private database: DatabaseService,
     private gupshup: GupshupService,
     private settingsService: SettingsService,
   ) {}
 
   async create(campaignId: string, dto: CreateFormDto) {
-    // Check if campaign already has a form
-    const existingForm = await this.prisma.form.findFirst({
-      where: { campaignId },
-    });
+    const [existingForm] = await this.database.db
+      .select()
+      .from(forms)
+      .where(eq(forms.campaignId, campaignId))
+      .limit(1);
+
     if (existingForm) {
       throw new BadRequestException('This campaign already has a form. Each campaign can only have one form.');
     }
 
-    return this.prisma.form.create({
-      data: {
+    const [form] = await this.database.db
+      .insert(forms)
+      .values({
         campaignId,
         title: dto.title,
-        fields: (dto.fields || []) as unknown as Prisma.InputJsonValue,
+        fields: (dto.fields || []) as any,
         publicSlug: uuidv4().substring(0, 8),
-      },
-    });
+      })
+      .returning();
+
+    return form;
   }
 
   async findByCampaign(campaignId: string) {
-    return this.prisma.form.findMany({
-      where: { campaignId },
-      include: { _count: { select: { submissions: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.database.db
+      .select()
+      .from(forms)
+      .where(eq(forms.campaignId, campaignId))
+      .orderBy(desc(forms.createdAt));
   }
 
   async findOne(id: string) {
-    const form = await this.prisma.form.findUnique({
-      where: { id },
-      include: { campaign: true },
-    });
+    const [form] = await this.database.db
+      .select({
+        form: forms,
+        campaign: campaigns,
+      })
+      .from(forms)
+      .innerJoin(campaigns, eq(forms.campaignId, campaigns.id))
+      .where(eq(forms.id, id))
+      .limit(1);
+
     if (!form) throw new NotFoundException('Form not found');
-    return form;
+    return { ...form.form, campaign: form.campaign };
   }
 
   async findBySlug(slug: string) {
-    const form = await this.prisma.form.findUnique({
-      where: { publicSlug: slug },
-      include: { campaign: { select: { name: true } } },
-    });
-    if (!form || !form.isPublished) throw new NotFoundException('Form not found');
-    return form;
+    const [result] = await this.database.db
+      .select({
+        form: forms,
+        campaign: { name: campaigns.name },
+      })
+      .from(forms)
+      .innerJoin(campaigns, eq(forms.campaignId, campaigns.id))
+      .where(eq(forms.publicSlug, slug))
+      .limit(1);
+
+    if (!result || !result.form.isPublished) throw new NotFoundException('Form not found');
+    return { ...result.form, campaign: result.campaign };
   }
 
   async submitForm(slug: string, data: Record<string, any>, ipAddress?: string) {
@@ -78,29 +96,31 @@ export class FormsService {
     const fields = Array.isArray(form.fields) ? form.fields as PublicFormField[] : [];
     this.validateSubmissionData(fields, data);
 
-    const submission = await this.prisma.enquiry.create({
-      data: {
+    const [submission] = await this.database.db
+      .insert(enquiries)
+      .values({
         formId: form.id,
         data,
         ipAddress,
-      },
-    });
+      })
+      .returning();
 
     const name = data.name || data.Name || 'Unknown';
     const email = data.email || data.Email || null;
     const phone = data.phone || data.Phone || null;
 
-    // Find next user via round-robin
     const doerId = await this.getNextRoundRobinUser(form.campaignId);
 
-    // Get the first status (New) for the campaign
-    const firstStatus = await this.prisma.campaignStatus.findFirst({
-      where: { campaignId: form.campaignId },
-      orderBy: { order: 'asc' },
-    });
+    const [firstStatus] = await this.database.db
+      .select()
+      .from(campaignStatuses)
+      .where(eq(campaignStatuses.campaignId, form.campaignId))
+      .orderBy(asc(campaignStatuses.order))
+      .limit(1);
 
-    const lead = await this.prisma.lead.create({
-      data: {
+    const [lead] = await this.database.db
+      .insert(leads)
+      .values({
         campaignId: form.campaignId,
         enquiryId: submission.id,
         name,
@@ -110,25 +130,21 @@ export class FormsService {
         customData: data,
         doerId,
         statusId: firstStatus?.id || null,
-      },
-    });
+      })
+      .returning();
 
-    // Auto-create initial followup so it appears in followup dashboard
     const statusLabel = firstStatus?.label || 'New';
-    await this.prisma.followup.create({
-      data: {
-        leadId: lead.id,
-        userId: doerId,
-        status: statusLabel,
-        remarks: 'Form submitted',
-      },
+    await this.database.db.insert(followups).values({
+      leadId: lead.id,
+      userId: doerId,
+      status: statusLabel,
+      remarks: 'Form submitted',
     });
 
     // Extract per-form communication config from meta
     const metaField = fields.find((f: any) => f.type === '__design_meta' || f.name === '__form_meta');
     const formComm = (metaField as any)?.meta?.communication || {};
 
-    // Send form submission greeting via WhatsApp if configured
     this.sendFormGreeting(phone, name, formComm, data).catch((err) => {
       this.logger.warn(`Form greeting failed: ${err.message}`);
     });
@@ -137,35 +153,34 @@ export class FormsService {
   }
 
   private async getNextRoundRobinUser(campaignId: string): Promise<string> {
-    // Get all active users assigned to this campaign
-    const activeUsers = await this.prisma.campaignUser.findMany({
-      where: { campaignId, isActive: true },
-      include: { user: { select: { role: true } } },
-      orderBy: { assignedAt: 'asc' },
-    });
+    const activeUsers = await this.database.db
+      .select({
+        userId: campaignUsers.userId,
+        role: users.role,
+      })
+      .from(campaignUsers)
+      .innerJoin(users, eq(campaignUsers.userId, users.id))
+      .where(and(eq(campaignUsers.campaignId, campaignId), eq(campaignUsers.isActive, true)))
+      .orderBy(asc(campaignUsers.assignedAt));
 
-    // Only assign to USER role (telecallers), not ADMIN or MANAGER
-    const eligibleUsers = activeUsers.filter((au) => au.user?.role === 'USER');
+    const eligibleUsers = activeUsers.filter((au) => au.role === 'USER');
 
     if (eligibleUsers.length === 0) {
       throw new BadRequestException('No telecaller users assigned to this campaign. Please assign USER role users before creating leads.');
     }
 
-    // Find the last lead assigned in this campaign to determine who's next
-    const lastAssignedLead = await this.prisma.lead.findFirst({
-      where: { campaignId, doerId: { not: null } },
-      orderBy: { createdAt: 'desc' },
-      select: { doerId: true },
-    });
+    const [lastAssignedLead] = await this.database.db
+      .select({ doerId: leads.doerId })
+      .from(leads)
+      .where(and(eq(leads.campaignId, campaignId), sql`${leads.doerId} IS NOT NULL`))
+      .orderBy(desc(leads.createdAt))
+      .limit(1);
 
     if (!lastAssignedLead?.doerId) {
-      // No leads assigned yet, give to the first eligible user
       return eligibleUsers[0].userId;
     }
 
-    // Find the index of the last assigned user
     const lastIndex = eligibleUsers.findIndex((u) => u.userId === lastAssignedLead.doerId);
-    // Next user is the one after the last assigned (wraps around)
     const nextIndex = (lastIndex + 1) % eligibleUsers.length;
     return eligibleUsers[nextIndex].userId;
   }
@@ -174,43 +189,56 @@ export class FormsService {
     await this.findOne(id);
     const updateData: any = { ...dto };
     if (dto.fields) {
-      updateData.fields = dto.fields as unknown as Prisma.InputJsonValue;
+      updateData.fields = dto.fields as any;
     }
-    return this.prisma.form.update({ where: { id }, data: updateData });
+    const [updated] = await this.database.db
+      .update(forms)
+      .set(updateData)
+      .where(eq(forms.id, id))
+      .returning();
+    return updated;
   }
 
   async publish(id: string) {
     await this.findOne(id);
-    return this.prisma.form.update({
-      where: { id },
-      data: { isPublished: true },
-    });
+    const [updated] = await this.database.db
+      .update(forms)
+      .set({ isPublished: true })
+      .where(eq(forms.id, id))
+      .returning();
+    return updated;
   }
 
   async unpublish(id: string) {
     await this.findOne(id);
-    return this.prisma.form.update({
-      where: { id },
-      data: { isPublished: false },
-    });
+    const [updated] = await this.database.db
+      .update(forms)
+      .set({ isPublished: false })
+      .where(eq(forms.id, id))
+      .returning();
+    return updated;
   }
 
   async remove(id: string) {
     await this.findOne(id);
-    return this.prisma.form.delete({ where: { id } });
+    const [deleted] = await this.database.db
+      .delete(forms)
+      .where(eq(forms.id, id))
+      .returning();
+    return deleted;
   }
 
   async getSubmissions(formId: string, pagination?: PaginationDto) {
-    // ✅ FIXED: Apply pagination with skip/take
     const skip = pagination?.getSkip() || 0;
     const take = pagination?.getTake() || 50;
-    
-    return this.prisma.enquiry.findMany({
-      where: { formId },
-      orderBy: { submittedAt: 'desc' },
-      skip,
-      take,
-    });
+
+    return this.database.db
+      .select()
+      .from(enquiries)
+      .where(eq(enquiries.formId, formId))
+      .orderBy(desc(enquiries.submittedAt))
+      .offset(skip)
+      .limit(take);
   }
 
   private async sendFormGreeting(
@@ -242,7 +270,6 @@ export class FormsService {
         return;
       }
 
-      // Replace {{field}} tags with actual form data
       const message = rawMessage.replace(/\{\{(\w+)\}\}/g, (_, field) => {
         const value = formData[field];
         if (value === undefined || value === null) return '';

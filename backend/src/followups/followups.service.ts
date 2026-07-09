@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { eq, and, inArray, desc, asc, or, like, sql, ne } from 'drizzle-orm';
+import { DatabaseService } from '../db/database.service';
+import { followups, leads, users, campaigns, campaignStatuses } from '../db/schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaginationDto } from '../common/pagination.dto';
 import { CreateFollowupDto } from './dto/create-followup.dto';
@@ -8,186 +10,306 @@ import { UpdateFollowupDto } from './dto/update-followup.dto';
 @Injectable()
 export class FollowupsService {
   constructor(
-    private prisma: PrismaService,
+    private database: DatabaseService,
     private notificationsService: NotificationsService,
   ) {}
 
   async findByLead(leadId: string, userId?: string, role?: string) {
     if (role === 'USER' && userId) {
-      const lead = await this.prisma.lead.findUnique({
-        where: { id: leadId },
-        select: { doerId: true },
-      });
+      const [lead] = await this.database.db
+        .select({ doerId: leads.doerId })
+        .from(leads)
+        .where(eq(leads.id, leadId))
+        .limit(1);
 
       if (!lead || lead.doerId !== userId) {
         throw new NotFoundException('Lead not found');
       }
     }
 
-    return this.prisma.followup.findMany({
-      where: { leadId },
-      include: { user: { select: { id: true, name: true, username: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
+    const results = await this.database.db
+      .select({
+        followup: followups,
+        user: {
+          id: users.id,
+          name: users.name,
+          username: users.username,
+        },
+      })
+      .from(followups)
+      .innerJoin(users, eq(followups.userId, users.id))
+      .where(eq(followups.leadId, leadId))
+      .orderBy(desc(followups.createdAt));
+
+    return results.map((r) => ({
+      ...r.followup,
+      user: r.user,
+    }));
   }
 
   async create(dto: CreateFollowupDto, userId: string) {
-    const followup = await this.prisma.followup.create({
-      data: {
+    const [followup] = await this.database.db
+      .insert(followups)
+      .values({
         leadId: dto.leadId,
         userId,
         status: dto.status,
         remarks: dto.remarks,
         nextCallDate: dto.nextCallDate ? new Date(dto.nextCallDate) : null,
-      },
-      include: { user: { select: { name: true } } },
-    });
+      })
+      .returning();
+
+    // Get user name for response
+    const [user] = await this.database.db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
 
     // Create notification for this followup
     await this.notificationsService.createNotificationForFollowup(userId, followup.id);
 
-    return followup;
+    return { ...followup, user };
   }
 
   async getMyFollowups(userId: string, campaignId?: string, pagination?: PaginationDto) {
-    const where: any = { userId };
-    if (campaignId) {
-      where.lead = { campaignId };
-    }
-    // ✅ FIXED: Apply pagination with skip/take
+    const conditions: any[] = [eq(followups.userId, userId)];
+
     const skip = pagination?.getSkip() || 0;
     const take = pagination?.getTake() || 50;
-    
-    return this.prisma.followup.findMany({
-      where,
-      include: {
-        lead: {
-          include: {
-            campaign: { select: { id: true, name: true } },
-            status: true,
-            doer: { select: { name: true } },
+
+    let results;
+    if (campaignId) {
+      results = await this.database.db
+        .select({
+          followup: followups,
+          lead: {
+            ...leads,
+            campaign: {
+              id: campaigns.id,
+              name: campaigns.name,
+            },
+            status: campaignStatuses,
+            doer: { name: users.name },
           },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take,
-    });
+        })
+        .from(followups)
+        .innerJoin(leads, eq(followups.leadId, leads.id))
+        .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
+        .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
+        .leftJoin(users, eq(leads.doerId, users.id))
+        .where(and(eq(followups.userId, userId), eq(leads.campaignId, campaignId)))
+        .orderBy(desc(followups.createdAt))
+        .offset(skip)
+        .limit(take);
+    } else {
+      results = await this.database.db
+        .select({
+          followup: followups,
+          lead: {
+            ...leads,
+            campaign: {
+              id: campaigns.id,
+              name: campaigns.name,
+            },
+            status: campaignStatuses,
+            doer: { name: users.name },
+          },
+        })
+        .from(followups)
+        .innerJoin(leads, eq(followups.leadId, leads.id))
+        .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
+        .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
+        .leftJoin(users, eq(leads.doerId, users.id))
+        .where(eq(followups.userId, userId))
+        .orderBy(desc(followups.createdAt))
+        .offset(skip)
+        .limit(take);
+    }
+
+    return results.map((r) => ({
+      ...r.followup,
+      lead: r.lead,
+    }));
   }
 
   async getUpcomingFollowups(userId: string, campaignId?: string) {
-    const where: any = {
-      userId,
-      nextCallDate: { gte: new Date() },
-    };
+    const conditions: any[] = [
+      eq(followups.userId, userId),
+      sql`${followups.nextCallDate} >= ${new Date()}`,
+    ];
+
+    let results;
     if (campaignId) {
-      where.lead = { campaignId };
-    }
-    return this.prisma.followup.findMany({
-      where,
-      include: {
-        lead: {
-          include: {
-            campaign: { select: { id: true, name: true } },
-            status: true,
+      results = await this.database.db
+        .select({
+          followup: followups,
+          lead: {
+            ...leads,
+            campaign: {
+              id: campaigns.id,
+              name: campaigns.name,
+            },
+            status: campaignStatuses,
           },
-        },
-      },
-      orderBy: { nextCallDate: 'asc' },
-    });
+        })
+        .from(followups)
+        .innerJoin(leads, eq(followups.leadId, leads.id))
+        .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
+        .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
+        .where(and(eq(followups.userId, userId), eq(leads.campaignId, campaignId), sql`${followups.nextCallDate} >= ${new Date()}`))
+        .orderBy(asc(followups.nextCallDate));
+    } else {
+      results = await this.database.db
+        .select({
+          followup: followups,
+          lead: {
+            ...leads,
+            campaign: {
+              id: campaigns.id,
+              name: campaigns.name,
+            },
+            status: campaignStatuses,
+          },
+        })
+        .from(followups)
+        .innerJoin(leads, eq(followups.leadId, leads.id))
+        .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
+        .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
+        .where(and(eq(followups.userId, userId), sql`${followups.nextCallDate} >= ${new Date()}`))
+        .orderBy(asc(followups.nextCallDate));
+    }
+
+    return results.map((r) => ({
+      ...r.followup,
+      lead: r.lead,
+    }));
   }
 
   async findOne(id: string, userId?: string, role?: string) {
-    const followup = await this.prisma.followup.findUnique({
-      where: { id },
-      include: {
-        lead: { select: { doerId: true } },
-        user: { select: { name: true } },
-      },
-    });
-    if (!followup) throw new NotFoundException('Followup not found');
+    const [result] = await this.database.db
+      .select({
+        followup: followups,
+        lead: { doerId: leads.doerId },
+        user: { name: users.name },
+      })
+      .from(followups)
+      .innerJoin(leads, eq(followups.leadId, leads.id))
+      .innerJoin(users, eq(followups.userId, users.id))
+      .where(eq(followups.id, id))
+      .limit(1);
 
-    if (role === 'USER' && userId && followup.lead?.doerId !== userId) {
+    if (!result) throw new NotFoundException('Followup not found');
+
+    if (role === 'USER' && userId && result.lead?.doerId !== userId) {
       throw new NotFoundException('Followup not found');
     }
 
-    return followup;
+    return {
+      ...result.followup,
+      lead: result.lead,
+      user: result.user,
+    };
   }
 
   async update(id: string, dto: UpdateFollowupDto, userId?: string, role?: string) {
-    const followup = await this.findOne(id, userId, role);
+    await this.findOne(id, userId, role);
 
-    const updated = await this.prisma.followup.update({
-      where: { id },
-      data: {
-        ...(dto.status !== undefined && { status: dto.status }),
-        ...(dto.remarks !== undefined && { remarks: dto.remarks }),
-        ...(dto.nextCallDate !== undefined && {
-          nextCallDate: dto.nextCallDate ? new Date(dto.nextCallDate) : null,
-        }),
-      },
-      include: { user: { select: { name: true } } },
-    });
+    const updateData: any = {};
+    if (dto.status !== undefined) updateData.status = dto.status;
+    if (dto.remarks !== undefined) updateData.remarks = dto.remarks;
+    if (dto.nextCallDate !== undefined) {
+      updateData.nextCallDate = dto.nextCallDate ? new Date(dto.nextCallDate) : null;
+    }
+
+    const [updated] = await this.database.db
+      .update(followups)
+      .set(updateData)
+      .where(eq(followups.id, id))
+      .returning();
+
+    // Get user name for response
+    const [user] = await this.database.db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(followups.userId, updated.userId))
+      .limit(1);
 
     // Update notification for this followup
     await this.notificationsService.createNotificationForFollowup(
-      followup.userId,
+      updated.userId,
       id,
     );
 
-    return updated;
+    return { ...updated, user };
   }
 
   async remove(id: string, userId?: string, role?: string) {
     await this.findOne(id, userId, role);
-
-    return this.prisma.followup.delete({ where: { id } });
+    const [deleted] = await this.database.db
+      .delete(followups)
+      .where(eq(followups.id, id))
+      .returning();
+    return deleted;
   }
 
   async findCrossCampaign(phone?: string, email?: string, excludeLeadId?: string, userId?: string, role?: string) {
     if (!phone && !email) return [];
 
-    const orConditions: any[] = [];
+    const leadConditions: any[] = [];
     if (phone) {
       const normalized = phone.replace(/\D/g, '');
-      orConditions.push({ phone: normalized });
-      orConditions.push({ phone: { contains: normalized } });
+      leadConditions.push(or(eq(leads.phone, normalized), like(leads.phone, `%${normalized}%`)));
     }
     if (email) {
-      orConditions.push({ email: email.toLowerCase() });
+      leadConditions.push(eq(leads.email, email.toLowerCase()));
     }
 
-    const leads = await this.prisma.lead.findMany({
-      where: {
-        ...(excludeLeadId ? { id: { not: excludeLeadId } } : {}),
-        ...(role === 'USER' && userId ? { doerId: userId } : {}),
-        OR: orConditions,
-      },
-      select: { id: true, name: true, campaignId: true },
-    });
+    if (excludeLeadId) {
+      leadConditions.push(ne(leads.id, excludeLeadId));
+    }
+    if (role === 'USER' && userId) {
+      leadConditions.push(eq(leads.doerId, userId));
+    }
 
-    if (leads.length === 0) return [];
+    const matchingLeads = await this.database.db
+      .select({ id: leads.id, name: leads.name, campaignId: leads.campaignId })
+      .from(leads)
+      .where(and(...leadConditions));
 
-    const leadIds = leads.map((l) => l.id);
-    const leadMap = new Map(leads.map((l) => [l.id, l]));
+    if (matchingLeads.length === 0) return [];
 
-    const followups = await this.prisma.followup.findMany({
-      where: { leadId: { in: leadIds } },
-      include: {
-        user: { select: { id: true, name: true, username: true } },
-        lead: {
-          include: {
-            campaign: { select: { id: true, name: true } },
-          },
+    const leadIds = matchingLeads.map((l) => l.id);
+    const leadMap = new Map(matchingLeads.map((l) => [l.id, l]));
+
+    const followupsList = await this.database.db
+      .select({
+        followup: followups,
+        user: {
+          id: users.id,
+          name: users.name,
+          username: users.username,
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        leadCampaign: {
+          id: campaigns.id,
+          name: campaigns.name,
+        },
+      })
+      .from(followups)
+      .innerJoin(users, eq(followups.userId, users.id))
+      .innerJoin(leads, eq(followups.leadId, leads.id))
+      .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
+      .where(inArray(followups.leadId, leadIds))
+      .orderBy(desc(followups.createdAt));
 
-    return followups.map((f) => ({
-      ...f,
+    return followupsList.map((f) => ({
+      ...f.followup,
       crossCampaign: true,
-      matchedLead: leadMap.get(f.leadId),
+      matchedLead: leadMap.get(f.followup.leadId),
+      user: f.user,
+      lead: {
+        campaign: f.leadCampaign,
+      },
     }));
   }
 }

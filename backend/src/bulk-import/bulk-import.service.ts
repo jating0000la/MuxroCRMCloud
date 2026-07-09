@@ -1,11 +1,13 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { eq, and, ne, desc, asc, sql } from 'drizzle-orm';
+import { DatabaseService } from '../db/database.service';
+import { leads, followups, campaignStatuses, campaignUsers, users } from '../db/schema';
 import { parse } from 'csv-parse/sync';
 import { BulkLeadRowSchema, sanitizeJson } from '../common/validation';
 
 @Injectable()
 export class BulkImportService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private database: DatabaseService) {}
 
   async importFromCSV(campaignId: string, fileBuffer: Buffer, allocateRoundRobin: boolean = true) {
     let records: any[];
@@ -43,14 +45,16 @@ export class BulkImportService {
       }
     }
 
-    const firstStatus = await this.prisma.campaignStatus.findFirst({
-      where: { campaignId },
-      orderBy: { order: 'asc' },
-    });
+    const [firstStatus] = await this.database.db
+      .select()
+      .from(campaignStatuses)
+      .where(eq(campaignStatuses.campaignId, campaignId))
+      .orderBy(asc(campaignStatuses.order))
+      .limit(1);
 
-    // Batch insert with createMany (single query instead of N)
-    await this.prisma.lead.createMany({
-      data: validatedRecords.map((record) => ({
+    // Batch insert
+    await this.database.db.insert(leads).values(
+      validatedRecords.map((record) => ({
         campaignId,
         name: record.name,
         email: record.email || null,
@@ -59,25 +63,27 @@ export class BulkImportService {
         customData: record.customData,
         statusId: firstStatus?.id || null,
       })),
-    });
+    );
 
-    // Fetch all leads for this campaign (just created)
-    const leads = await this.prisma.lead.findMany({
-      where: { campaignId, source: 'bulk' },
-      orderBy: { createdAt: 'asc' },
-    });
+    // Fetch all leads for this campaign
+    const leadsList = await this.database.db
+      .select()
+      .from(leads)
+      .where(and(eq(leads.campaignId, campaignId), eq(leads.source, 'bulk')))
+      .orderBy(asc(leads.createdAt));
 
-    if (allocateRoundRobin && leads.length > 0) {
-      await this.allocateRoundRobin(campaignId, leads.map((l) => l.id));
+    if (allocateRoundRobin && leadsList.length > 0) {
+      await this.allocateRoundRobin(campaignId, leadsList.map((l) => l.id));
     }
 
     // Re-fetch leads to get updated doerId after allocation
-    const leadIds = leads.map((l) => l.id);
-    const updatedLeads = await this.prisma.lead.findMany({
-      where: { id: { in: leadIds } },
-    });
+    const leadIds = leadsList.map((l) => l.id);
+    const updatedLeads = await this.database.db
+      .select()
+      .from(leads)
+      .where(sql`${leads.id} IN ${leadIds}`);
 
-    // Batch create followups with createMany
+    // Batch create followups
     const statusLabel = firstStatus?.label || 'New';
     const followupData = updatedLeads
       .filter((lead) => lead.doerId)
@@ -89,11 +95,11 @@ export class BulkImportService {
       }));
 
     if (followupData.length > 0) {
-      await this.prisma.followup.createMany({ data: followupData });
+      await this.database.db.insert(followups).values(followupData);
     }
 
     return {
-      imported: leads.length,
+      imported: leadsList.length,
       total: validatedRecords.length,
       leads: updatedLeads,
     };
@@ -120,14 +126,16 @@ export class BulkImportService {
       }
     }
 
-    const firstStatus = await this.prisma.campaignStatus.findFirst({
-      where: { campaignId },
-      orderBy: { order: 'asc' },
-    });
+    const [firstStatus] = await this.database.db
+      .select()
+      .from(campaignStatuses)
+      .where(eq(campaignStatuses.campaignId, campaignId))
+      .orderBy(asc(campaignStatuses.order))
+      .limit(1);
 
-    // Batch insert with createMany
-    await this.prisma.lead.createMany({
-      data: validatedRecords.map((record) => ({
+    // Batch insert
+    await this.database.db.insert(leads).values(
+      validatedRecords.map((record) => ({
         campaignId,
         name: record.name,
         email: record.email || null,
@@ -136,21 +144,23 @@ export class BulkImportService {
         customData: record.customData,
         statusId: firstStatus?.id || null,
       })),
-    });
+    );
 
-    const leads = await this.prisma.lead.findMany({
-      where: { campaignId, source: 'bulk' },
-      orderBy: { createdAt: 'asc' },
-    });
+    const leadsList = await this.database.db
+      .select()
+      .from(leads)
+      .where(and(eq(leads.campaignId, campaignId), eq(leads.source, 'bulk')))
+      .orderBy(asc(leads.createdAt));
 
-    if (allocateRoundRobin && leads.length > 0) {
-      await this.allocateRoundRobin(campaignId, leads.map((l) => l.id));
+    if (allocateRoundRobin && leadsList.length > 0) {
+      await this.allocateRoundRobin(campaignId, leadsList.map((l) => l.id));
     }
 
-    const leadIds = leads.map((l) => l.id);
-    const updatedLeads = await this.prisma.lead.findMany({
-      where: { id: { in: leadIds } },
-    });
+    const leadIds = leadsList.map((l) => l.id);
+    const updatedLeads = await this.database.db
+      .select()
+      .from(leads)
+      .where(sql`${leads.id} IN ${leadIds}`);
 
     const statusLabel = firstStatus?.label || 'New';
     const followupData = updatedLeads
@@ -163,34 +173,39 @@ export class BulkImportService {
       }));
 
     if (followupData.length > 0) {
-      await this.prisma.followup.createMany({ data: followupData });
+      await this.database.db.insert(followups).values(followupData);
     }
 
     return {
-      imported: leads.length,
+      imported: leadsList.length,
       total: data.length,
       leads: updatedLeads,
     };
   }
 
   private async allocateRoundRobin(campaignId: string, leadIds: string[]) {
-    const activeUsers = await this.prisma.campaignUser.findMany({
-      where: { campaignId, isActive: true },
-      include: { user: { select: { role: true } } },
-      orderBy: { assignedAt: 'asc' },
-    });
+    const activeUsers = await this.database.db
+      .select({
+        userId: campaignUsers.userId,
+        role: users.role,
+      })
+      .from(campaignUsers)
+      .innerJoin(users, eq(campaignUsers.userId, users.id))
+      .where(and(eq(campaignUsers.campaignId, campaignId), eq(campaignUsers.isActive, true)))
+      .orderBy(asc(campaignUsers.assignedAt));
 
-    const eligibleUsers = activeUsers.filter((au) => au.user?.role === 'USER');
+    const eligibleUsers = activeUsers.filter((au) => au.role === 'USER');
 
     if (eligibleUsers.length === 0) {
       throw new BadRequestException('No telecaller users assigned to this campaign. Please assign USER role users before importing leads.');
     }
 
-    const lastAssignedLead = await this.prisma.lead.findFirst({
-      where: { campaignId, doerId: { not: null } },
-      orderBy: { createdAt: 'desc' },
-      select: { doerId: true },
-    });
+    const [lastAssignedLead] = await this.database.db
+      .select({ doerId: leads.doerId })
+      .from(leads)
+      .where(and(eq(leads.campaignId, campaignId), sql`${leads.doerId} IS NOT NULL`))
+      .orderBy(desc(leads.createdAt))
+      .limit(1);
 
     let startIndex = 0;
     if (lastAssignedLead?.doerId) {
@@ -200,15 +215,13 @@ export class BulkImportService {
       }
     }
 
-    // Batch update doerId with createMany-style update
-    const updates = leadIds.map((id, i) => {
+    // Batch update doerId
+    for (let i = 0; i < leadIds.length; i++) {
       const userIndex = (startIndex + i) % eligibleUsers.length;
-      return this.prisma.lead.update({
-        where: { id },
-        data: { doerId: eligibleUsers[userIndex].userId },
-      });
-    });
-
-    await this.prisma.$transaction(updates);
+      await this.database.db
+        .update(leads)
+        .set({ doerId: eligibleUsers[userIndex].userId })
+        .where(eq(leads.id, leadIds[i]));
+    }
   }
 }

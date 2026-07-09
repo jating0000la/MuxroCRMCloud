@@ -57,7 +57,24 @@
    ssh root@your-vps-ip
    ```
 
-2. **Run Automated Setup**
+2. **Configure Environment**
+   ```bash
+   nano ~/.env  # or vim
+   ```
+   
+   Add these critical variables (also in `/opt/muxro-crm/.env` if not root home):
+   ```
+   POSTGRES_PASSWORD=YourStrongPassword123!
+   POSTGRES_DB=crm_db
+   POSTGRES_USER=postgres
+   JWT_SECRET=$(openssl rand -base64 48)
+   DOMAIN=muxrocrm.com
+   ACME_EMAIL=admin@muxrocrm.com
+   # CRITICAL: DATABASE_URL must use 127.0.0.1 for VPS (not 'host' or 'postgres')
+   DATABASE_URL="postgresql://postgres:YourStrongPassword123!@127.0.0.1:5432/crm_db?schema=public"
+   ```
+
+3. **Run Automated Setup**
    ```bash
    bash <(curl -s https://raw.githubusercontent.com/jating0000la/MuxroCRMCloud/main/setup-vps.sh) \
      https://github.com/jating0000la/MuxroCRMCloud.git \
@@ -225,6 +242,31 @@ docker compose logs backend -f
 docker compose restart backend
 ```
 
+### Issue: Prisma Error "Can't reach database server at `host:5432`"
+
+This means `DATABASE_URL` is missing or contains the literal hostname `host` instead of `127.0.0.1`.
+
+**VPS Fix:**
+```bash
+# Check if DATABASE_URL is set
+grep DATABASE_URL ~/.env
+
+# If missing or wrong, add the correct one:
+echo 'DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@127.0.0.1:5432/crm_db?schema=public"' >> ~/.env
+source ~/.env
+
+# Then retry Prisma:
+cd ~/MuxroCRMCloud/backend
+npx prisma migrate deploy
+```
+
+**Docker Fix:**
+```bash
+# DATABASE_URL should reference 'postgres' (container name), not 'host' or '127.0.0.1'
+# Check docker-compose.yml backend environment section:
+docker compose config | grep DATABASE_URL
+```
+
 ### Issue: Database won't connect
 
 **Check connection string in `.env`:**
@@ -233,7 +275,7 @@ docker compose restart backend
 DATABASE_URL=postgresql://postgres:postgres@postgres:5432/crm_db?schema=public
 
 # VPS (default):
-DATABASE_URL=postgresql://crm_user:XXXXXX@127.0.0.1:5432/crm_db?schema=public
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@127.0.0.1:5432/crm_db?schema=public
 ```
 
 **Test connection:**

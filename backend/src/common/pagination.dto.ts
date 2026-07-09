@@ -32,7 +32,7 @@ export class PaginationDto {
   limit?: number = 50;
 
   /**
-   * Calculate skip for Prisma
+   * Calculate skip for pagination
    */
   getSkip(): number {
     const page = Math.max(this.page || 1, 1);
@@ -41,7 +41,7 @@ export class PaginationDto {
   }
 
   /**
-   * Get take for Prisma
+   * Get take for pagination
    */
   getTake(): number {
     return Math.max(Math.min(this.limit || 50, 500), 1);

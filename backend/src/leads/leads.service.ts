@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { Lead } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import { eq, and, ne, inArray, desc, asc, sql } from 'drizzle-orm';
+import { DatabaseService } from '../db/database.service';
+import { leads, followups, campaignStatuses, campaignUsers, users, campaigns } from '../db/schema';
 import { PaginationDto } from '../common/pagination.dto';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
@@ -8,77 +9,137 @@ import { UpdateStatusDto } from './dto/update-status.dto';
 
 @Injectable()
 export class LeadsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private database: DatabaseService) {}
 
   async findByCampaign(campaignId: string, userId?: string, role?: string, pagination?: PaginationDto) {
-    const where: any = { campaignId };
-    // USER: only see leads assigned to them
+    const conditions: any[] = [eq(leads.campaignId, campaignId)];
     if (role === 'USER' && userId) {
-      where.doerId = userId;
+      conditions.push(eq(leads.doerId, userId));
     }
-    // ✅ FIXED: Apply pagination with skip/take
+
     const skip = pagination?.getSkip() || 0;
     const take = pagination?.getTake() || 50;
-    
-    return this.prisma.lead.findMany({
-      where,
-      include: {
-        doer: { select: { id: true, name: true, username: true } },
-        status: true,
-        followups: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          include: { user: { select: { name: true } } },
+
+    const results = await this.database.db
+      .select({
+        lead: leads,
+        doer: {
+          id: users.id,
+          name: users.name,
+          username: users.username,
         },
-      },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take,
-    });
+        status: campaignStatuses,
+      })
+      .from(leads)
+      .leftJoin(users, eq(leads.doerId, users.id))
+      .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
+      .where(and(...conditions))
+      .orderBy(desc(leads.createdAt))
+      .offset(skip)
+      .limit(take);
+
+    // Get latest followup for each lead
+    const leadIds = results.map((r) => r.lead.id);
+    let latestFollowups: any[] = [];
+    if (leadIds.length > 0) {
+      latestFollowups = await this.database.db
+        .select({
+          leadId: followups.leadId,
+          status: followups.status,
+          user: { name: users.name },
+        })
+        .from(followups)
+        .innerJoin(users, eq(followups.userId, users.id))
+        .where(inArray(followups.leadId, leadIds))
+        .orderBy(desc(followups.createdAt));
+    }
+
+    // Group followups by leadId and take the first one per lead
+    const followupMap = new Map<string, any>();
+    for (const f of latestFollowups) {
+      if (!followupMap.has(f.leadId)) {
+        followupMap.set(f.leadId, [f]);
+      }
+    }
+
+    return results.map((r) => ({
+      ...r.lead,
+      doer: r.doer,
+      status: r.status,
+      followups: followupMap.get(r.lead.id) || [],
+    }));
   }
 
   async findOne(id: string, userId?: string, role?: string) {
-    const lead = await this.prisma.lead.findUnique({
-      where: { id },
-      include: {
-        doer: { select: { id: true, name: true, username: true } },
-        status: true,
-        campaign: { select: { id: true, name: true } },
-        followups: {
-          orderBy: { createdAt: 'desc' },
-          include: { user: { select: { name: true, username: true } } },
+    const [result] = await this.database.db
+      .select({
+        lead: leads,
+        doer: {
+          id: users.id,
+          name: users.name,
+          username: users.username,
         },
-        enquiry: true,
-      },
-    });
-    if (!lead) throw new NotFoundException('Lead not found');
+        status: campaignStatuses,
+        campaign: {
+          id: campaigns.id,
+          name: campaigns.name,
+        },
+      })
+      .from(leads)
+      .leftJoin(users, eq(leads.doerId, users.id))
+      .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
+      .leftJoin(campaigns, eq(leads.campaignId, campaigns.id))
+      .where(eq(leads.id, id))
+      .limit(1);
 
-    // USER: can only view leads assigned to them
-    if (role === 'USER' && userId && lead.doerId !== userId) {
+    if (!result) throw new NotFoundException('Lead not found');
+
+    if (role === 'USER' && userId && result.lead.doerId !== userId) {
       throw new ForbiddenException('You can only view leads assigned to you');
     }
 
-    return lead;
+    // Get followups
+    const followupsList = await this.database.db
+      .select({
+        followup: followups,
+        user: { name: users.name, username: users.username },
+      })
+      .from(followups)
+      .innerJoin(users, eq(followups.userId, users.id))
+      .where(eq(followups.leadId, id))
+      .orderBy(desc(followups.createdAt));
+
+    return {
+      ...result.lead,
+      doer: result.doer,
+      status: result.status,
+      campaign: result.campaign,
+      followups: followupsList.map((f) => ({
+        ...f.followup,
+        user: f.user,
+      })),
+    };
   }
 
   async create(dto: CreateLeadDto, userId?: string, role?: string) {
     await this.ensureCampaignAccess(dto.campaignId, userId, role);
 
-    // Auto-assign via round-robin if no doerId provided
     const doerId = dto.doerId || await this.getNextRoundRobinUser(dto.campaignId);
 
-    // Get the first status if no statusId provided
     let statusId = dto.statusId;
     if (!statusId) {
-      const firstStatus = await this.prisma.campaignStatus.findFirst({
-        where: { campaignId: dto.campaignId },
-        orderBy: { order: 'asc' },
-      });
+      const [firstStatus] = await this.database.db
+        .select()
+        .from(campaignStatuses)
+        .where(eq(campaignStatuses.campaignId, dto.campaignId))
+        .orderBy(asc(campaignStatuses.order))
+        .limit(1);
       statusId = firstStatus?.id || undefined;
     }
 
-    const lead = await this.prisma.lead.create({
-      data: {
+    const [lead] = await this.database.db
+      .insert(leads)
+      .values({
         campaignId: dto.campaignId,
         name: dto.name,
         email: dto.email,
@@ -87,44 +148,53 @@ export class LeadsService {
         statusId,
         source: dto.source || 'manual',
         customData: dto.customData,
-      },
-    });
+      })
+      .returning();
 
-    // Auto-create initial followup so it appears in followup dashboard
-    const statusLabel = statusId
-      ? (await this.prisma.campaignStatus.findUnique({ where: { id: statusId } }))?.label || 'New'
-      : 'New';
-    await this.prisma.followup.create({
-      data: {
-        leadId: lead.id,
-        userId: doerId,
-        status: statusLabel,
-        remarks: dto.source === 'form' ? 'Form submitted' : dto.source === 'bulk' ? 'Imported via bulk upload' : 'Lead created',
-      },
+    // Auto-create initial followup
+    let statusLabel = 'New';
+    if (statusId) {
+      const [status] = await this.database.db
+        .select()
+        .from(campaignStatuses)
+        .where(eq(campaignStatuses.id, statusId))
+        .limit(1);
+      statusLabel = status?.label || 'New';
+    }
+
+    await this.database.db.insert(followups).values({
+      leadId: lead.id,
+      userId: doerId,
+      status: statusLabel,
+      remarks: dto.source === 'form' ? 'Form submitted' : dto.source === 'bulk' ? 'Imported via bulk upload' : 'Lead created',
     });
 
     return lead;
   }
 
   private async getNextRoundRobinUser(campaignId: string): Promise<string> {
-    const activeUsers = await this.prisma.campaignUser.findMany({
-      where: { campaignId, isActive: true },
-      include: { user: { select: { role: true } } },
-      orderBy: { assignedAt: 'asc' },
-    });
+    const activeUsers = await this.database.db
+      .select({
+        userId: campaignUsers.userId,
+        role: users.role,
+      })
+      .from(campaignUsers)
+      .innerJoin(users, eq(campaignUsers.userId, users.id))
+      .where(and(eq(campaignUsers.campaignId, campaignId), eq(campaignUsers.isActive, true)))
+      .orderBy(asc(campaignUsers.assignedAt));
 
-    // Only assign to USER role (telecallers), not ADMIN or MANAGER
-    const eligibleUsers = activeUsers.filter((au) => au.user?.role === 'USER');
+    const eligibleUsers = activeUsers.filter((au) => au.role === 'USER');
 
     if (eligibleUsers.length === 0) {
       throw new BadRequestException('No telecaller users assigned to this campaign. Please assign USER role users before creating leads.');
     }
 
-    const lastAssignedLead = await this.prisma.lead.findFirst({
-      where: { campaignId, doerId: { not: null } },
-      orderBy: { createdAt: 'desc' },
-      select: { doerId: true },
-    });
+    const [lastAssignedLead] = await this.database.db
+      .select({ doerId: leads.doerId })
+      .from(leads)
+      .where(and(eq(leads.campaignId, campaignId), sql`${leads.doerId} IS NOT NULL`))
+      .orderBy(desc(leads.createdAt))
+      .limit(1);
 
     if (!lastAssignedLead?.doerId) {
       return eligibleUsers[0].userId;
@@ -137,87 +207,107 @@ export class LeadsService {
 
   async update(id: string, dto: UpdateLeadDto, userId?: string, role?: string) {
     const lead = await this.findOne(id, userId, role);
-    // USER: can only edit leads assigned to them
     if (role === 'USER' && lead.doerId !== userId) {
       throw new ForbiddenException('You can only edit leads assigned to you');
     }
-    return this.prisma.lead.update({ where: { id }, data: dto });
+    const [updated] = await this.database.db
+      .update(leads)
+      .set(dto)
+      .where(eq(leads.id, id))
+      .returning();
+    return updated;
   }
 
   async updateStatus(id: string, dto: UpdateStatusDto, userId: string, role?: string) {
     const lead = await this.findOne(id, userId, role);
-    // USER: can only update status for leads assigned to them
     if (role === 'USER' && lead.doerId !== userId) {
       throw new ForbiddenException('You can only update status for leads assigned to you');
     }
 
-    const followup = await this.prisma.followup.create({
-      data: {
+    const [followup] = await this.database.db
+      .insert(followups)
+      .values({
         leadId: id,
         userId,
         status: dto.status,
         remarks: dto.remarks,
         nextCallDate: dto.nextCallDate ? new Date(dto.nextCallDate) : null,
-      },
-    });
+      })
+      .returning();
 
     const leadUpdate: any = {};
     if (dto.statusId) leadUpdate.statusId = dto.statusId;
     if (dto.dnd !== undefined) leadUpdate.dnd = dto.dnd;
 
-    await this.prisma.lead.update({ where: { id }, data: leadUpdate });
+    await this.database.db.update(leads).set(leadUpdate).where(eq(leads.id, id));
 
     return followup;
   }
 
   async findDnd(userId?: string, role?: string, pagination?: PaginationDto) {
-    const where: any = { dnd: true };
+    const conditions: any[] = [eq(leads.dnd, true)];
     if (role === 'USER' && userId) {
-      where.doerId = userId;
+      conditions.push(eq(leads.doerId, userId));
     }
-    // ✅ FIXED: Apply pagination with skip/take
+
     const skip = pagination?.getSkip() || 0;
     const take = pagination?.getTake() || 50;
-    
-    return this.prisma.lead.findMany({
-      where,
-      include: {
-        doer: { select: { id: true, name: true, username: true } },
-        status: true,
-        campaign: { select: { id: true, name: true } },
-        followups: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          include: { user: { select: { name: true } } },
+
+    const results = await this.database.db
+      .select({
+        lead: leads,
+        doer: {
+          id: users.id,
+          name: users.name,
+          username: users.username,
         },
-      },
-      orderBy: { updatedAt: 'desc' },
-      skip,
-      take,
-    });
+        status: campaignStatuses,
+        campaign: {
+          id: campaigns.id,
+          name: campaigns.name,
+        },
+      })
+      .from(leads)
+      .leftJoin(users, eq(leads.doerId, users.id))
+      .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
+      .leftJoin(campaigns, eq(leads.campaignId, campaigns.id))
+      .where(and(...conditions))
+      .orderBy(desc(leads.updatedAt))
+      .offset(skip)
+      .limit(take);
+
+    return results.map((r) => ({
+      ...r.lead,
+      doer: r.doer,
+      status: r.status,
+      campaign: r.campaign,
+    }));
   }
 
   async allocateRoundRobin(campaignId: string, leadIds: string[], userId?: string, role?: string) {
     await this.ensureCampaignAccess(campaignId, userId, role);
 
-    const activeUsers = await this.prisma.campaignUser.findMany({
-      where: { campaignId, isActive: true },
-      include: { user: { select: { role: true } } },
-      orderBy: { assignedAt: 'asc' },
-    });
+    const activeUsers = await this.database.db
+      .select({
+        userId: campaignUsers.userId,
+        role: users.role,
+      })
+      .from(campaignUsers)
+      .innerJoin(users, eq(campaignUsers.userId, users.id))
+      .where(and(eq(campaignUsers.campaignId, campaignId), eq(campaignUsers.isActive, true)))
+      .orderBy(asc(campaignUsers.assignedAt));
 
-    // Only assign to USER role (telecallers), not ADMIN or MANAGER
-    const eligibleUsers = activeUsers.filter((au) => au.user?.role === 'USER');
-
+    const eligibleUsers = activeUsers.filter((au) => au.role === 'USER');
     if (eligibleUsers.length === 0) return { message: 'No telecaller users in campaign' };
 
-    const allocations: Lead[] = [];
+    const allocations: any[] = [];
     for (let i = 0; i < leadIds.length; i++) {
       const userIndex = i % eligibleUsers.length;
-      const updated = await this.prisma.lead.update({
-        where: { id: leadIds[i] },
-        data: { doerId: eligibleUsers[userIndex].userId },
-      });
+      const [updated] = await this.database.db
+        .update(leads)
+        .set({ doerId: eligibleUsers[userIndex].userId })
+        .where(eq(leads.id, leadIds[i]))
+        .returning();
       allocations.push(updated);
     }
 
@@ -229,21 +319,32 @@ export class LeadsService {
     if (role === 'USER') {
       throw new ForbiddenException('You cannot delete leads');
     }
-    return this.prisma.lead.delete({ where: { id } });
+    const [deleted] = await this.database.db
+      .delete(leads)
+      .where(eq(leads.id, id))
+      .returning();
+    return deleted;
   }
 
   async getStats(campaignId: string) {
-    const total = await this.prisma.lead.count({ where: { campaignId } });
-    const byStatus = await this.prisma.lead.groupBy({
-      by: ['statusId'],
-      where: { campaignId },
-      _count: true,
-    });
+    const [{ total }] = await this.database.db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(leads)
+      .where(eq(leads.campaignId, campaignId));
+
+    const byStatus = await this.database.db
+      .select({
+        statusId: leads.statusId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(leads)
+      .where(eq(leads.campaignId, campaignId))
+      .groupBy(leads.statusId);
+
     return { total, byStatus };
   }
 
   private async ensureCampaignAccess(campaignId: string, userId?: string, role?: string) {
-    // MANAGER role removed - only ADMIN and USER exist, no special access checks needed
     return;
   }
 }

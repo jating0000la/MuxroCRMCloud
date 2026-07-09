@@ -2,7 +2,9 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { AxiosResponse } from 'axios';
 import { firstValueFrom } from 'rxjs';
-import { PrismaService } from '../prisma/prisma.service';
+import { eq, and, desc, asc } from 'drizzle-orm';
+import { DatabaseService } from '../db/database.service';
+import { campaigns, campaignStatuses, leads, followups, settings, users } from '../db/schema';
 
 export interface IndiamartLead {
   UNIQUE_QUERY_ID: string;
@@ -43,17 +45,9 @@ export class IndiamartService {
 
   constructor(
     private http: HttpService,
-    private prisma: PrismaService,
+    private database: DatabaseService,
   ) {}
 
-  /**
-   * Fetch leads from IndiaMART Pull API v2
-   * Docs: https://help.indiamart.com/knowledge-base/lms-crm-integration-v2/
-   *
-   * @param crmKey - The Pull API Key (glusr_crm_key)
-   * @param startTime - Start date/time (DD-MON-YYYY or DD-MM-YYYYHH:MM:SS)
-   * @param endTime - End date/time (same formats)
-   */
   async fetchLeads(
     crmKey: string,
     startTime?: string,
@@ -77,20 +71,19 @@ export class IndiamartService {
 
       const body = response.data as any;
 
-      // Check for API errors
       if (body.CODE && body.CODE !== 200) {
         throw new BadRequestException(
           `IndiaMART API error (${body.CODE}): ${body.MESSAGE || 'Unknown error'}`,
         );
       }
 
-      const leads: IndiamartLead[] = body.RESPONSE || [];
-      this.logger.log(`Fetched ${leads.length} leads from IndiaMART`);
+      const leadsList: IndiamartLead[] = body.RESPONSE || [];
+      this.logger.log(`Fetched ${leadsList.length} leads from IndiaMART`);
 
       return {
         success: true,
-        count: leads.length,
-        leads,
+        count: leadsList.length,
+        leads: leadsList,
       };
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
@@ -101,25 +94,22 @@ export class IndiamartService {
     }
   }
 
-  /**
-   * Auto-import leads from IndiaMART into a CRM campaign
-   * Fetches leads and creates Lead records with deduplication via UNIQUE_QUERY_ID
-   */
   async autoImportLeads(
     campaignId: string,
     crmKey: string,
     startTime?: string,
     endTime?: string,
   ): Promise<IndiamartAutoImportResult> {
-    // Verify campaign exists
-    const campaign = await this.prisma.campaign.findUnique({
-      where: { id: campaignId },
-    });
+    const [campaign] = await this.database.db
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.id, campaignId))
+      .limit(1);
+
     if (!campaign) {
       throw new BadRequestException('Campaign not found');
     }
 
-    // Fetch leads from IndiaMART
     const fetchResult = await this.fetchLeads(crmKey, startTime, endTime);
 
     if (fetchResult.leads.length === 0) {
@@ -134,11 +124,12 @@ export class IndiamartService {
       };
     }
 
-    // Get the first status for the campaign (New)
-    const firstStatus = await this.prisma.campaignStatus.findFirst({
-      where: { campaignId },
-      orderBy: { order: 'asc' },
-    });
+    const [firstStatus] = await this.database.db
+      .select()
+      .from(campaignStatuses)
+      .where(eq(campaignStatuses.campaignId, campaignId))
+      .orderBy(asc(campaignStatuses.order))
+      .limit(1);
 
     let imported = 0;
     let duplicates = 0;
@@ -147,26 +138,26 @@ export class IndiamartService {
 
     for (const imLead of fetchResult.leads) {
       try {
-        // Skip leads without any contact info
         if (!imLead.SENDER_MOBILE && !imLead.SENDER_EMAIL) {
           this.logger.warn(`Skipping lead ${imLead.UNIQUE_QUERY_ID}: no contact info`);
           errors++;
           continue;
         }
 
-        // Check for duplicate by UNIQUE_QUERY_ID
-        const existingLead = await this.prisma.lead.findUnique({
-          where: { indiamartQueryId: imLead.UNIQUE_QUERY_ID },
-        });
+        const [existingLead] = await this.database.db
+          .select()
+          .from(leads)
+          .where(eq(leads.indiamartQueryId, imLead.UNIQUE_QUERY_ID))
+          .limit(1);
 
         if (existingLead) {
           duplicates++;
           continue;
         }
 
-        // Create the lead
-        const lead = await this.prisma.lead.create({
-          data: {
+        const [lead] = await this.database.db
+          .insert(leads)
+          .values({
             campaignId,
             name: imLead.SENDER_NAME || 'IndiaMART Buyer',
             email: imLead.SENDER_EMAIL || null,
@@ -184,17 +175,15 @@ export class IndiamartService {
               buyerPageUrl: imLead.BUYER_PAGE_URL,
               queryMessage: imLead.QUERY_MESSAGE,
             },
-          },
-        });
+          })
+          .returning();
 
-        // Create initial followup
-        await this.prisma.followup.create({
-          data: {
-            leadId: lead.id,
-            userId: campaign.managerId || (await this.getAdminUserId()),
-            status: firstStatus?.label || 'New',
-            remarks: `Imported from IndiaMART (${imLead.QUERY_TYPE || 'lead'})`,
-          },
+        const userId = campaign.managerId || (await this.getAdminUserId());
+        await this.database.db.insert(followups).values({
+          leadId: lead.id,
+          userId,
+          status: firstStatus?.label || 'New',
+          remarks: `Imported from IndiaMART (${imLead.QUERY_TYPE || 'lead'})`,
         });
 
         imported++;
@@ -220,23 +209,18 @@ export class IndiamartService {
     };
   }
 
-  /**
-   * Get the last fetch time for incremental fetching
-   */
   async getLastFetchTime(): Promise<string | null> {
     try {
-      const setting = await this.prisma.setting.findUnique({
-        where: { key: 'indiamartLastFetchTime' },
-      });
+      const [setting] = await this.database.db
+        .select()
+        .from(settings)
+        .where(eq(settings.key, 'indiamartLastFetchTime'))
+        .limit(1);
       if (!setting) return null;
 
       let value = setting.encryptedValue;
       if (setting.isEncrypted) {
-        // For non-sensitive timestamps, we can try to parse directly
-        // The encryption service might not be needed for timestamps
         try {
-          const { EncryptionService } = await import('../settings/encryption.service');
-          // Simple approach - just return the raw value if it looks like a date
           if (setting.encryptedValue.match(/^\d{4}-\d{2}-\d{2}/)) {
             return setting.encryptedValue;
           }
@@ -248,33 +232,27 @@ export class IndiamartService {
     }
   }
 
-  /**
-   * Update the last fetch time
-   */
   async updateLastFetchTime(time: string): Promise<void> {
-    const existing = await this.prisma.setting.findUnique({
-      where: { key: 'indiamartLastFetchTime' },
-    });
+    const [existing] = await this.database.db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, 'indiamartLastFetchTime'))
+      .limit(1);
 
     if (existing) {
-      await this.prisma.setting.update({
-        where: { key: 'indiamartLastFetchTime' },
-        data: { encryptedValue: time, isEncrypted: false },
-      });
+      await this.database.db
+        .update(settings)
+        .set({ encryptedValue: time, isEncrypted: false })
+        .where(eq(settings.key, 'indiamartLastFetchTime'));
     } else {
-      await this.prisma.setting.create({
-        data: {
-          key: 'indiamartLastFetchTime',
-          encryptedValue: time,
-          isEncrypted: false,
-        },
+      await this.database.db.insert(settings).values({
+        key: 'indiamartLastFetchTime',
+        encryptedValue: time,
+        isEncrypted: false,
       });
     }
   }
 
-  /**
-   * Parse IndiaMART email notification for lead details (fallback)
-   */
   parseEmailBody(htmlBody: string): Partial<IndiamartLead> {
     const extract = (pattern: RegExp): string => {
       const match = htmlBody.match(pattern);
@@ -298,9 +276,11 @@ export class IndiamartService {
   }
 
   private async getAdminUserId(): Promise<string> {
-    const admin = await this.prisma.user.findFirst({
-      where: { role: 'ADMIN' },
-    });
+    const [admin] = await this.database.db
+      .select()
+      .from(users)
+      .where(eq(users.role, 'ADMIN'))
+      .limit(1);
     return admin?.id || '';
   }
 }

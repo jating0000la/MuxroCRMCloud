@@ -80,7 +80,7 @@ export function createPaginatedResponse<T>(
  * Parse sort parameters
  * @param sortBy Field to sort by
  * @param sortOrder asc or desc
- * @returns Prisma orderBy object
+ * @returns Sort order object
  */
 export function parseSort(
   sortBy: string = 'createdAt',

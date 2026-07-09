@@ -1,21 +1,25 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { PrismaService } from '../prisma/prisma.service';
+import { eq } from 'drizzle-orm';
+import { DatabaseService } from '../db/database.service';
+import { users } from '../db/schema';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private prisma: PrismaService,
+    private database: DatabaseService,
     private jwtService: JwtService,
   ) {}
 
   async login(loginDto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { username: loginDto.username },
-    });
+    const [user] = await this.database.db
+      .select()
+      .from(users)
+      .where(eq(users.username, loginDto.username))
+      .limit(1);
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid credentials');
@@ -40,21 +44,24 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto) {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { username: registerDto.username },
-    });
+    const [existingUser] = await this.database.db
+      .select()
+      .from(users)
+      .where(eq(users.username, registerDto.username))
+      .limit(1);
 
     if (existingUser) {
       throw new ConflictException('Username already exists');
     }
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
-    const user = await this.prisma.user.create({
-      data: {
+    const [user] = await this.database.db
+      .insert(users)
+      .values({
         ...registerDto,
         password: hashedPassword,
-      },
-    });
+      })
+      .returning();
 
     const payload = { sub: user.id, username: user.username, role: user.role };
     return {
@@ -70,19 +77,20 @@ export class AuthService {
   }
 
   async validateUser(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        username: true,
-        name: true,
-        email: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    const [user] = await this.database.db
+      .select({
+        id: users.id,
+        username: users.username,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        isActive: users.isActive,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
     return user;
   }
 }

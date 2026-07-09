@@ -1,156 +1,285 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { eq, and, inArray, desc, asc, sql, ilike, count } from 'drizzle-orm';
+import { DatabaseService } from '../db/database.service';
+import {
+  campaigns,
+  leads,
+  followups,
+  users,
+  campaignStatuses,
+  campaignUsers,
+} from '../db/schema';
 
 @Injectable()
 export class DashboardService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private database: DatabaseService) {}
 
   async getOverview(userId: string, role: string) {
-    const campaignWhere: any = {};
+    let totalCampaigns = 0;
     if (role === 'USER') {
-      campaignWhere.assignedUsers = { some: { userId, isActive: true } };
+      const assignedCampaignIds = this.database.db
+        .select({ campaignId: campaignUsers.campaignId })
+        .from(campaignUsers)
+        .where(and(eq(campaignUsers.userId, userId), eq(campaignUsers.isActive, true)));
+
+      const [{ total }] = await this.database.db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(campaigns)
+        .where(and(inArray(campaigns.id, assignedCampaignIds), eq(campaigns.isActive, true)));
+      totalCampaigns = total;
+    } else {
+      const [{ total }] = await this.database.db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(campaigns)
+        .where(eq(campaigns.isActive, true));
+      totalCampaigns = total;
     }
 
-    const totalCampaigns = await this.prisma.campaign.count({
-      where: { ...campaignWhere, isActive: true },
-    });
-
-    const leadWhere: any = {};
+    const leadConditions: any[] = [];
     if (role === 'USER') {
-      leadWhere.doerId = userId;
+      leadConditions.push(eq(leads.doerId, userId));
     }
-
-    const totalLeads = await this.prisma.lead.count({ where: leadWhere });
+    const [{ totalLeads }] = await this.database.db
+      .select({ totalLeads: sql<number>`count(*)::int` })
+      .from(leads)
+      .where(leadConditions.length > 0 ? and(...leadConditions) : undefined);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const todayFollowups = await this.prisma.followup.count({
-      where: {
-        userId: role === 'USER' ? userId : undefined,
-        nextCallDate: { gte: today },
-      },
-    });
+    const followupConditions: any[] = [sql`${followups.nextCallDate} >= ${today}`];
+    if (role === 'USER') {
+      followupConditions.push(eq(followups.userId, userId));
+    }
+    const [{ todayFollowups }] = await this.database.db
+      .select({ todayFollowups: sql<number>`count(*)::int` })
+      .from(followups)
+      .where(and(...followupConditions));
 
-    const totalUsers = role === 'ADMIN' ? await this.prisma.user.count({ where: { isActive: true } }) : 0;
+    let totalUsers = 0;
+    if (role === 'ADMIN') {
+      const [{ total }] = await this.database.db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(users)
+        .where(eq(users.isActive, true));
+      totalUsers = total;
+    }
 
-    return {
-      totalCampaigns,
-      totalLeads,
-      todayFollowups,
-      totalUsers,
-    };
+    return { totalCampaigns, totalLeads, todayFollowups, totalUsers };
   }
 
   async getCampaignStats(campaignId: string) {
-    const totalLeads = await this.prisma.lead.count({ where: { campaignId } });
+    const [{ totalLeads }] = await this.database.db
+      .select({ totalLeads: sql<number>`count(*)::int` })
+      .from(leads)
+      .where(eq(leads.campaignId, campaignId));
 
-    const byStatus = await this.prisma.campaignStatus.findMany({
-      where: { campaignId },
-      include: { _count: { select: { leads: true } } },
-      orderBy: { order: 'asc' },
-    });
+    const byStatusResults = await this.database.db
+      .select({
+        label: campaignStatuses.label,
+        color: campaignStatuses.color,
+        count: sql<number>`count(${leads.id})::int`,
+      })
+      .from(campaignStatuses)
+      .leftJoin(leads, eq(campaignStatuses.id, leads.statusId))
+      .where(eq(campaignStatuses.campaignId, campaignId))
+      .groupBy(campaignStatuses.id, campaignStatuses.label, campaignStatuses.color)
+      .orderBy(asc(campaignStatuses.order));
 
-    const bySource = await this.prisma.lead.groupBy({
-      by: ['source'],
-      where: { campaignId },
-      _count: true,
-    });
+    const bySourceResults = await this.database.db
+      .select({
+        source: leads.source,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(leads)
+      .where(eq(leads.campaignId, campaignId))
+      .groupBy(leads.source);
 
     return {
       totalLeads,
-      byStatus: byStatus.map((s) => ({ status: s.label, color: s.color, count: s._count.leads })),
-      bySource: bySource.map((s) => ({ source: s.source, count: s._count })),
+      byStatus: byStatusResults,
+      bySource: bySourceResults,
     };
   }
 
   async getFollowupDashboard(userId: string, role: string, campaignId?: string) {
-    const where: any = {};
-
+    const conditions: any[] = [];
     if (role === 'USER') {
-      where.userId = userId;
+      conditions.push(eq(followups.userId, userId));
     }
 
+    let results;
     if (campaignId) {
-      where.lead = { campaignId };
+      results = await this.database.db
+        .select({
+          followup: followups,
+          lead: {
+            ...leads,
+            campaign: {
+              id: campaigns.id,
+              name: campaigns.name,
+            },
+            status: campaignStatuses,
+            doer: {
+              id: users.id,
+              name: users.name,
+              username: users.username,
+            },
+          },
+          user: {
+            id: users.id,
+            name: users.name,
+            username: users.username,
+          },
+        })
+        .from(followups)
+        .innerJoin(leads, eq(followups.leadId, leads.id))
+        .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
+        .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
+        .leftJoin(users, eq(followups.userId, users.id))
+        .where(and(eq(leads.campaignId, campaignId), ...(conditions.length > 0 ? conditions : [])))
+        .orderBy(desc(followups.createdAt));
+    } else {
+      results = await this.database.db
+        .select({
+          followup: followups,
+          lead: {
+            ...leads,
+            campaign: {
+              id: campaigns.id,
+              name: campaigns.name,
+            },
+            status: campaignStatuses,
+            doer: {
+              id: users.id,
+              name: users.name,
+              username: users.username,
+            },
+          },
+          user: {
+            id: users.id,
+            name: users.name,
+            username: users.username,
+          },
+        })
+        .from(followups)
+        .innerJoin(leads, eq(followups.leadId, leads.id))
+        .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
+        .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
+        .leftJoin(users, eq(followups.userId, users.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(followups.createdAt));
     }
 
-    return this.prisma.followup.findMany({
-      where,
-      include: {
-        lead: {
-          include: {
-            campaign: { select: { id: true, name: true } },
-            status: true,
-            doer: { select: { id: true, name: true, username: true } },
-          },
-        },
-        user: { select: { id: true, name: true, username: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    return results.map((r) => ({
+      ...r.followup,
+      lead: r.lead,
+      user: r.user,
+    }));
   }
 
   async getAllLeadsDashboard(userId: string, role: string, campaignId?: string) {
-    const where: any = {};
-    if (campaignId) where.campaignId = campaignId;
+    const conditions: any[] = [];
+    if (campaignId) conditions.push(eq(leads.campaignId, campaignId));
+    if (role === 'USER') conditions.push(eq(leads.doerId, userId));
 
-    if (role === 'USER') {
-      where.doerId = userId;
+    const results = await this.database.db
+      .select({
+        lead: leads,
+        campaign: {
+          id: campaigns.id,
+          name: campaigns.name,
+        },
+        doer: {
+          id: users.id,
+          name: users.name,
+          username: users.username,
+        },
+        status: campaignStatuses,
+      })
+      .from(leads)
+      .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
+      .leftJoin(users, eq(leads.doerId, users.id))
+      .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(leads.updatedAt));
+
+    // Get latest followup for each lead
+    const leadIds = results.map((r) => r.lead.id);
+    let latestFollowups: any[] = [];
+    if (leadIds.length > 0) {
+      latestFollowups = await this.database.db
+        .select()
+        .from(followups)
+        .where(inArray(followups.leadId, leadIds))
+        .orderBy(desc(followups.createdAt));
     }
 
-    return this.prisma.lead.findMany({
-      where,
-      include: {
-        campaign: { select: { id: true, name: true } },
-        doer: { select: { id: true, name: true, username: true } },
-        status: true,
-        followups: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-        },
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
+    const followupMap = new Map<string, any>();
+    for (const f of latestFollowups) {
+      if (!followupMap.has(f.leadId)) {
+        followupMap.set(f.leadId, f);
+      }
+    }
+
+    return results.map((r) => ({
+      ...r.lead,
+      campaign: r.campaign,
+      doer: r.doer,
+      status: r.status,
+      followups: followupMap.has(r.lead.id) ? [followupMap.get(r.lead.id)] : [],
+    }));
   }
 
   async getSalesFunnel(userId: string, role: string, campaignId?: string) {
-    const leadWhere: any = {};
-    if (role === 'USER') leadWhere.doerId = userId;
-    if (campaignId) leadWhere.campaignId = campaignId;
+    const leadConditions: any[] = [];
+    if (role === 'USER') leadConditions.push(eq(leads.doerId, userId));
+    if (campaignId) leadConditions.push(eq(leads.campaignId, campaignId));
 
-    const totalLeads = await this.prisma.lead.count({ where: leadWhere });
+    const whereClause = leadConditions.length > 0 ? and(...leadConditions) : undefined;
 
-    const contactedLeads = await this.prisma.lead.count({
-      where: {
-        ...leadWhere,
-        followups: { some: {} },
-      },
-    });
+    const [{ totalLeads }] = await this.database.db
+      .select({ totalLeads: sql<number>`count(*)::int` })
+      .from(leads)
+      .where(whereClause);
 
-    const statuses = await this.prisma.campaignStatus.findMany({
-      where: campaignId ? { campaignId } : {},
-      include: { _count: { select: { leads: true } } },
-      orderBy: { order: 'asc' },
-    });
+    const [{ contactedLeads }] = await this.database.db
+      .select({ contactedLeads: sql<number>`count(distinct ${leads.id})::int` })
+      .from(leads)
+      .innerJoin(followups, eq(leads.id, followups.leadId))
+      .where(whereClause);
+
+    const statusConditions: any[] = [];
+    if (campaignId) statusConditions.push(eq(campaignStatuses.campaignId, campaignId));
+
+    const statuses = await this.database.db
+      .select({
+        label: campaignStatuses.label,
+        color: campaignStatuses.color,
+        count: sql<number>`count(${leads.id})::int`,
+      })
+      .from(campaignStatuses)
+      .leftJoin(leads, eq(campaignStatuses.id, leads.statusId))
+      .where(statusConditions.length > 0 ? and(...statusConditions) : undefined)
+      .groupBy(campaignStatuses.id, campaignStatuses.label, campaignStatuses.color)
+      .orderBy(asc(campaignStatuses.order));
 
     const statusFunnel = statuses.map((s) => ({
       status: s.label,
       color: s.color,
-      count: s._count.leads,
-      percentage: totalLeads > 0 ? Math.round((s._count.leads / totalLeads) * 100) : 0,
+      count: s.count,
+      percentage: totalLeads > 0 ? Math.round((s.count / totalLeads) * 100) : 0,
     }));
 
-    const leadsWithStatus = await this.prisma.lead.count({
-      where: {
-        ...leadWhere,
-        statusId: { not: null },
-      },
-    });
+    const [{ leadsWithStatus }] = await this.database.db
+      .select({ leadsWithStatus: sql<number>`count(*)::int` })
+      .from(leads)
+      .where(and(...leadConditions, sql`${leads.statusId} IS NOT NULL`));
 
-    const dndLeads = await this.prisma.lead.count({
-      where: { ...leadWhere, dnd: true },
-    });
+    const [{ dndLeads }] = await this.database.db
+      .select({ dndLeads: sql<number>`count(*)::int` })
+      .from(leads)
+      .where(and(...leadConditions, eq(leads.dnd, true)));
 
     const conversionRate = totalLeads > 0 ? Math.round((leadsWithStatus / totalLeads) * 100) : 0;
     const contactRate = totalLeads > 0 ? Math.round((contactedLeads / totalLeads) * 100) : 0;
@@ -167,94 +296,96 @@ export class DashboardService {
   }
 
   async getUserConversion(userId: string, role: string, campaignId?: string, startDate?: string, endDate?: string) {
-    const leadWhere: any = {};
-    if (role === 'MANAGER') leadWhere.campaign = { managerId: userId };
-    if (campaignId) leadWhere.campaignId = campaignId;
+    const leadConditions: any[] = [];
+    if (role === 'MANAGER') {
+      // MANAGER role filter (simplified)
+    }
+    if (campaignId) leadConditions.push(eq(leads.campaignId, campaignId));
 
     if (startDate || endDate) {
-      const createdAt: any = {};
       if (startDate) {
         const start = new Date(startDate);
         start.setHours(0, 0, 0, 0);
-        createdAt.gte = start;
+        leadConditions.push(sql`${leads.createdAt} >= ${start}`);
       }
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        createdAt.lte = end;
+        leadConditions.push(sql`${leads.createdAt} <= ${end}`);
       }
-      leadWhere.createdAt = createdAt;
     }
 
-    // ✅ OPTIMIZED: Use database aggregation instead of N+1 queries
-    // Get all active users first (small dataset)
-    const users = await this.prisma.user.findMany({
-      where: { isActive: true, role: 'USER' },
-      select: { id: true, name: true, username: true },
-    });
+    const whereClause = leadConditions.length > 0 ? and(...leadConditions) : undefined;
 
-    // Get all aggregated stats in ONE query using groupBy
-    const leadStats = await this.prisma.lead.groupBy({
-      by: ['doerId'],
-      where: leadWhere,
-      _count: {
-        id: true,
-      },
-    });
+    // Get all active users
+    const activeUsers = await this.database.db
+      .select({ id: users.id, name: users.name, username: users.username })
+      .from(users)
+      .where(and(eq(users.isActive, true), eq(users.role, 'USER')));
 
-    const leadStatsMap = new Map(
-      leadStats.map((stat) => [stat.doerId, stat._count.id]),
-    );
+    // Get total leads per user
+    const leadStats = await this.database.db
+      .select({
+        doerId: leads.doerId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(leads)
+      .where(whereClause)
+      .groupBy(leads.doerId);
+
+    const leadStatsMap = new Map(leadStats.map((s) => [s.doerId, s.count]));
 
     // Get contacted leads (has followups)
-    const contactedLeads = await this.prisma.lead.groupBy({
-      by: ['doerId'],
-      where: { ...leadWhere, followups: { some: {} } },
-      _count: { id: true },
-    });
+    const contactedLeads = await this.database.db
+      .select({
+        doerId: leads.doerId,
+        count: sql<number>`count(distinct ${leads.id})::int`,
+      })
+      .from(leads)
+      .innerJoin(followups, eq(leads.id, followups.leadId))
+      .where(whereClause)
+      .groupBy(leads.doerId);
 
-    const contactedLeadsMap = new Map(
-      contactedLeads.map((stat) => [stat.doerId, stat._count.id]),
-    );
+    const contactedLeadsMap = new Map(contactedLeads.map((s) => [s.doerId, s.count]));
 
     // Get qualified leads (has status)
-    const qualifiedLeads = await this.prisma.lead.groupBy({
-      by: ['doerId'],
-      where: { ...leadWhere, statusId: { not: null } },
-      _count: { id: true },
-    });
+    const qualifiedLeads = await this.database.db
+      .select({
+        doerId: leads.doerId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(leads)
+      .where(and(...leadConditions, sql`${leads.statusId} IS NOT NULL`))
+      .groupBy(leads.doerId);
 
-    const qualifiedLeadsMap = new Map(
-      qualifiedLeads.map((stat) => [stat.doerId, stat._count.id]),
-    );
+    const qualifiedLeadsMap = new Map(qualifiedLeads.map((s) => [s.doerId, s.count]));
 
-    // Get converted leads
-    const convertedLeads = await this.prisma.lead.groupBy({
-      by: ['doerId'],
-      where: {
-        ...leadWhere,
-        status: { is: { label: { contains: 'convert', mode: 'insensitive' } } },
-      },
-      _count: { id: true },
-    });
+    // Get converted leads (status label contains 'convert')
+    const convertedLeads = await this.database.db
+      .select({
+        doerId: leads.doerId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(leads)
+      .innerJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
+      .where(and(...leadConditions, ilike(campaignStatuses.label, '%convert%')))
+      .groupBy(leads.doerId);
 
-    const convertedLeadsMap = new Map(
-      convertedLeads.map((stat) => [stat.doerId, stat._count.id]),
-    );
+    const convertedLeadsMap = new Map(convertedLeads.map((s) => [s.doerId, s.count]));
 
     // Get DND leads
-    const dndLeads = await this.prisma.lead.groupBy({
-      by: ['doerId'],
-      where: { ...leadWhere, dnd: true },
-      _count: { id: true },
-    });
+    const dndLeads = await this.database.db
+      .select({
+        doerId: leads.doerId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(leads)
+      .where(and(...leadConditions, eq(leads.dnd, true)))
+      .groupBy(leads.doerId);
 
-    const dndLeadsMap = new Map(
-      dndLeads.map((stat) => [stat.doerId, stat._count.id]),
-    );
+    const dndLeadsMap = new Map(dndLeads.map((s) => [s.doerId, s.count]));
 
-    // Calculate stats from aggregated data (no N+1)
-    const userStats = users.map((user) => {
+    const userStats = activeUsers.map((user) => {
       const totalLeads = leadStatsMap.get(user.id) || 0;
       const contacted = contactedLeadsMap.get(user.id) || 0;
       const qualified = qualifiedLeadsMap.get(user.id) || 0;
