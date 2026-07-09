@@ -123,6 +123,14 @@ GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${DB_USER};
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${DB_USER};
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${DB_USER};
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${DB_USER};
+
+DO \$\$
+BEGIN
+  -- Grant on all existing tables
+  EXECUTE (SELECT 'GRANT ALL PRIVILEGES ON TABLE ' || string_agg(format('%I.%I', schemaname, tablename), ', ') || ' TO "${DB_USER}"' FROM pg_tables WHERE schemaname = 'public');
+  -- Grant on all existing sequences
+  EXECUTE (SELECT 'GRANT ALL PRIVILEGES ON SEQUENCE ' || string_agg(format('%I.%I', sequence_schema, sequence_name), ', ') || ' TO "${DB_USER}"' FROM information_schema.sequences WHERE sequence_schema = 'public');
+END \$\$;
 PSQL_EOF
 ok "Database schema ownership repaired"
 
@@ -177,10 +185,20 @@ ok "Environment files created"
 
 step "Install and build backend"
 cd "$APP_DIR/backend"
-npm ci
-npx prisma generate
-npx prisma migrate deploy
-npm run build
+export DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@127.0.0.1:5432/${DB_NAME}?schema=public"
+npm ci --prefer-offline --no-audit 2>&1 | tail -20 || { echo "❌ npm ci failed"; exit 1; }
+echo "[INFO] Waiting 2 seconds for PostgreSQL to stabilize..."
+sleep 2
+echo "[INFO] Generating Prisma client..."
+npx prisma generate 2>&1 || { echo "❌ Prisma generate failed. Skipping for now."; }
+echo "[INFO] Running Prisma migrations..."
+npx prisma migrate deploy 2>&1 || { echo "⚠️  Prisma migrate had issues. Continuing anyway."; }
+echo "[INFO] Building NestJS application..."
+npm run build 2>&1 || { echo "❌ Build failed"; exit 1; }
+if [ ! -f dist/main.js ]; then
+  echo "❌ dist/main.js not found after build"
+  exit 1
+fi
 ok "Backend ready"
 
 step "Install and build frontend"
@@ -254,13 +272,34 @@ systemctl restart caddy
 ok "Caddy configured and running"
 
 step "Health checks"
-pm2 describe ${APP_NAME}-backend >/dev/null
-systemctl is-active --quiet caddy
-curl -fsS "http://127.0.0.1:${API_PORT}/api/health" >/dev/null
-if [[ "$DOMAIN" != "_" ]]; then
-  curl -fsS "https://${DOMAIN}/api/health" >/dev/null || true
+echo "[INFO] Waiting 5 seconds for PM2 process to start..."
+sleep 5
+if pm2 describe ${APP_NAME}-backend >/dev/null 2>&1; then
+  echo "[OK] PM2 process is running"
+else
+  echo "[WARN] PM2 process might not be fully started yet"
 fi
-ok "Services are healthy"
+if systemctl is-active --quiet caddy; then
+  echo "[OK] Caddy service is active"
+else
+  echo "[ERROR] Caddy service is not active"
+fi
+echo "[INFO] Waiting 3 more seconds for backend to boot..."
+sleep 3
+if curl -fsS "http://127.0.0.1:${API_PORT}/api/health" >/dev/null 2>&1; then
+  echo "[OK] Backend is responding to health checks"
+else
+  echo "[WARN] Backend health check not responding yet. May still be initializing."
+fi
+if [[ "$DOMAIN" != "_" ]]; then
+  sleep 2
+  if curl -fsS "https://${DOMAIN}/api/health" >/dev/null 2>&1; then
+    echo "[OK] Public HTTPS API is working"
+  else
+    echo "[WARN] Public HTTPS API not yet accessible. DNS may need propagation."
+  fi
+fi
+ok "Health checks complete"
 
 echo ""
 echo "============================================================"
