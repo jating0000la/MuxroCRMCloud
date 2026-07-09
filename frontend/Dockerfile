@@ -8,14 +8,20 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# Production stage
-FROM nginx:alpine
+# Production stage - use serve for static files
+FROM node:18-alpine
 
-RUN rm /etc/nginx/conf.d/default.conf
+RUN npm install -g serve
 
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+RUN addgroup -g 1001 appgroup && adduser -u 1001 -G appgroup -s /bin/sh -D appuser
+
+WORKDIR /app
+COPY --from=build /app/dist ./dist
+
+RUN chown -R appuser:appgroup /app
+
+USER appuser
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["serve", "-s", "dist", "-l", "80"]

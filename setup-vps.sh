@@ -68,7 +68,6 @@ apt-get install -y \
   gnupg \
   lsb-release \
   build-essential \
-  nginx \
   postgresql \
   postgresql-contrib
 ok "Base packages installed"
@@ -198,43 +197,40 @@ systemctl enable ${APP_NAME}-backend
 systemctl restart ${APP_NAME}-backend
 ok "Backend service started"
 
-step "Configure Nginx for frontend + API proxy"
-cat > /etc/nginx/sites-available/${APP_NAME} <<EOF
-server {
-    listen 80;
-    server_name ${DOMAIN};
+step "Install Caddy"
+if ! command -v caddy >/dev/null 2>&1; then
+  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
+  apt-get update
+  apt-get install -y caddy
+fi
+ok "Caddy installed"
 
-    root ${APP_DIR}/frontend/dist;
-    index index.html;
+step "Configure Caddy for frontend + API proxy"
+cat > /etc/caddy/Caddyfile <<EOF
+${DOMAIN} {
+    root * ${APP_DIR}/frontend/dist
+    file_server
 
-    location / {
-        try_files \$uri \$uri/ /index.html;
+    try_files {path} /index.html
+
+    handle /api/* {
+        reverse_proxy 127.0.0.1:${API_PORT}
     }
 
-    location /api/ {
-        proxy_pass http://127.0.0.1:${API_PORT};
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_read_timeout 300s;
+    handle /api/health {
+        reverse_proxy 127.0.0.1:${API_PORT}
     }
 }
 EOF
 
-rm -f /etc/nginx/sites-enabled/default
-ln -sf /etc/nginx/sites-available/${APP_NAME} /etc/nginx/sites-enabled/${APP_NAME}
-nginx -t
-systemctl enable nginx
-systemctl restart nginx
-ok "Nginx configured and running"
+systemctl enable caddy
+systemctl restart caddy
+ok "Caddy configured and running"
 
 step "Health checks"
 systemctl is-active --quiet ${APP_NAME}-backend
-systemctl is-active --quiet nginx
+systemctl is-active --quiet caddy
 curl -fsS "http://127.0.0.1:${API_PORT}/api/health" >/dev/null
 ok "Services are healthy"
 
@@ -249,8 +245,8 @@ echo ""
 echo "Useful commands:"
 echo "  systemctl status ${APP_NAME}-backend"
 echo "  journalctl -u ${APP_NAME}-backend -f"
-echo "  systemctl status nginx"
+echo "  systemctl status caddy"
+echo "  journalctl -u caddy -f"
 echo ""
-echo "Next recommended step (SSL):"
-echo "  apt-get install -y certbot python3-certbot-nginx"
-echo "  certbot --nginx -d ${DOMAIN}"
+echo "SSL is automatic with Caddy. Just ensure DNS points to this server."
+echo "Caddy will obtain and renew Let's Encrypt certificates automatically."

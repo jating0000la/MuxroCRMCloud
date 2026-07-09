@@ -17,8 +17,8 @@ export class BulkImportController {
 
   @Post('csv')
   @Roles('ADMIN')
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiOperation({ summary: 'Import leads from CSV file' })
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @ApiOperation({ summary: 'Import leads from CSV file (max 5MB)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {

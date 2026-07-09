@@ -17,7 +17,7 @@ import { CreateSettingDto, UpdateSettingDto, SettingResponseDto } from './dto/se
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
-@Controller('api/settings')
+@Controller('settings')
 @UseGuards(JwtAuthGuard)
 export class SettingsController {
   constructor(private settingsService: SettingsService) {}

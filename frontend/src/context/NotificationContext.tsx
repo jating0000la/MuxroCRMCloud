@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { notificationService, type Notification } from '../services/notifications';
+import toast from 'react-hot-toast';
 
 interface NotificationContextType {
   notifications: Notification[];
@@ -18,11 +19,39 @@ const NotificationContext = createContext<NotificationContextType | undefined>(
   undefined,
 );
 
+/** Singleton AudioContext — reused across all plays, resumed on user interaction */
+let audioCtx: AudioContext | null = null;
+let audioListenersAttached = false;
+
+function getAudioContext(): AudioContext | null {
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended' && !audioListenersAttached) {
+      audioListenersAttached = true;
+      const resume = () => {
+        audioCtx?.resume();
+        document.removeEventListener('click', resume);
+        document.removeEventListener('keydown', resume);
+        audioListenersAttached = false;
+      };
+      document.addEventListener('click', resume, { once: true });
+      document.addEventListener('keydown', resume, { once: true });
+    }
+    return audioCtx;
+  } catch {
+    return null;
+  }
+}
+
 /** Play an alert beep using Web Audio API — no external file needed */
 function playAlertSound(type: 'overdue' | 'today' | 'other' = 'other') {
+  const ctx = getAudioContext();
+  if (!ctx) return;
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const frequencies = type === 'overdue' ? [880, 660, 880] : type === 'today' ? [660, 880] : [550];
+    const frequencies = type === 'overdue' ? [880, 660, 880, 1100] : type === 'today' ? [660, 880] : [550];
+    const durations = type === 'overdue' ? [0.2, 0.2, 0.2, 0.3] : [0.3, 0.3];
     let time = ctx.currentTime;
     frequencies.forEach((freq, i) => {
       const osc = ctx.createOscillator();
@@ -31,11 +60,11 @@ function playAlertSound(type: 'overdue' | 'today' | 'other' = 'other') {
       gain.connect(ctx.destination);
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, time);
-      gain.gain.setValueAtTime(0.4, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
+      gain.gain.setValueAtTime(type === 'overdue' ? 0.5 : 0.4, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + durations[i]);
       osc.start(time);
-      osc.stop(time + 0.3);
-      time += 0.35;
+      osc.stop(time + durations[i]);
+      time += durations[i] + 0.05;
     });
   } catch {
     // Audio not supported — fail silently
@@ -104,6 +133,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             .map((n) => n.followup?.lead?.name || 'Lead')
             .join(', ')
         );
+        const names = newOnes.filter((n) => n.type === 'overdue')
+          .slice(0, 3)
+          .map((n) => n.followup?.lead?.name || 'Lead')
+          .join(', ');
+        toast.error(
+          `${overdueCount} Overdue Followup${overdueCount > 1 ? 's' : ''}!${names ? ' — ' + names : ''}`,
+          { duration: 8000, icon: '🔴' }
+        );
       } else if (todayCount > 0) {
         showBrowserNotification(
           `⏰ ${todayCount} Followup${todayCount > 1 ? 's' : ''} Due Today`,
@@ -111,6 +148,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             .slice(0, 3)
             .map((n) => n.followup?.lead?.name || 'Lead')
             .join(', ')
+        );
+        const names = newOnes.filter((n) => n.type === 'today')
+          .slice(0, 3)
+          .map((n) => n.followup?.lead?.name || 'Lead')
+          .join(', ');
+        toast(
+          `${todayCount} Followup${todayCount > 1 ? 's' : ''} Due Today${names ? ' — ' + names : ''}`,
+          { duration: 6000, icon: '⏰' }
         );
       }
     }
@@ -202,11 +247,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     initializeSync();
   }, [user]);
 
-  // Poll every 30 seconds while logged in
+  // Poll every 10 seconds while logged in
   useEffect(() => {
     if (!user || !hasInitialized) return;
 
-    const interval = setInterval(syncNotifications, 30 * 1000);
+    const interval = setInterval(syncNotifications, 10 * 1000);
     return () => clearInterval(interval);
   }, [user, hasInitialized, soundEnabled]);
 

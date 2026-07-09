@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { formService } from '../../services/forms';
 import { Form, FormField } from '../../types';
+import { readBranding } from '../../utils/branding';
 import toast from 'react-hot-toast';
 
 type FormDesignTheme = 'ocean' | 'sunset' | 'forest' | 'royal';
@@ -47,6 +48,7 @@ export default function PublicFormPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const branding = readBranding();
 
   useEffect(() => {
     loadForm();
@@ -476,8 +478,12 @@ export default function PublicFormPage() {
       <div className={`mx-auto ${design.layout === 'split' ? 'max-w-5xl grid grid-cols-1 lg:grid-cols-5 gap-6' : 'max-w-lg'}`}>
         {design.layout === 'split' && (
           <aside className={`lg:col-span-2 ${radiusClass} border ${activeTheme.card} p-6 shadow-lg h-fit`}>
-            <div className={`w-12 h-12 bg-gradient-to-br ${activeTheme.accent} rounded-xl flex items-center justify-center mb-4 shadow-md`} style={accentStyle}>
-              <span className="text-xl font-bold text-white">C</span>
+            <div className={`w-12 h-12 bg-gradient-to-br ${activeTheme.accent} rounded-xl flex items-center justify-center mb-4 shadow-md overflow-hidden`} style={accentStyle}>
+              {branding.appLogoUrl ? (
+                <img src={branding.appLogoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+              ) : (
+                <span className="text-xl font-bold text-white">{(branding.appName || 'C').charAt(0).toUpperCase()}</span>
+              )}
             </div>
             <h2 className={`text-2xl font-bold ${activeTheme.title}`}>{form?.title}</h2>
             <p className={`mt-2 text-sm ${activeTheme.muted}`}>{description || 'Please share your details. Our team will contact you soon.'}</p>
@@ -492,8 +498,12 @@ export default function PublicFormPage() {
         <div className={design.layout === 'split' ? 'lg:col-span-3' : ''}>
         {/* Header */}
         <div className="text-center mb-8">
-          <div className={`w-12 h-12 bg-gradient-to-br ${activeTheme.accent} rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg`} style={accentStyle}>
-            <span className="text-xl font-bold text-white">C</span>
+          <div className={`w-12 h-12 bg-gradient-to-br ${activeTheme.accent} rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg overflow-hidden`} style={accentStyle}>
+            {branding.appLogoUrl ? (
+              <img src={branding.appLogoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+            ) : (
+              <span className="text-xl font-bold text-white">{(branding.appName || 'C').charAt(0).toUpperCase()}</span>
+            )}
           </div>
           <h1 className={`text-2xl font-bold ${activeTheme.title}`}>{form?.title}</h1>
           {description && <p className={`mt-2 text-sm ${activeTheme.muted}`}>{description}</p>}
