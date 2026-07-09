@@ -69,12 +69,12 @@ export const CreateLeadSchema = z.object({
     .optional()
     .or(z.literal('')),
   source: z.enum(['bulk', 'form', 'manual', 'indiamart']).default('manual'),
-  customData: z.record(z.any()).optional().default({}),
+  customData: z.record(z.string(), z.any()).optional().default({}),
 });
 
 // Form submission validation
 export const FormSubmissionSchema = z.object({
-  data: z.record(z.any()),
+  data: z.record(z.string(), z.any()),
   ipAddress: z.string().optional(),
 });
 
