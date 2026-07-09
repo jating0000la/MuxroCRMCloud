@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
+import { ExtractJwt, Strategy, StrategyOptionsWithRequest } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { TokenBlacklistService } from '../services/token-blacklist.service';
 
@@ -11,7 +11,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly tokenBlacklist: TokenBlacklistService,
   ) {
     super({
-      // ✅ FIXED: Extract from both Bearer token AND httpOnly cookie
       jwtFromRequest: (req) => {
         let token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
         if (!token && req.cookies) {
@@ -22,7 +21,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_SECRET'),
       passReqToCallback: true,
-    });
+    } as StrategyOptionsWithRequest);
   }
 
   async validate(req: any, payload: any) {
