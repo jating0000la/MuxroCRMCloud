@@ -114,33 +114,17 @@ sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};"
 ok "Database configured"
 
-step "Repair PostgreSQL ownership and grants for Prisma migrations"
-sudo -u postgres psql -d "$DB_NAME" <<EOF
+step "Repair database schema ownership for Prisma migrations"
+sudo -u postgres psql -d "${DB_NAME}" <<PSQL_EOF
 ALTER SCHEMA public OWNER TO ${DB_USER};
+GRANT USAGE ON SCHEMA public TO ${DB_USER};
 GRANT USAGE, CREATE ON SCHEMA public TO ${DB_USER};
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${DB_USER};
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${DB_USER};
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${DB_USER};
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${DB_USER};
-DO \$\$
-DECLARE r record;
-BEGIN
-  FOR r IN
-    SELECT tablename FROM pg_tables WHERE schemaname = 'public'
-  LOOP
-    EXECUTE format('ALTER TABLE public.%I OWNER TO %I', r.tablename, '${DB_USER}');
-    EXECUTE format('GRANT ALL PRIVILEGES ON TABLE public.%I TO %I', r.tablename, '${DB_USER}');
-  END LOOP;
-
-  FOR r IN
-    SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'
-  LOOP
-    EXECUTE format('ALTER SEQUENCE public.%I OWNER TO %I', r.sequence_name, '${DB_USER}');
-    EXECUTE format('GRANT ALL PRIVILEGES ON SEQUENCE public.%I TO %I', r.sequence_name, '${DB_USER}');
-  END LOOP;
-END \$\$;
-EOF
-ok "PostgreSQL ownership and grants repaired"
+PSQL_EOF
+ok "Database schema ownership repaired"
 
 step "Create production environment files"
 cat > "$APP_DIR/.env" <<EOF

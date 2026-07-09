@@ -1,5 +1,5 @@
 {
-    email {$ACME_EMAIL}
+    email {$ACME_EMAIL:admin@muxrocrm.com}
 }
 
 {$DOMAIN:muxrocrm.com}, www.{$DOMAIN:muxrocrm.com} {
