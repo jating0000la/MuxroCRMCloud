@@ -52,11 +52,8 @@ export default function SettingsPage() {
   const [gupshupAppId, setGupshupAppId] = useState('');
   const [gupshupTestPhone, setGupshupTestPhone] = useState('');
   const [gupshupWebhookUrl, setGupshupWebhookUrl] = useState('');
-  const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
-  const [autoReplyMessage, setAutoReplyMessage] = useState('Thank you for reaching out! We will get back to you shortly.');
-  const [formGreetingEnabled, setFormGreetingEnabled] = useState(true);
-  const [formGreetingMessage, setFormGreetingMessage] = useState('Thank you for your inquiry! Our team will contact you within 24 hours.');
-  const [formGreetingTemplateId, setFormGreetingTemplateId] = useState('');
+
+
 
   // UI state
   const [saving, setSaving] = useState(false);
@@ -121,12 +118,7 @@ export default function SettingsPage() {
           case 'gupshupAppId': setGupshupAppId(setting.value); break;
           case 'gupshupTestPhone': setGupshupTestPhone(setting.value); break;
           case 'gupshupWebhookUrl': setGupshupWebhookUrl(setting.value); break;
-          case 'autoReplyEnabled': setAutoReplyEnabled(setting.value === 'true'); break;
-          case 'autoReplyMessage': setAutoReplyMessage(setting.value); break;
-          case 'formGreetingEnabled': setFormGreetingEnabled(setting.value !== 'false'); break;
-          case 'formGreetingMessage': setFormGreetingMessage(setting.value); break;
-          case 'formGreetingTemplateId': setFormGreetingTemplateId(setting.value); break;
-          case 'welcomeTemplateId': if (!formGreetingTemplateId) setFormGreetingTemplateId(setting.value); break;
+
         }
       });
       try {
@@ -218,11 +210,6 @@ export default function SettingsPage() {
         { key: 'gupshupAppId', value: gupshupAppId },
         { key: 'gupshupTestPhone', value: gupshupTestPhone },
         { key: 'gupshupWebhookUrl', value: gupshupWebhookUrl },
-        { key: 'autoReplyEnabled', value: String(autoReplyEnabled) },
-        { key: 'autoReplyMessage', value: autoReplyMessage },
-        { key: 'formGreetingEnabled', value: String(formGreetingEnabled) },
-        { key: 'formGreetingMessage', value: formGreetingMessage },
-        { key: 'formGreetingTemplateId', value: formGreetingTemplateId },
       ]);
       toast.success('Communication settings saved');
     } catch (error: any) {
@@ -517,7 +504,7 @@ export default function SettingsPage() {
               <div className="space-y-8">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Communication Setup</h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Configure WhatsApp messaging, auto-replies, and form greetings</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Configure WhatsApp messaging settings</p>
                 </div>
 
                 {/* Gupshup WhatsApp Setup */}
@@ -568,78 +555,6 @@ export default function SettingsPage() {
                   <button onClick={handleTestGupshup} disabled={testingGupshup || !gupshupApiKey || !gupshupSource || !gupshupAppName || !gupshupTestPhone} className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium">
                     {testingGupshup ? <><svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Testing...</> : 'Test Connection'}
                   </button>
-                </div>
-
-                {/* Message Templates */}
-                <div className="p-5 border border-gray-200 rounded-xl dark:border-gray-600 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-indigo-50 rounded-lg flex items-center justify-center dark:bg-indigo-900/30">
-                      <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">Greeting Template</h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Approved Gupshup template used only after form submission</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className={labelCls}>Form Greeting Template ID</label>
-                      <input type="text" value={formGreetingTemplateId} onChange={(e) => setFormGreetingTemplateId(e.target.value)} className={inputCls} placeholder="c6aecef6-bcb0-4fb1-8100-28c094e3bc6b" />
-                      <p className={hintCls}>Used for the single WhatsApp greeting sent after a public form submission</p>
-                    </div>
-                    <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-4 text-sm text-gray-500 dark:text-gray-400">
-                      Manual WhatsApp sends and follow-up templates are not part of the supported CRM flow anymore. Keep this integration limited to post-form greeting only.
-                    </div>
-                  </div>
-                </div>
-
-                {/* Auto-Reply */}
-                <div className="p-5 border border-gray-200 rounded-xl dark:border-gray-600 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-amber-50 rounded-lg flex items-center justify-center dark:bg-amber-900/30">
-                        <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Auto-Reply</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Automatically reply to incoming WhatsApp messages</p>
-                      </div>
-                    </div>
-                    <button type="button" onClick={() => setAutoReplyEnabled(!autoReplyEnabled)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${autoReplyEnabled ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoReplyEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                  </div>
-                  {autoReplyEnabled && (
-                    <div>
-                      <label className={labelCls}>Auto-Reply Message</label>
-                      <textarea value={autoReplyMessage} onChange={(e) => setAutoReplyMessage(e.target.value)} rows={3} className={inputCls + ' resize-none'} placeholder="Thank you for reaching out..." />
-                    </div>
-                  )}
-                </div>
-
-                {/* Form Submission Greeting */}
-                <div className="p-5 border border-gray-200 rounded-xl dark:border-gray-600 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-cyan-50 rounded-lg flex items-center justify-center dark:bg-cyan-900/30">
-                        <svg className="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Form Submission Greeting</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">WhatsApp message sent after a lead submits a form</p>
-                      </div>
-                    </div>
-                    <button type="button" onClick={() => setFormGreetingEnabled(!formGreetingEnabled)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formGreetingEnabled ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formGreetingEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                  </div>
-                  {formGreetingEnabled && (
-                    <div>
-                      <label className={labelCls}>Greeting Message</label>
-                      <textarea value={formGreetingMessage} onChange={(e) => setFormGreetingMessage(e.target.value)} rows={3} className={inputCls + ' resize-none'} placeholder="Thank you for your inquiry..." />
-                      <p className={hintCls}>This message is sent via WhatsApp when a public form is submitted</p>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
