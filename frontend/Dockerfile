@@ -6,7 +6,7 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN npm run build
+RUN npx vite build
 
 # Production stage - use serve for static files
 FROM node:18-alpine
