@@ -26,6 +26,7 @@ COPY --from=builder /app/drizzle.config.ts ./
 COPY --from=builder /app/src/db ./src/db
 
 RUN npm prune --production
+RUN npm install drizzle-kit@0.31.10 --save-dev
 RUN chown -R appuser:appgroup /app
 
 USER appuser
