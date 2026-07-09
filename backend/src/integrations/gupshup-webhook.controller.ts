@@ -1,4 +1,5 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, Logger, Query, Req, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { timingSafeEqual } from 'crypto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
 import { eq, and, desc, like } from 'drizzle-orm';
@@ -128,7 +129,13 @@ export class GupshupWebhookController {
     }
 
     const providedSecret = (queryToken || headerToken || '').trim();
-    if (providedSecret !== configuredSecret) {
+    // Timing-safe comparison to prevent timing-based secret enumeration
+    const providedBuf = Buffer.from(providedSecret);
+    const expectedBuf = Buffer.from(configuredSecret);
+    const secretsMatch =
+      providedBuf.length === expectedBuf.length &&
+      timingSafeEqual(providedBuf, expectedBuf);
+    if (!secretsMatch) {
       this.logger.warn('Rejected Gupshup webhook with invalid secret');
       throw new UnauthorizedException('Invalid webhook token');
     }

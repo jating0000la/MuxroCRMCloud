@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { eq, and, ne, desc, asc, sql } from 'drizzle-orm';
+import { eq, and, ne, desc, asc, sql, inArray } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
 import { leads, followups, campaignStatuses, campaignUsers, users } from '../db/schema';
 import { parse } from 'csv-parse/sync';
@@ -52,8 +52,8 @@ export class BulkImportService {
       .orderBy(asc(campaignStatuses.order))
       .limit(1);
 
-    // Batch insert
-    await this.database.db.insert(leads).values(
+    // Batch insert — use .returning() to get only the newly inserted lead IDs
+    const newLeads = await this.database.db.insert(leads).values(
       validatedRecords.map((record) => ({
         campaignId,
         name: record.name,
@@ -63,27 +63,20 @@ export class BulkImportService {
         customData: record.customData,
         statusId: firstStatus?.id || null,
       })),
-    );
+    ).returning();
 
-    // Fetch all leads for this campaign
-    const leadsList = await this.database.db
-      .select()
-      .from(leads)
-      .where(and(eq(leads.campaignId, campaignId), eq(leads.source, 'bulk')))
-      .orderBy(asc(leads.createdAt));
-
-    if (allocateRoundRobin && leadsList.length > 0) {
-      await this.allocateRoundRobin(campaignId, leadsList.map((l) => l.id));
+    if (allocateRoundRobin && newLeads.length > 0) {
+      await this.allocateRoundRobin(campaignId, newLeads.map((l) => l.id));
     }
 
-    // Re-fetch leads to get updated doerId after allocation
-    const leadIds = leadsList.map((l) => l.id);
+    // Re-fetch new leads to get updated doerId after allocation
+    const newLeadIds = newLeads.map((l) => l.id);
     const updatedLeads = await this.database.db
       .select()
       .from(leads)
-      .where(sql`${leads.id} IN ${leadIds}`);
+      .where(inArray(leads.id, newLeadIds));
 
-    // Batch create followups
+    // Batch create followups for newly imported leads only
     const statusLabel = firstStatus?.label || 'New';
     const followupData = updatedLeads
       .filter((lead) => lead.doerId)
@@ -99,7 +92,7 @@ export class BulkImportService {
     }
 
     return {
-      imported: leadsList.length,
+      imported: newLeads.length,
       total: validatedRecords.length,
       leads: updatedLeads,
     };
@@ -133,8 +126,8 @@ export class BulkImportService {
       .orderBy(asc(campaignStatuses.order))
       .limit(1);
 
-    // Batch insert
-    await this.database.db.insert(leads).values(
+    // Batch insert — use .returning() to get only the newly inserted lead IDs
+    const newLeads = await this.database.db.insert(leads).values(
       validatedRecords.map((record) => ({
         campaignId,
         name: record.name,
@@ -144,23 +137,17 @@ export class BulkImportService {
         customData: record.customData,
         statusId: firstStatus?.id || null,
       })),
-    );
+    ).returning();
 
-    const leadsList = await this.database.db
-      .select()
-      .from(leads)
-      .where(and(eq(leads.campaignId, campaignId), eq(leads.source, 'bulk')))
-      .orderBy(asc(leads.createdAt));
-
-    if (allocateRoundRobin && leadsList.length > 0) {
-      await this.allocateRoundRobin(campaignId, leadsList.map((l) => l.id));
+    if (allocateRoundRobin && newLeads.length > 0) {
+      await this.allocateRoundRobin(campaignId, newLeads.map((l) => l.id));
     }
 
-    const leadIds = leadsList.map((l) => l.id);
+    const newLeadIds = newLeads.map((l) => l.id);
     const updatedLeads = await this.database.db
       .select()
       .from(leads)
-      .where(sql`${leads.id} IN ${leadIds}`);
+      .where(inArray(leads.id, newLeadIds));
 
     const statusLabel = firstStatus?.label || 'New';
     const followupData = updatedLeads
@@ -177,7 +164,7 @@ export class BulkImportService {
     }
 
     return {
-      imported: leadsList.length,
+      imported: newLeads.length,
       total: data.length,
       leads: updatedLeads,
     };

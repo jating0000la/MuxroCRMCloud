@@ -29,6 +29,7 @@ export class LeadsController {
       campaignId,
       req.user.id,
       req.user.role,
+      paginationDto,
     );
   }
 
@@ -38,7 +39,7 @@ export class LeadsController {
     @Query() paginationDto: PaginationDto,
     @Request() req,
   ) {
-    return this.leadsService.findDnd(req.user.id, req.user.role);
+    return this.leadsService.findDnd(req.user.id, req.user.role, paginationDto);
   }
 
   @Get('stats/:campaignId')

@@ -3,6 +3,7 @@ import {
   Get,
   Patch,
   Param,
+  Query,
   UseGuards,
   Request,
 } from '@nestjs/common';
@@ -32,8 +33,8 @@ export class NotificationsController {
 
   @Get()
   @ApiOperation({ summary: 'Get all notifications for user' })
-  async getNotifications(@Request() req) {
-    return this.notificationsService.getNotifications(req.user.id);
+  async getNotifications(@Request() req, @Query('limit') limit?: string) {
+    return this.notificationsService.getNotifications(req.user.id, limit ? parseInt(limit, 10) : 20);
   }
 
   @Patch(':id/read')

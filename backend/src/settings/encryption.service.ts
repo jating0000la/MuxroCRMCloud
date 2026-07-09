@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
 
 @Injectable()
 export class EncryptionService {
+  private readonly logger = new Logger(EncryptionService.name);
   private readonly algorithm = 'aes-256-gcm';
   private readonly encryptionKey: Buffer;
   private readonly encryptionSalt: string;
@@ -46,7 +47,7 @@ export class EncryptionService {
       const combined = iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
       return combined;
     } catch (error) {
-      console.error('Encryption error:', error);
+      this.logger.error('Encryption error', error);
       throw new Error('Failed to encrypt data');
     }
   }
@@ -70,7 +71,7 @@ export class EncryptionService {
       
       return decrypted;
     } catch (error) {
-      console.error('Decryption error:', error);
+      this.logger.error('Decryption error', error);
       throw new Error('Failed to decrypt data');
     }
   }

@@ -146,8 +146,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 

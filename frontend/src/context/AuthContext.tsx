@@ -5,7 +5,7 @@ import { authService } from '../services/auth';
 interface AuthContextType {
   user: User | null;
   login: (username: string, password: string, remember?: boolean) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -42,7 +42,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await authService.logout(); // Revoke token on backend + clear httpOnly cookie
+    } catch {
+      // Best-effort: clear local state regardless of network errors
+    }
     clearStoredAuth();
     setUser(null);
   };

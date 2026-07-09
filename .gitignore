@@ -11,3 +11,7 @@ backend/.env
 frontend/.env
 nginx/ssl/
 postgres_data/
+*.tsbuildinfo
+*.js.map
+drizzle.config.js
+drizzle.config.d.ts

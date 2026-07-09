@@ -7,8 +7,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { IsString, MinLength } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 class ResetPasswordDto {
+  @ApiProperty({ example: 'newPassword123', minLength: 6 })
   @IsString()
   @MinLength(6)
   password: string;

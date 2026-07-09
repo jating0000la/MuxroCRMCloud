@@ -16,9 +16,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     const databaseUrl = this.configService.get<string>('DATABASE_URL');
     this.pool = new Pool({
       connectionString: databaseUrl,
-      max: 20,
+      max: 5,                         // Safe for 512MB VPS; raise only with Redis-backed sessions
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
+      options: '-c statement_timeout=30000', // Apply 30s timeout to ALL pool connections
     });
 
     this.db = drizzle(this.pool, { schema });
@@ -26,8 +27,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     // Test connection
     const client = await this.pool.connect();
     try {
-      await client.query('SET statement_timeout TO 30000');
-      this.logger.log('Database connected. Query timeout: 30s');
+      const { rows } = await client.query('SHOW statement_timeout');
+      this.logger.log(`Database connected. statement_timeout=${rows[0]?.statement_timeout ?? '?'}`);
     } finally {
       client.release();
     }

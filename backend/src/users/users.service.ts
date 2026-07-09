@@ -21,7 +21,8 @@ export class UsersService {
         isActive: users.isActive,
         createdAt: users.createdAt,
       })
-      .from(users);
+      .from(users)
+      .limit(1000); // Safety cap — users list is admin-only and never huge
   }
 
   async findOne(id: string) {

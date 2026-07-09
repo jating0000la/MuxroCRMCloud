@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
 import { eq, desc } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
 import { settings, settingAuditLogs } from '../db/schema';
@@ -7,6 +7,7 @@ import { CreateSettingDto, UpdateSettingDto, SettingResponseDto } from './dto/se
 
 @Injectable()
 export class SettingsService {
+  private readonly logger = new Logger(SettingsService.name);
   constructor(
     private database: DatabaseService,
     private encryption: EncryptionService,
@@ -32,7 +33,7 @@ export class SettingsService {
       try {
         decryptedValue = this.encryption.decrypt(setting.encryptedValue);
       } catch (error) {
-        console.error(`Failed to decrypt setting ${key}:`, error);
+        this.logger.error(`Failed to decrypt setting ${key}`, error);
         decryptedValue = '';
       }
     }
@@ -59,7 +60,7 @@ export class SettingsService {
         try {
           decryptedValue = this.encryption.decrypt(setting.encryptedValue);
         } catch (error) {
-          console.error(`Failed to decrypt setting ${setting.key}:`, error);
+          this.logger.error(`Failed to decrypt setting ${setting.key}`, error);
           decryptedValue = '';
         }
       }
@@ -184,7 +185,7 @@ export class SettingsService {
       try {
         decryptedValue = this.encryption.decrypt(setting.encryptedValue);
       } catch (error) {
-        console.error(`Failed to decrypt setting ${key}:`, error);
+        this.logger.error(`Failed to decrypt setting ${key}`, error);
         throw new Error(`Failed to retrieve setting ${key}`);
       }
     }

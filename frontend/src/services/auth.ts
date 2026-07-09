@@ -7,6 +7,10 @@ export const authService = {
     return data;
   },
 
+  logout: async (): Promise<void> => {
+    await api.post('/auth/logout');
+  },
+
   getProfile: async (): Promise<User> => {
     const { data } = await api.get('/auth/profile');
     return data;
