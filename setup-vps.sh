@@ -183,22 +183,52 @@ EOF
 chmod 600 "$SECRETS_FILE"
 ok "Environment files created"
 
+step "Verify database connectivity before build"
+echo "[INFO] Testing database connection with credentials..."
+DB_CONN_TEST=$(PGPASSWORD="${DB_PASS}" psql -h 127.0.0.1 -U "${DB_USER}" -d "${DB_NAME}" -c "SELECT 1" 2>&1 || true)
+if echo "$DB_CONN_TEST" | grep -q "^\s*1\s*$"; then
+  echo "[OK] Database connection successful"
+else
+  echo "[WARN] Initial connection test failed. PostgreSQL may need more time to start."
+  echo "[INFO] Waiting 5 seconds and retrying..."
+  sleep 5
+  if ! PGPASSWORD="${DB_PASS}" psql -h 127.0.0.1 -U "${DB_USER}" -d "${DB_NAME}" -c "SELECT 1" >/dev/null 2>&1; then
+    echo "❌ Database connection failed after retry"
+    echo "[DEBUG] Credentials: user=${DB_USER}, db=${DB_NAME}, host=127.0.0.1"
+    exit 1
+  fi
+  echo "[OK] Database connection successful after retry"
+fi
+
 step "Install and build backend"
 cd "$APP_DIR/backend"
 export DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@127.0.0.1:5432/${DB_NAME}?schema=public"
+echo "[INFO] Installing dependencies with npm ci..."
 npm ci --prefer-offline --no-audit 2>&1 | tail -20 || { echo "❌ npm ci failed"; exit 1; }
 echo "[INFO] Waiting 2 seconds for PostgreSQL to stabilize..."
 sleep 2
 echo "[INFO] Generating Prisma client..."
-npx prisma generate 2>&1 || { echo "❌ Prisma generate failed. Skipping for now."; }
+if npx prisma generate 2>&1; then
+  echo "[OK] Prisma client generated"
+else
+  echo "❌ Prisma generate failed"
+  exit 1
+fi
 echo "[INFO] Running Prisma migrations..."
-npx prisma migrate deploy 2>&1 || { echo "⚠️  Prisma migrate had issues. Continuing anyway."; }
+if npx prisma migrate deploy 2>&1; then
+  echo "[OK] Prisma migrations completed"
+else
+  echo "❌ Prisma migrate failed"
+  echo "[DEBUG] Check database permissions with: sudo -u postgres psql -d ${DB_NAME} -c '\\dt'"
+  exit 1
+fi
 echo "[INFO] Building NestJS application..."
 npm run build 2>&1 || { echo "❌ Build failed"; exit 1; }
 if [ ! -f dist/main.js ]; then
   echo "❌ dist/main.js not found after build"
   exit 1
 fi
+echo "[OK] Backend build successful"
 ok "Backend ready"
 
 step "Install and build frontend"
