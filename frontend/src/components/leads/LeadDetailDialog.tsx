@@ -85,7 +85,7 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
         status: selectedStatus?.label || 'Updated',
         statusId,
         remarks: remarks || undefined,
-        nextCallDate: nextCallDate || undefined,
+        nextCallDate: nextCallDate ? new Date(nextCallDate).toISOString() : undefined,
         dnd,
       });
 

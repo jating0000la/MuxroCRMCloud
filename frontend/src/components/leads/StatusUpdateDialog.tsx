@@ -55,7 +55,7 @@ export default function StatusUpdateDialog({ lead, statuses, onClose, onUpdate }
         status: selectedStatus?.label || 'Updated',
         statusId: statusId || undefined,
         remarks: remarks || undefined,
-        nextCallDate: nextCallDate || undefined,
+        nextCallDate: nextCallDate ? new Date(nextCallDate).toISOString() : undefined,
       });
       toast.success('Status updated successfully');
       onUpdate();
