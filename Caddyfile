@@ -2,7 +2,12 @@
     email {$ACME_EMAIL}
 }
 
-{$DOMAIN:localhost} {
+{$DOMAIN:muxrocrm.com}, www.{$DOMAIN:muxrocrm.com} {
+    @www host www.{$DOMAIN:muxrocrm.com}
+    redir @www https://{$DOMAIN:muxrocrm.com}{uri} 308
+
+    encode zstd gzip
+
     # API proxy
     handle /api/* {
         reverse_proxy backend:3000 {
@@ -10,6 +15,13 @@
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
         }
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
     }
 
     # Frontend (static files)
