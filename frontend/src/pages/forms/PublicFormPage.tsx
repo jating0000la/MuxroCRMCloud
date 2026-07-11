@@ -39,6 +39,44 @@ const extractPublicFormConfig = (allFields: FormField[]) => {
   return { fields, design, description };
 };
 
+const LogoImage = ({ src, alt, size = 48 }: { src: string; alt: string; size?: number }) => {
+  const [fitClass, setFitClass] = useState('object-contain');
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
+
+  const handleLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    setNaturalSize({ w, h });
+    const ratio = w / h;
+    if (ratio > 2) setFitClass('object-contain w-[80%]');
+    else if (ratio > 1.3) setFitClass('object-contain w-[70%]');
+    else if (ratio < 0.5) setFitClass('object-contain h-[80%]');
+    else if (ratio < 0.75) setFitClass('object-contain h-[70%]');
+    else setFitClass('object-contain');
+  }, []);
+
+  const containerStyle: React.CSSProperties = naturalSize
+    ? (() => {
+        const ratio = naturalSize.w / naturalSize.h;
+        if (ratio > 1.8) return { width: size * 1.6, height: size * 0.7, borderRadius: 8 };
+        if (ratio > 1.3) return { width: size * 1.3, height: size * 0.85, borderRadius: 8 };
+        if (ratio < 0.55) return { width: size * 0.7, height: size * 1.3, borderRadius: 8 };
+        if (ratio < 0.75) return { width: size * 0.85, height: size * 1.1, borderRadius: 8 };
+        return { width: size, height: size, borderRadius: 8 };
+      })()
+    : { width: size, height: size, borderRadius: 8 };
+
+  return (
+    <div
+      className="flex items-center justify-center overflow-hidden bg-white/20"
+      style={containerStyle}
+    >
+      <img src={src} alt={alt} onLoad={handleLoad} className={`${fitClass} max-h-full`} />
+    </div>
+  );
+};
+
 export default function PublicFormPage() {
   const { slug } = useParams<{ slug: string }>();
   const [form, setForm] = useState<Form | null>(null);
@@ -114,10 +152,10 @@ export default function PublicFormPage() {
 
   if (loading) {
     return (
-      <div className="sleek-page min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600 mx-auto" />
-          <p className="mt-4 text-gray-500 dark:text-gray-400">Loading form...</p>
+          <p className="mt-4 text-gray-500">Loading form...</p>
         </div>
       </div>
     );
@@ -125,15 +163,15 @@ export default function PublicFormPage() {
 
   if (error) {
     return (
-      <div className="sleek-page min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Form Not Available</h1>
-          <p className="text-gray-500 dark:text-gray-400">{error}</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Form Not Available</h1>
+          <p className="text-gray-500">{error}</p>
         </div>
       </div>
     );
@@ -141,16 +179,16 @@ export default function PublicFormPage() {
 
   if (submitted) {
     return (
-      <div className="sleek-page min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
         <div className="max-w-md w-full text-center">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-            <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+          <div className="bg-white rounded-2xl shadow-xl p-8">
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Thank You!</h1>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h1>
+            <p className="text-gray-500 mb-6">
               Your submission has been received successfully. We will get back to you soon.
             </p>
             <button
@@ -176,28 +214,28 @@ export default function PublicFormPage() {
   const themeClasses: Record<FormDesignTheme, { page: string; card: string; accent: string; title: string; muted: string }> = {
     ocean: {
       page: 'from-sky-100 via-cyan-50 to-blue-100',
-      card: 'border-cyan-200 bg-white/95',
+      card: 'border-cyan-200 bg-white',
       accent: 'from-sky-600 to-cyan-500',
       title: 'text-slate-900',
       muted: 'text-slate-600',
     },
     sunset: {
       page: 'from-rose-100 via-orange-50 to-amber-100',
-      card: 'border-rose-200 bg-white/95',
+      card: 'border-rose-200 bg-white',
       accent: 'from-rose-600 to-orange-500',
       title: 'text-slate-900',
       muted: 'text-slate-600',
     },
     forest: {
       page: 'from-emerald-100 via-lime-50 to-teal-100',
-      card: 'border-emerald-200 bg-white/95',
+      card: 'border-emerald-200 bg-white',
       accent: 'from-emerald-600 to-lime-500',
       title: 'text-slate-900',
       muted: 'text-slate-600',
     },
     royal: {
       page: 'from-indigo-100 via-fuchsia-50 to-violet-100',
-      card: 'border-indigo-200 bg-white/95',
+      card: 'border-indigo-200 bg-white',
       accent: 'from-indigo-600 to-fuchsia-500',
       title: 'text-slate-900',
       muted: 'text-slate-600',
@@ -239,7 +277,7 @@ export default function PublicFormPage() {
             value={formData[field.name] || ''}
             onChange={(e) => handleChange(field.name, e.target.value)}
             className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors ${
-              hasError ? 'border-red-300 dark:border-red-700' : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
+              hasError ? 'border-red-300' : 'border-gray-300 bg-white text-gray-900'
             }`}
             rows={4}
             placeholder={`Enter ${field.label.toLowerCase()}`}
@@ -252,7 +290,7 @@ export default function PublicFormPage() {
             value={formData[field.name] || ''}
             onChange={(e) => handleChange(field.name, e.target.value)}
             className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors ${
-              hasError ? 'border-red-300 dark:border-red-700' : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
+              hasError ? 'border-red-300' : 'border-gray-300 bg-white text-gray-900'
             }`}
           >
             <option value="">Select {field.label.toLowerCase()}...</option>
@@ -266,7 +304,7 @@ export default function PublicFormPage() {
         return (
           <div className="space-y-2">
             {field.options?.map((opt) => (
-              <label key={opt} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700 transition-colors">
+              <label key={opt} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
                 <input
                   type="radio"
                   name={field.name}
@@ -275,7 +313,7 @@ export default function PublicFormPage() {
                   onChange={(e) => handleChange(field.name, e.target.value)}
                   className="w-4 h-4 text-primary-600"
                 />
-                <span className="text-sm text-gray-700 dark:text-gray-300">{opt}</span>
+                <span className="text-sm text-gray-700">{opt}</span>
               </label>
             ))}
           </div>
@@ -285,7 +323,7 @@ export default function PublicFormPage() {
         return (
           <div className="space-y-2">
             {field.options?.map((opt) => (
-              <label key={opt} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700 transition-colors">
+              <label key={opt} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
                 <input
                   type="checkbox"
                   value={opt}
@@ -300,7 +338,7 @@ export default function PublicFormPage() {
                   }}
                   className="w-4 h-4 text-primary-600 rounded"
                 />
-                <span className="text-sm text-gray-700 dark:text-gray-300">{opt}</span>
+                <span className="text-sm text-gray-700">{opt}</span>
               </label>
             ))}
           </div>
@@ -311,7 +349,7 @@ export default function PublicFormPage() {
         const max = field.max || 5;
         return (
           <div>
-            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-2">
+            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
               <span>{min}</span>
               <span>{max}</span>
             </div>
@@ -324,7 +362,7 @@ export default function PublicFormPage() {
                   className={`flex-1 py-3 border rounded-lg font-medium transition-colors ${
                     formData[field.name] === n
                       ? 'bg-primary-600 text-white border-primary-600'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                   }`}
                 >
                   {n}
@@ -345,7 +383,7 @@ export default function PublicFormPage() {
                 type="button"
                 onClick={() => handleChange(field.name, n)}
                 className={`text-3xl transition-colors ${
-                  (formData[field.name] || 0) >= n ? 'text-yellow-400' : 'text-gray-300 dark:text-gray-600 hover:text-yellow-200'
+                  (formData[field.name] || 0) >= n ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-200'
                 }`}
               >
                 ★
@@ -363,14 +401,14 @@ export default function PublicFormPage() {
                 <tr>
                   <th className="p-2"></th>
                   {(field.columns || []).map((col) => (
-                    <th key={col} className="p-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400">{col}</th>
+                    <th key={col} className="p-2 text-center text-xs font-medium text-gray-500">{col}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {(field.rows || []).map((row) => (
-                  <tr key={row} className="border-t border-gray-100 dark:border-t dark:border-gray-700">
-                    <td className="p-2 text-sm text-gray-700 dark:text-gray-300 pr-4">{row}</td>
+                  <tr key={row} className="border-t border-gray-100">
+                    <td className="p-2 text-sm text-gray-700 pr-4">{row}</td>
                     {(field.columns || []).map((col) => (
                       <td key={col} className="p-2 text-center">
                         <input
@@ -401,14 +439,14 @@ export default function PublicFormPage() {
                 <tr>
                   <th className="p-2"></th>
                   {(field.columns || []).map((col) => (
-                    <th key={col} className="p-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400">{col}</th>
+                    <th key={col} className="p-2 text-center text-xs font-medium text-gray-500">{col}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {(field.rows || []).map((row) => (
-                  <tr key={row} className="border-t border-gray-100 dark:border-t dark:border-gray-700">
-                    <td className="p-2 text-sm text-gray-700 dark:text-gray-300 pr-4">{row}</td>
+                  <tr key={row} className="border-t border-gray-100">
+                    <td className="p-2 text-sm text-gray-700 pr-4">{row}</td>
                     {(field.columns || []).map((col) => (
                       <td key={col} className="p-2 text-center">
                         <input
@@ -441,7 +479,7 @@ export default function PublicFormPage() {
             value={formData[field.name] || ''}
             onChange={(e) => handleChange(field.name, e.target.value)}
             className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors ${
-              hasError ? 'border-red-300 dark:border-red-700' : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
+              hasError ? 'border-red-300' : 'border-gray-300 bg-white text-gray-900'
             }`}
           />
         );
@@ -453,7 +491,7 @@ export default function PublicFormPage() {
             value={formData[field.name] || ''}
             onChange={(e) => handleChange(field.name, e.target.value)}
             className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors ${
-              hasError ? 'border-red-300 dark:border-red-700' : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
+              hasError ? 'border-red-300' : 'border-gray-300 bg-white text-gray-900'
             }`}
           />
         );
@@ -465,7 +503,7 @@ export default function PublicFormPage() {
             value={formData[field.name] || ''}
             onChange={(e) => handleChange(field.name, e.target.value)}
             className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors ${
-              hasError ? 'border-red-300 dark:border-red-700' : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
+              hasError ? 'border-red-300' : 'border-gray-300 bg-white text-gray-900'
             }`}
             placeholder={`Enter ${field.label.toLowerCase()}`}
           />
@@ -474,20 +512,25 @@ export default function PublicFormPage() {
   };
 
   return (
-    <div className={`sleek-page min-h-screen bg-gradient-to-br ${activeTheme.page} py-8 px-4`}>
+    <div className={`min-h-screen bg-gradient-to-br ${activeTheme.page} py-8 px-4`}>
       <div className={`mx-auto ${design.layout === 'split' ? 'max-w-5xl grid grid-cols-1 lg:grid-cols-5 gap-6' : 'max-w-lg'}`}>
         {design.layout === 'split' && (
           <aside className={`lg:col-span-2 ${radiusClass} border ${activeTheme.card} p-6 shadow-lg h-fit`}>
-            <div className={`w-12 h-12 bg-gradient-to-br ${activeTheme.accent} rounded-xl flex items-center justify-center mb-4 shadow-md overflow-hidden`} style={accentStyle}>
+            <div className="flex items-center justify-center mb-4">
               {branding.appLogoUrl ? (
-                <img src={branding.appLogoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+                <LogoImage src={branding.appLogoUrl} alt="Logo" size={56} />
               ) : (
-                <span className="text-xl font-bold text-white">{(branding.appName || 'C').charAt(0).toUpperCase()}</span>
+                <div
+                  className={`bg-gradient-to-br ${activeTheme.accent} rounded-xl flex items-center justify-center shadow-md`}
+                  style={{ width: 48, height: 48 }}
+                >
+                  <span className="text-xl font-bold text-white">{(branding.appName || 'C').charAt(0).toUpperCase()}</span>
+                </div>
               )}
             </div>
             <h2 className={`text-2xl font-bold ${activeTheme.title}`}>{form?.title}</h2>
             <p className={`mt-2 text-sm ${activeTheme.muted}`}>{description || 'Please share your details. Our team will contact you soon.'}</p>
-            <div className="mt-6 space-y-2 text-sm text-slate-600 dark:text-gray-400">
+            <div className="mt-6 space-y-2 text-sm text-slate-600">
               <p>Fast response from our team</p>
               <p>Secure data handling</p>
               <p>Quick callback and assistance</p>
@@ -498,11 +541,16 @@ export default function PublicFormPage() {
         <div className={design.layout === 'split' ? 'lg:col-span-3' : ''}>
         {/* Header */}
         <div className="text-center mb-8">
-          <div className={`w-12 h-12 bg-gradient-to-br ${activeTheme.accent} rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg overflow-hidden`} style={accentStyle}>
+          <div className="flex items-center justify-center mb-4">
             {branding.appLogoUrl ? (
-              <img src={branding.appLogoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+              <LogoImage src={branding.appLogoUrl} alt="Logo" size={56} />
             ) : (
-              <span className="text-xl font-bold text-white">{(branding.appName || 'C').charAt(0).toUpperCase()}</span>
+              <div
+                className={`bg-gradient-to-br ${activeTheme.accent} rounded-xl flex items-center justify-center shadow-lg`}
+                style={{ width: 48, height: 48 }}
+              >
+                <span className="text-xl font-bold text-white">{(branding.appName || 'C').charAt(0).toUpperCase()}</span>
+              </div>
             )}
           </div>
           <h1 className={`text-2xl font-bold ${activeTheme.title}`}>{form?.title}</h1>
@@ -519,7 +567,7 @@ export default function PublicFormPage() {
               <span>Progress</span>
               <span>{progress}%</span>
             </div>
-            <div className="w-full bg-white/70 dark:bg-gray-700/70 rounded-full h-2 border border-white/60 dark:border-gray-600/60 overflow-hidden">
+            <div className="w-full bg-white rounded-full h-2 border border-white/60 overflow-hidden">
               <div
                 className={`bg-gradient-to-r ${activeTheme.accent} h-2 rounded-full transition-all duration-300`}
                 style={{ ...(accentStyle || {}), width: `${progress}%` }}
@@ -529,11 +577,11 @@ export default function PublicFormPage() {
         )}
 
         {/* Form */}
-        <div className={`border ${activeTheme.card} ${radiusClass} shadow-xl p-6 sm:p-8 backdrop-blur`}>
+        <div className={`border ${activeTheme.card} ${radiusClass} shadow-xl p-6 sm:p-8`}>
           <form onSubmit={handleSubmit} className="space-y-5">
             {fields.map((field, index) => (
               <div key={field.name}>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   {field.label}
                   {field.required && <span className="text-red-500 ml-1">*</span>}
                 </label>
