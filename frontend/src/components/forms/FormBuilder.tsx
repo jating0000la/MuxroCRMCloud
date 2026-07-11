@@ -279,14 +279,14 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
   const renderFieldPreview = (field: FormBuilderField) => {
     switch (field.type) {
       case 'text':
-        return <input disabled placeholder={field.placeholder || field.label} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50" />;
+        return <input disabled placeholder={field.placeholder || field.label} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100" />;
       case 'textarea':
-        return <textarea disabled placeholder={field.placeholder || field.label} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 h-20" />;
+        return <textarea disabled placeholder={field.placeholder || field.label} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 h-20" />;
       case 'radio':
         return (
           <div className="space-y-1 mt-1">
             {field.options?.map((o, i) => (
-              <label key={i} className="flex items-center gap-2 text-sm text-gray-600">
+              <label key={i} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 <input type="radio" disabled className="text-primary-600" />{o}
               </label>
             ))}
@@ -296,7 +296,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
         return (
           <div className="space-y-1 mt-1">
             {field.options?.map((o, i) => (
-              <label key={i} className="flex items-center gap-2 text-sm text-gray-600">
+              <label key={i} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 <input type="checkbox" disabled className="text-primary-600 rounded" />{o}
               </label>
             ))}
@@ -304,47 +304,47 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
         );
       case 'select':
         return (
-          <select disabled className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50">
+          <select disabled className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100">
             <option>Select...</option>
             {field.options?.map((o, i) => <option key={i}>{o}</option>)}
           </select>
         );
       case 'date':
-        return <input type="date" disabled className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50" />;
+        return <input type="date" disabled className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100" />;
       case 'time':
-        return <input type="time" disabled className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50" />;
+        return <input type="time" disabled className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100" />;
       case 'linear_scale':
         return (
           <div className="flex items-center gap-1 mt-1">
-            <span className="text-xs text-gray-400">{field.min}</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">{field.min}</span>
             {Array.from({ length: (field.max || 5) - (field.min || 1) + 1 }, (_, i) => (field.min || 1) + i).map((n) => (
-              <span key={n} className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded text-sm text-gray-500">{n}</span>
+              <span key={n} className="w-8 h-8 flex items-center justify-center border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-500 dark:text-gray-400">{n}</span>
             ))}
-            <span className="text-xs text-gray-400">{field.max}</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">{field.max}</span>
           </div>
         );
       case 'rating':
         return (
           <div className="flex gap-1 mt-1">
             {Array.from({ length: field.max || 5 }, (_, i) => (
-              <span key={i} className="text-xl text-gray-300">★</span>
+              <span key={i} className="text-xl text-gray-300 dark:text-gray-600">★</span>
             ))}
           </div>
         );
       case 'multiple_choice_grid':
       case 'checkbox_grid':
         return (
-          <div className="mt-1 border border-gray-200 rounded-lg overflow-hidden">
+          <div className="mt-1 border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50">
-                  {field.columns?.map((c, i) => <th key={i} className="p-2 text-left text-xs font-medium text-gray-500">{c}</th>)}
+                <tr className="bg-gray-50 dark:bg-gray-700">
+                  {field.columns?.map((c, i) => <th key={i} className="p-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">{c}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {field.rows?.map((r, i) => (
-                  <tr key={i} className="border-t border-gray-100">
-                    <td className="p-2 text-sm text-gray-700">{r}</td>
+                  <tr key={i} className="border-t border-gray-100 dark:border-gray-700">
+                    <td className="p-2 text-sm text-gray-700 dark:text-gray-300">{r}</td>
                     {field.columns?.slice(1).map((_, ci) => (
                       <td key={ci} className="p-2 text-center">
                         <input type={field.type === 'checkbox_grid' ? 'checkbox' : 'radio'} disabled className="text-primary-600" />
@@ -357,21 +357,21 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
           </div>
         );
       default:
-        return <input disabled className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50" />;
+        return <input disabled className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100" />;
     }
   };
 
   return (
     <div className="flex flex-col h-[90vh]">
       {/* Header with tabs */}
-      <div className="border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
+      <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">{initialForm ? 'Edit Form' : 'Create Form'}</h2>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">{initialForm ? 'Edit Form' : 'Create Form'}</h2>
         </div>
         <div className="flex items-center gap-2">
           <button
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              builderTab === 'fields' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              builderTab === 'fields' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
             onClick={() => setBuilderTab('fields')}
           >
@@ -379,7 +379,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
           </button>
           <button
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              builderTab === 'design' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              builderTab === 'design' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
             onClick={() => setBuilderTab('design')}
           >
@@ -387,7 +387,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
           </button>
           <button
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              builderTab === 'communication' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              builderTab === 'communication' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
             onClick={() => setBuilderTab('communication')}
           >
@@ -400,8 +400,8 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
       {builderTab === 'fields' ? (
         <div className="flex flex-1 min-h-0">
           {/* Left: Field palette */}
-          <div className="w-56 bg-gray-50 border-r border-gray-200 p-4 overflow-y-auto flex-shrink-0">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Form Elements</h3>
+          <div className="w-56 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 p-4 overflow-y-auto flex-shrink-0">
+            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Form Elements</h3>
             <button
               onClick={addLeadCaptureTemplate}
               className="w-full mb-3 px-3 py-2.5 rounded-lg bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700"
@@ -413,9 +413,9 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                 <button
                   key={ft.value}
                   onClick={() => addField(ft.value)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-colors"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-500 transition-colors"
                 >
-                  <span className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded text-xs font-medium text-gray-600">{ft.icon}</span>
+                  <span className="w-6 h-6 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded text-xs font-medium text-gray-600 dark:text-gray-400">{ft.icon}</span>
                   {ft.label}
                 </button>
               ))}
@@ -426,29 +426,29 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
           <div className="flex-1 p-6 overflow-y-auto">
             <div className="max-w-2xl mx-auto space-y-4 mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Form Title *</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Form Title *</label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   placeholder="e.g., Contact Us Form"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm h-20"
+                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm h-20 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   placeholder="Optional description"
                 />
               </div>
             </div>
 
-            <div className="max-w-2xl mx-auto space-y-3 min-h-[300px] border-2 border-dashed border-gray-300 rounded-xl p-4">
+            <div className="max-w-2xl mx-auto space-y-3 min-h-[300px] border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-4">
               {fields.length === 0 ? (
-                <div className="text-center text-gray-400 py-12">
+                <div className="text-center text-gray-400 dark:text-gray-500 py-12">
                   <p className="text-4xl mb-2">+</p>
                   <p className="text-sm">Add form elements from the left panel</p>
                 </div>
@@ -457,32 +457,32 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                   <div
                     key={idx}
                     onClick={() => setSelectedFieldIndex(idx)}
-                    className={`p-4 border rounded-xl bg-white cursor-pointer transition-all ${
-                      selectedFieldIndex === idx ? 'border-primary-500 ring-2 ring-primary-100' : 'border-gray-200 hover:border-gray-300'
+                    className={`p-4 border rounded-xl bg-white dark:bg-gray-800 cursor-pointer transition-all ${
+                      selectedFieldIndex === idx ? 'border-primary-500 ring-2 ring-primary-100 dark:ring-primary-900' : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-400 cursor-grab">⋮⋮</span>
-                        <span className="text-sm font-medium text-gray-900">
+                        <span className="text-gray-400 dark:text-gray-500 cursor-grab">⋮⋮</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                           {field.label}
                           {field.required && <span className="text-red-500 ml-1">*</span>}
                         </span>
-                        <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                        <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
                           {FIELD_TYPES.find((ft) => ft.value === field.type)?.label}
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <button onClick={(e) => { e.stopPropagation(); moveField(idx, 'up'); }} disabled={idx === 0} className="p-1 hover:bg-gray-100 rounded disabled:opacity-30 text-gray-400">
+                        <button onClick={(e) => { e.stopPropagation(); moveField(idx, 'up'); }} disabled={idx === 0} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-30 text-gray-400 dark:text-gray-500">
                           ↑
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); moveField(idx, 'down'); }} disabled={idx === fields.length - 1} className="p-1 hover:bg-gray-100 rounded disabled:opacity-30 text-gray-400">
+                        <button onClick={(e) => { e.stopPropagation(); moveField(idx, 'down'); }} disabled={idx === fields.length - 1} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-30 text-gray-400 dark:text-gray-500">
                           ↓
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); duplicateField(idx); }} className="p-1 hover:bg-gray-100 rounded text-gray-400" title="Duplicate">
+                        <button onClick={(e) => { e.stopPropagation(); duplicateField(idx); }} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-400 dark:text-gray-500" title="Duplicate">
                           ⧉
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); deleteField(idx); }} disabled={fields.length <= 1} className="p-1 hover:bg-red-50 text-red-400 hover:text-red-600 rounded disabled:opacity-30">
+                        <button onClick={(e) => { e.stopPropagation(); deleteField(idx); }} disabled={fields.length <= 1} className="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-400 hover:text-red-600 rounded disabled:opacity-30">
                           ✕
                         </button>
                       </div>
@@ -495,26 +495,26 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
           </div>
 
           {/* Right: Properties panel */}
-          <div className="w-72 bg-gray-50 border-l border-gray-200 p-4 overflow-y-auto flex-shrink-0">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Field Properties</h3>
+          <div className="w-72 bg-gray-50 dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 p-4 overflow-y-auto flex-shrink-0">
+            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Field Properties</h3>
             {selectedFieldIndex !== null && fields[selectedFieldIndex] ? (() => {
               const sf = fields[selectedFieldIndex];
               return (
                 <div className="space-y-4 text-sm">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Label</label>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Label</label>
                     <input
                       value={sf.label}
                       onChange={(e) => updateField(selectedFieldIndex, 'label', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Type</label>
                     <select
                       value={sf.type}
                       onChange={(e) => updateField(selectedFieldIndex, 'type', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                     >
                       {FIELD_TYPES.map((ft) => (
                         <option key={ft.value} value={ft.value}>{ft.icon} {ft.label}</option>
@@ -522,11 +522,11 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Placeholder</label>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Placeholder</label>
                     <input
                       value={sf.placeholder || ''}
                       onChange={(e) => updateField(selectedFieldIndex, 'placeholder', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                       placeholder="Optional placeholder"
                     />
                   </div>
@@ -537,20 +537,20 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                       onChange={(e) => updateField(selectedFieldIndex, 'required', e.target.checked)}
                       className="w-4 h-4 text-primary-600 rounded"
                     />
-                    <span className="text-sm text-gray-700">Required</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Required</span>
                   </label>
 
                   {/* Options for radio, checkbox, select */}
                   {needsOptions(sf.type) && (
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-2">Options</label>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Options</label>
                       <div className="space-y-2">
                         {sf.options?.map((opt, oi) => (
                           <div key={oi} className="flex gap-2">
                             <input
                               value={opt}
                               onChange={(e) => updateListItem(selectedFieldIndex, 'options', oi, e.target.value)}
-                              className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-sm"
+                              className="flex-1 px-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                             />
                             <button
                               onClick={() => removeListItem(selectedFieldIndex, 'options', oi)}
@@ -570,11 +570,11 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                   {/* Linear scale */}
                   {needsScale(sf.type) && (
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-2">Scale Range</label>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Scale Range</label>
                       <div className="flex items-center gap-2">
-                        <input type="number" value={sf.min || 1} onChange={(e) => updateField(selectedFieldIndex, 'min', parseInt(e.target.value) || 1)} className="w-16 px-2 py-1.5 border border-gray-200 rounded text-sm" min={0} max={10} />
-                        <span className="text-gray-400">to</span>
-                        <input type="number" value={sf.max || 5} onChange={(e) => updateField(selectedFieldIndex, 'max', parseInt(e.target.value) || 5)} className="w-16 px-2 py-1.5 border border-gray-200 rounded text-sm" min={1} max={10} />
+                        <input type="number" value={sf.min || 1} onChange={(e) => updateField(selectedFieldIndex, 'min', parseInt(e.target.value) || 1)} className="w-16 px-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" min={0} max={10} />
+                        <span className="text-gray-400 dark:text-gray-500">to</span>
+                        <input type="number" value={sf.max || 5} onChange={(e) => updateField(selectedFieldIndex, 'max', parseInt(e.target.value) || 5)} className="w-16 px-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" min={1} max={10} />
                       </div>
                     </div>
                   )}
@@ -582,8 +582,8 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                   {/* Rating */}
                   {needsRating(sf.type) && (
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-2">Max Stars</label>
-                      <input type="number" value={sf.max || 5} onChange={(e) => updateField(selectedFieldIndex, 'max', Math.min(10, Math.max(1, parseInt(e.target.value) || 5)))} className="w-20 px-2 py-1.5 border border-gray-200 rounded text-sm" min={1} max={10} />
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Max Stars</label>
+                      <input type="number" value={sf.max || 5} onChange={(e) => updateField(selectedFieldIndex, 'max', Math.min(10, Math.max(1, parseInt(e.target.value) || 5)))} className="w-20 px-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" min={1} max={10} />
                     </div>
                   )}
 
@@ -591,11 +591,11 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                   {needsGrid(sf.type) && (
                     <>
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-2">Rows</label>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Rows</label>
                         <div className="space-y-2">
                           {sf.rows?.map((row, ri) => (
                             <div key={ri} className="flex gap-2">
-                              <input value={row} onChange={(e) => updateListItem(selectedFieldIndex, 'rows', ri, e.target.value)} className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-sm" />
+                              <input value={row} onChange={(e) => updateListItem(selectedFieldIndex, 'rows', ri, e.target.value)} className="flex-1 px-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                               <button onClick={() => removeListItem(selectedFieldIndex, 'rows', ri)} disabled={(sf.rows || []).length <= 1} className="p-1 text-red-400 hover:text-red-600 disabled:opacity-30">✕</button>
                             </div>
                           ))}
@@ -603,11 +603,11 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-2">Columns</label>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Columns</label>
                         <div className="space-y-2">
                           {sf.columns?.map((col, ci) => (
                             <div key={ci} className="flex gap-2">
-                              <input value={col} onChange={(e) => updateListItem(selectedFieldIndex, 'columns', ci, e.target.value)} className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-sm" />
+                              <input value={col} onChange={(e) => updateListItem(selectedFieldIndex, 'columns', ci, e.target.value)} className="flex-1 px-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                               <button onClick={() => removeListItem(selectedFieldIndex, 'columns', ci)} disabled={(sf.columns || []).length <= 1} className="p-1 text-red-400 hover:text-red-600 disabled:opacity-30">✕</button>
                             </div>
                           ))}
@@ -619,21 +619,21 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                 </div>
               );
             })() : (
-              <p className="text-gray-400 text-sm">Select a field to edit its properties</p>
+              <p className="text-gray-400 dark:text-gray-500 text-sm">Select a field to edit its properties</p>
             )}
           </div>
         </div>
       ) : builderTab === 'communication' ? (
         <div className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto w-full space-y-6">
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-            <h3 className="text-base font-semibold text-gray-900 mb-1">WhatsApp Communication</h3>
-            <p className="text-sm text-gray-500 mb-5">Configure WhatsApp message templates for this form's submissions.</p>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">WhatsApp Communication</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Configure WhatsApp message templates for this form's submissions.</p>
 
             <div className="space-y-5">
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Enable WhatsApp Greeting</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Send a WhatsApp template message when someone submits this form</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Enable WhatsApp Greeting</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Send a WhatsApp template message when someone submits this form</p>
                 </div>
                 <button
                   type="button"
@@ -652,21 +652,21 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
 
               {communication.whatsappEnabled && (
                 <>
-                  <div className="p-4 border border-gray-200 rounded-xl space-y-4">
+                  <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-xl space-y-4">
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Greeting Message</label>
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Greeting Message</label>
                       <textarea
                         value={communication.greetingMessage}
                         onChange={(e) => setCommunication((prev) => ({ ...prev, greetingMessage: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm h-28 focus:ring-2 focus:ring-primary-500 font-mono"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm h-28 focus:ring-2 focus:ring-primary-500 font-mono bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                         placeholder="Hi {{name}}, thank you for your inquiry! We'll get back to you at {{email}} shortly."
                       />
-                      <p className="text-xs text-gray-400 mt-1">Type <code className="bg-gray-100 px-1 rounded">{'{{field_name}}'}</code> to insert form answers. Uses WhatsApp session message (free within 24h of submission).</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Type <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">{'{{field_name}}'}</code> to insert form answers. Uses WhatsApp session message (free within 24h of submission).</p>
                     </div>
 
                     {availableTags.length > 0 && (
                       <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Available Tags</label>
+                        <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Available Tags</label>
                         <div className="flex flex-wrap gap-1.5">
                           {availableTags.map((t) => (
                             <button
@@ -679,21 +679,21 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                                   greetingMessage: prev.greetingMessage + (prev.greetingMessage && !prev.greetingMessage.endsWith(' ') ? ' ' : '') + tag,
                                 }));
                               }}
-                              className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border border-gray-200 font-mono transition-colors"
+                              className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded border border-gray-200 dark:border-gray-600 font-mono transition-colors"
                               title={`Insert ${t.label}`}
                             >
                               {`{{${t.tag}}}`}
                             </button>
                           ))}
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">Click a tag to insert it into the message</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Click a tag to insert it into the message</p>
                       </div>
                     )}
                   </div>
 
-                  <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                    <h4 className="text-sm font-semibold text-green-900 mb-2">How it works</h4>
-                    <ul className="text-xs text-green-800 space-y-1.5">
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4">
+                    <h4 className="text-sm font-semibold text-green-900 dark:text-green-300 mb-2">How it works</h4>
+                    <ul className="text-xs text-green-800 dark:text-green-400 space-y-1.5">
                       <li className="flex items-start gap-2">
                         <span className="text-green-500 mt-0.5">1.</span>
                         <span>Lead submits the public form</span>
@@ -713,14 +713,14 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                     </ul>
                   </div>
 
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                    <h4 className="text-sm font-semibold text-blue-900 mb-2">Message Preview</h4>
-                    <div className="bg-white rounded-lg border border-gray-200 p-3">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+                    <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-2">Message Preview</h4>
+                    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 p-3">
                       <div className="flex items-center gap-2 mb-2">
                         <svg className="w-4 h-4 text-green-500" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">WhatsApp Message</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">WhatsApp Message</span>
                       </div>
-                      <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">
+                      <p className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
                         {communication.greetingMessage
                           ? communication.greetingMessage
                               .replace(/\{\{name\}\}/g, 'John Doe')
@@ -738,22 +738,22 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto w-full space-y-6">
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-            <h3 className="text-base font-semibold text-gray-900 mb-1">Form Design Studio</h3>
-            <p className="text-sm text-gray-500 mb-5">Tune layout, colors, and button style directly.</p>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">Form Design Studio</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Tune layout, colors, and button style directly.</p>
 
             <div className="space-y-5">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Quick Tune</label>
-                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-3">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Quick Tune</label>
+                <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 p-3 space-y-3">
                   <div>
-                    <p className="text-xs font-medium text-gray-600 mb-1.5">Layout</p>
+                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Layout</p>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
                         onClick={() => setDesign((prev) => ({ ...prev, layout: 'centered' }))}
                         className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${
-                          design.layout === 'centered' ? 'border-primary-400 bg-primary-100 text-primary-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
+                          design.layout === 'centered' ? 'border-primary-400 bg-primary-100 text-primary-700' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                         }`}
                       >
                         Centered
@@ -762,7 +762,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                         type="button"
                         onClick={() => setDesign((prev) => ({ ...prev, layout: 'split' }))}
                         className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${
-                          design.layout === 'split' ? 'border-primary-400 bg-primary-100 text-primary-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
+                          design.layout === 'split' ? 'border-primary-400 bg-primary-100 text-primary-700' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                         }`}
                       >
                         Split
@@ -771,7 +771,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                   </div>
 
                   <div>
-                    <p className="text-xs font-medium text-gray-600 mb-1.5">Button</p>
+                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Button</p>
                     <div className="flex flex-wrap gap-2">
                       {(['solid', 'gradient', 'outline'] as FormButtonStyle[]).map((style) => (
                         <button
@@ -779,7 +779,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                           type="button"
                           onClick={() => setDesign((prev) => ({ ...prev, buttonStyle: style }))}
                           className={`px-3 py-1.5 text-xs font-semibold rounded-md border capitalize ${
-                            design.buttonStyle === style ? 'border-primary-400 bg-primary-100 text-primary-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
+                            design.buttonStyle === style ? 'border-primary-400 bg-primary-100 text-primary-700' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                           }`}
                         >
                           {style}
@@ -796,18 +796,18 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                       onChange={(e) => setDesign((prev) => ({ ...prev, showProgress: e.target.checked }))}
                       className="w-4 h-4 text-primary-600 rounded"
                     />
-                    <label htmlFor="show-progress" className="text-sm text-gray-700">Show progress bar</label>
+                    <label htmlFor="show-progress" className="text-sm text-gray-700 dark:text-gray-300">Show progress bar</label>
                   </div>
 
                   <div>
-                    <p className="text-xs font-medium text-gray-600 mb-1.5">Accent Color</p>
-                    <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-3">
+                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Accent Color</p>
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-3 space-y-3">
                       <div className="flex items-center gap-3">
                         <input
                           type="color"
                           value={normalizeHexColor(design.customColor) || '#0EA5E9'}
                           onChange={(e) => setDesign((prev) => ({ ...prev, customColor: e.target.value.toUpperCase() }))}
-                          className="h-16 w-20 rounded border border-gray-300 bg-white p-1 cursor-pointer"
+                          className="h-16 w-20 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-1 cursor-pointer"
                         />
                         <div className="grid grid-cols-2 gap-2 flex-1">
                           <input
@@ -818,7 +818,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                               const normalized = normalizeHexColor(e.target.value);
                               setDesign((prev) => ({ ...prev, customColor: (normalized || prev.customColor).toUpperCase() }));
                             }}
-                            className="col-span-2 px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md uppercase"
+                            className="col-span-2 px-2.5 py-1.5 text-xs font-semibold border border-gray-300 dark:border-gray-600 rounded-md uppercase bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                             placeholder="#0EA5E9"
                           />
                           <input
@@ -827,7 +827,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                             max={255}
                             value={currentRgb.r}
                             onChange={(e) => setDesign((prev) => ({ ...prev, customColor: rgbToHex(Number(e.target.value), currentRgb.g, currentRgb.b) }))}
-                            className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md"
+                            className="px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                           />
                           <input
                             type="number"
@@ -835,7 +835,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                             max={255}
                             value={currentRgb.g}
                             onChange={(e) => setDesign((prev) => ({ ...prev, customColor: rgbToHex(currentRgb.r, Number(e.target.value), currentRgb.b) }))}
-                            className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md"
+                            className="px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                           />
                           <input
                             type="number"
@@ -843,7 +843,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                             max={255}
                             value={currentRgb.b}
                             onChange={(e) => setDesign((prev) => ({ ...prev, customColor: rgbToHex(currentRgb.r, currentRgb.g, Number(e.target.value)) }))}
-                            className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md"
+                            className="px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                           />
                           <button
                             type="button"
@@ -863,7 +863,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                                 return next;
                               });
                             }}
-                            className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                            className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                           >
                             Add to Custom
                           </button>
@@ -871,7 +871,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                       </div>
 
                       <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Basic Colors</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Basic Colors</p>
                         <div className="grid grid-cols-12 gap-1.5">
                           {BASIC_COLORS.map((color) => {
                             const active = (normalizeHexColor(design.customColor) || '').toLowerCase() === color.toLowerCase();
@@ -890,7 +890,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                       </div>
 
                       <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Custom Colors</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Custom Colors</p>
                         <div className="grid grid-cols-8 gap-1.5">
                           {customColorSlots.map((color, idx) => {
                             const active = color && (normalizeHexColor(design.customColor) || '').toLowerCase() === color.toLowerCase();
@@ -904,7 +904,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                                 title={color}
                               />
                             ) : (
-                              <span key={`empty-${idx}`} className="h-6 w-6 rounded-full border border-dashed border-gray-300 bg-gray-50" />
+                              <span key={`empty-${idx}`} className="h-6 w-6 rounded-full border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700" />
                             );
                           })}
                         </div>
@@ -915,24 +915,24 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Form Introduction</label>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Form Introduction</label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm h-20"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm h-20 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   placeholder="Short intro message shown above the public form"
                 />
               </div>
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-            <h4 className="text-sm font-semibold text-gray-900 mb-3">Live Style Preview</h4>
-            <div className="rounded-2xl border border-dashed border-gray-300 p-4 bg-gray-50">
-              <div className="rounded-xl bg-white border border-gray-200 p-4">
-                <p className="text-lg font-bold text-gray-900">{title || 'Your Form Title'}</p>
-                <p className="text-sm text-gray-500 mt-1">{description || 'Your form intro will appear here.'}</p>
-                <p className="text-xs text-gray-400 mt-1">Theme: {design.theme}</p>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Live Style Preview</h4>
+            <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 p-4 bg-gray-50 dark:bg-gray-900">
+              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 p-4">
+                <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{title || 'Your Form Title'}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{description || 'Your form intro will appear here.'}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Theme: {design.theme}</p>
                 <div className="mt-4 h-2 w-32 bg-gray-200 rounded-full overflow-hidden">
                   <div className="h-full w-1/2 bg-primary-500" />
                 </div>
@@ -943,8 +943,8 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
       )}
 
       {/* Footer */}
-      <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3 bg-white flex-shrink-0">
-        <button onClick={onCancel} className="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium">
+      <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-end gap-3 bg-white dark:bg-gray-800 flex-shrink-0">
+        <button onClick={onCancel} className="px-5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium">
           Cancel
         </button>
         <button
