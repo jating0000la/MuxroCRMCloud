@@ -518,13 +518,13 @@ export default function PublicFormPage() {
           <aside className={`lg:col-span-2 ${radiusClass} border ${activeTheme.card} p-6 shadow-lg h-fit`}>
             <div className="flex items-center justify-center mb-4">
               {branding.appLogoUrl ? (
-                <LogoImage src={branding.appLogoUrl} alt="Logo" size={56} />
+                <LogoImage src={branding.appLogoUrl} alt="Logo" size={80} />
               ) : (
                 <div
                   className={`bg-gradient-to-br ${activeTheme.accent} rounded-xl flex items-center justify-center shadow-md`}
-                  style={{ width: 48, height: 48 }}
+                  style={{ width: 64, height: 64 }}
                 >
-                  <span className="text-xl font-bold text-white">{(branding.appName || 'C').charAt(0).toUpperCase()}</span>
+                  <span className="text-2xl font-bold text-white">{(branding.appName || 'C').charAt(0).toUpperCase()}</span>
                 </div>
               )}
             </div>
@@ -543,13 +543,13 @@ export default function PublicFormPage() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             {branding.appLogoUrl ? (
-              <LogoImage src={branding.appLogoUrl} alt="Logo" size={56} />
+              <LogoImage src={branding.appLogoUrl} alt="Logo" size={80} />
             ) : (
               <div
                 className={`bg-gradient-to-br ${activeTheme.accent} rounded-xl flex items-center justify-center shadow-lg`}
-                style={{ width: 48, height: 48 }}
+                style={{ width: 64, height: 64 }}
               >
-                <span className="text-xl font-bold text-white">{(branding.appName || 'C').charAt(0).toUpperCase()}</span>
+                <span className="text-2xl font-bold text-white">{(branding.appName || 'C').charAt(0).toUpperCase()}</span>
               </div>
             )}
           </div>
