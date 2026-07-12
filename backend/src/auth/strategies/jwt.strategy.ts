@@ -4,6 +4,10 @@ import { ExtractJwt, Strategy, StrategyOptionsWithRequest } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { TokenBlacklistService } from '../services/token-blacklist.service';
 
+// Simple TTL cache for session validation (reduces DB hits from every HTTP request)
+const sessionCache = new Map<string, { valid: boolean; expires: number }>();
+const SESSION_CACHE_TTL = 60_000; // 1 minute
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
@@ -30,11 +34,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       token = req.cookies.auth_token;
     }
 
-    // Check if token has been revoked in the database
+    // Check cache first to avoid DB hit on every request
     if (token) {
-      const isRevoked = await this.tokenBlacklist.isBlacklisted(token);
-      if (isRevoked) {
-        throw new UnauthorizedException('Token has been revoked. Please log in again.');
+      const cached = sessionCache.get(token);
+      if (cached) {
+        if (!cached.valid) {
+          throw new UnauthorizedException('Token has been revoked. Please log in again.');
+        }
+        // Cache hit, valid session
+      } else {
+        // Cache miss, check DB
+        const isRevoked = await this.tokenBlacklist.isBlacklisted(token);
+        sessionCache.set(token, { valid: !isRevoked, expires: Date.now() + SESSION_CACHE_TTL });
+        if (isRevoked) {
+          throw new UnauthorizedException('Token has been revoked. Please log in again.');
+        }
       }
     }
 

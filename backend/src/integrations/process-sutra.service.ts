@@ -70,9 +70,8 @@ export class ProcessSutraService {
       };
     } catch (error: any) {
       const status = error.response?.status || 'Unknown';
-      const message = error.response?.data?.message || error.message;
-      this.logger.error(`Process Sutra error: ${status} - ${message}`);
-      throw new BadRequestException(`Process Sutra API error: ${status} - ${message}`);
+      this.logger.error(`Process Sutra error: ${status}`);
+      throw new BadRequestException('Failed to start Process Sutra flow');
     }
   }
 }

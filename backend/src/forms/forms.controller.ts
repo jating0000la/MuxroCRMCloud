@@ -1,8 +1,9 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, UseGuards,
+  Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FormsService } from './forms.service';
+import { AuthorizationService } from '../common/authorization/authorization.service';
 import { CreateFormDto } from './dto/create-form.dto';
 import { UpdateFormDto } from './dto/update-form.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -14,7 +15,10 @@ import { Roles } from '../auth/decorators/roles.decorator';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('campaigns/:campaignId/forms')
 export class FormsController {
-  constructor(private formsService: FormsService) {}
+  constructor(
+    private formsService: FormsService,
+    private authService: AuthorizationService,
+  ) {}
 
   @Post()
   @Roles('ADMIN')
@@ -25,47 +29,60 @@ export class FormsController {
 
   @Get()
   @ApiOperation({ summary: 'Get all forms for campaign' })
-  findAll(@Param('campaignId') campaignId: string) {
+  async findAll(@Param('campaignId') campaignId: string, @Request() req) {
+    await this.authService.ensureCampaignAccess(campaignId, req.user.id, req.user.role);
     return this.formsService.findByCampaign(campaignId);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get form details' })
-  findOne(@Param('id') id: string) {
-    return this.formsService.findOne(id);
+  async findOne(@Param('id') id: string, @Request() req) {
+    const form = await this.formsService.findOne(id);
+    await this.authService.ensureCampaignAccess((form as any).campaignId || '', req.user.id, req.user.role);
+    return form;
   }
 
   @Put(':id')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Update form' })
-  update(@Param('id') id: string, @Body() dto: UpdateFormDto) {
+  async update(@Param('id') id: string, @Body() dto: UpdateFormDto, @Request() req) {
+    const form = await this.formsService.findOne(id);
+    await this.authService.ensureCampaignAccess((form as any).campaignId || '', req.user.id, req.user.role);
     return this.formsService.update(id, dto);
   }
 
   @Post(':id/publish')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Publish form' })
-  publish(@Param('id') id: string) {
+  async publish(@Param('id') id: string, @Request() req) {
+    const form = await this.formsService.findOne(id);
+    await this.authService.ensureCampaignAccess((form as any).campaignId || '', req.user.id, req.user.role);
     return this.formsService.publish(id);
   }
 
   @Post(':id/unpublish')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Unpublish form' })
-  unpublish(@Param('id') id: string) {
+  async unpublish(@Param('id') id: string, @Request() req) {
+    const form = await this.formsService.findOne(id);
+    await this.authService.ensureCampaignAccess((form as any).campaignId || '', req.user.id, req.user.role);
     return this.formsService.unpublish(id);
   }
 
   @Delete(':id')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Delete form' })
-  remove(@Param('id') id: string) {
+  async remove(@Param('id') id: string, @Request() req) {
+    const form = await this.formsService.findOne(id);
+    await this.authService.ensureCampaignAccess((form as any).campaignId || '', req.user.id, req.user.role);
     return this.formsService.remove(id);
   }
 
   @Get(':id/submissions')
   @ApiOperation({ summary: 'Get form submissions' })
-  getSubmissions(@Param('id') id: string) {
+  async getSubmissions(@Param('id') id: string, @Request() req) {
+    const form = await this.formsService.findOne(id);
+    await this.authService.ensureCampaignAccess((form as any).campaignId || '', req.user.id, req.user.role);
     return this.formsService.getSubmissions(id);
   }
 }

@@ -270,8 +270,12 @@ export class FollowupsService {
       leadConditions.push(ne(leads.id, excludeLeadId));
     }
     if (role === 'USER' && userId) {
+      // USER can only see followups for leads they are assigned to (doer)
       leadConditions.push(eq(leads.doerId, userId));
     }
+
+    // Filter out deleted leads
+    leadConditions.push(eq(leads.isDeleted, false));
 
     const matchingLeads = await this.database.db
       .select({ id: leads.id, name: leads.name, campaignId: leads.campaignId })

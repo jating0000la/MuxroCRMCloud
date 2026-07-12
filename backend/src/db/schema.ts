@@ -159,6 +159,7 @@ export const leads = pgTable(
     index('Lead_campaignId_doerId_idx').on(table.campaignId, table.doerId),
     index('Lead_campaignId_statusId_idx').on(table.campaignId, table.statusId),
     index('Lead_doerId_dnd_idx').on(table.doerId, table.dnd),
+    index('Lead_isDeleted_idx').on(table.isDeleted),
   ],
 );
 
@@ -279,7 +280,7 @@ export const refreshSessions = pgTable(
     userId: uuid('userId')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    tokenHash: varchar('tokenHash', { length: 255 }).notNull(),
+    tokenHash: varchar('tokenHash', { length: 255 }).notNull().unique(),
     expiresAt: timestamp('expiresAt').notNull(),
     revokedAt: timestamp('revokedAt'),
     createdAt: timestamp('createdAt').notNull().defaultNow(),
@@ -313,6 +314,7 @@ export const outboxEvents = pgTable(
     index('OutboxEvent_eventType_idx').on(table.eventType),
     index('OutboxEvent_createdAt_idx').on(table.createdAt),
     index('OutboxEvent_aggregateType_aggregateId_idx').on(table.aggregateType, table.aggregateId),
+    index('OutboxEvent_published_retryCount_maxRetries_idx').on(table.published, table.retryCount, table.maxRetries),
   ],
 );
 

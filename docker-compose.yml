@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-crm_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -33,16 +33,16 @@ services:
     container_name: crm-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-crm_db}?schema=public
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-15m}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-crm_db}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-1h}
       PORT: 3000
       NODE_ENV: production
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
       PUBLIC_FORMS_ENABLED: ${PUBLIC_FORMS_ENABLED:-true}
-      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
-      ENCRYPTION_SALT: ${ENCRYPTION_SALT}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?Set APP_ENCRYPTION_KEY in .env}
+      ENCRYPTION_SALT: ${ENCRYPTION_SALT:?Set ENCRYPTION_SALT in .env}
       BACKUP_DIR: /backups
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
     depends_on:
@@ -76,9 +76,9 @@ services:
     restart: unless-stopped
     command: ["node", "dist/worker"]
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-crm_db}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-crm_db}?schema=public
       JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-15m}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-1h}
       NODE_ENV: production
       APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
       ENCRYPTION_SALT: ${ENCRYPTION_SALT}

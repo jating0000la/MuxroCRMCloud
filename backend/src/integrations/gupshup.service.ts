@@ -105,9 +105,8 @@ export class GupshupService {
       };
     } catch (error: any) {
       const status = error.response?.status || 'Unknown';
-      const message = error.response?.data?.message || error.message;
-      this.logger.error(`Gupshup session message error: ${status} - ${message}`);
-      throw new BadRequestException(`Gupshup API error: ${status} - ${message}`);
+      this.logger.error(`Gupshup session message error: ${status}`);
+      throw new BadRequestException('Failed to send WhatsApp message');
     }
   }
 
@@ -169,9 +168,8 @@ export class GupshupService {
       };
     } catch (error: any) {
       const status = error.response?.status || 'Unknown';
-      const message = error.response?.data?.message || error.message;
-      this.logger.error(`Gupshup template message error: ${status} - ${message}`);
-      throw new BadRequestException(`Gupshup API error: ${status} - ${message}`);
+      this.logger.error(`Gupshup template message error: ${status}`);
+      throw new BadRequestException('Failed to send WhatsApp template');
     }
   }
 

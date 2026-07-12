@@ -73,7 +73,7 @@ export class GupshupWebhookController {
         })
         .from(leads)
         .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
-        .where(eq(leads.phone, senderPhone))
+        .where(and(eq(leads.phone, senderPhone), eq(leads.isDeleted, false)))
         .orderBy(desc(leads.createdAt))
         .limit(1);
 

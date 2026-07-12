@@ -53,117 +53,61 @@ export class JobProcessors {
   }
 
   async registerAllProcessors() {
-    // WhatsApp message sending
-    await this.jobService.work(JOB_TYPES.WHATSAPP_SEND_MESSAGE, async (data) => {
-      await this.logJob(JOB_TYPES.WHATSAPP_SEND_MESSAGE, data, async () => {
+    const processors = [
+      { type: JOB_TYPES.WHATSAPP_SEND_MESSAGE, handler: async (data: any) => {
         const config = await this.resolveGupshupConfig();
-        await this.gupshupService.sendSessionMessage(
-          config.apiKey,
-          config.source,
-          config.appName,
-          data.phone,
-          data.message,
-        );
+        await this.gupshupService.sendSessionMessage(config.apiKey, config.source, config.appName, data.phone, data.message);
         return { success: true };
-      });
-    });
-
-    // WhatsApp template sending
-    await this.jobService.work(JOB_TYPES.WHATSAPP_SEND_TEMPLATE, async (data) => {
-      await this.logJob(JOB_TYPES.WHATSAPP_SEND_TEMPLATE, data, async () => {
+      }},
+      { type: JOB_TYPES.WHATSAPP_SEND_TEMPLATE, handler: async (data: any) => {
         const config = await this.resolveGupshupConfig();
         const mediaMsg = data.mediaUrl ? { type: data.mediaType || 'image', link: data.mediaUrl } : undefined;
-        await this.gupshupService.sendTemplateMessage(
-          config.apiKey,
-          config.source,
-          config.appName,
-          data.phone,
-          data.templateName,
-          data.params,
-          mediaMsg,
-        );
+        await this.gupshupService.sendTemplateMessage(config.apiKey, config.source, config.appName, data.phone, data.templateName, data.params, mediaMsg);
         return { success: true };
-      });
-    });
-
-    // WhatsApp form greeting
-    await this.jobService.work(JOB_TYPES.WHATSAPP_FORM_GREETING, async (data) => {
-      await this.logJob(JOB_TYPES.WHATSAPP_FORM_GREETING, data, async () => {
+      }},
+      { type: JOB_TYPES.WHATSAPP_FORM_GREETING, handler: async (data: any) => {
         const config = await this.resolveGupshupConfig();
-        await this.gupshupService.sendSessionMessage(
-          config.apiKey,
-          config.source,
-          config.appName,
-          data.phone,
-          data.message,
-        );
+        await this.gupshupService.sendSessionMessage(config.apiKey, config.source, config.appName, data.phone, data.message);
         return { success: true };
-      });
-    });
-
-    // IndiaMART lead fetch
-    await this.jobService.work(JOB_TYPES.INDIAMART_FETCH, async (data) => {
-      await this.logJob(JOB_TYPES.INDIAMART_FETCH, data, async () => {
+      }},
+      { type: JOB_TYPES.INDIAMART_FETCH, handler: async (data: any) => {
         const config = await this.resolveIndiaMartConfig();
-        const result = await this.indiamartService.fetchLeads(
-          config.crmKey,
-          data.startTime,
-          data.endTime,
-        );
+        const result = await this.indiamartService.fetchLeads(config.crmKey, data.startTime, data.endTime);
         return { fetched: result.leads.length };
-      });
-    });
-
-    // IndiaMART auto-import
-    await this.jobService.work(JOB_TYPES.INDIAIART_AUTO_IMPORT, async (data) => {
-      await this.logJob(JOB_TYPES.INDIAIART_AUTO_IMPORT, data, async () => {
+      }},
+      { type: JOB_TYPES.INDIAMART_AUTO_IMPORT, handler: async (data: any) => {
         const config = await this.resolveIndiaMartConfig();
-        const result = await this.indiamartService.autoImportLeads(
-          data.campaignId,
-          config.crmKey,
-          data.startTime,
-          data.endTime,
-        );
-        return result;
-      });
-    });
-
-    // Bulk allocate round-robin
-    await this.jobService.work(JOB_TYPES.BULK_ALLOCATE, async (data) => {
-      await this.logJob(JOB_TYPES.BULK_ALLOCATE, data, async () => {
-        const result = await this.roundRobinService.allocateRoundRobin(
-          data.campaignId,
-          data.leadIds,
-        );
+        return await this.indiamartService.autoImportLeads(data.campaignId, config.crmKey, data.startTime, data.endTime);
+      }},
+      { type: JOB_TYPES.BULK_ALLOCATE, handler: async (data: any) => {
+        const result = await this.roundRobinService.allocateRoundRobin(data.campaignId, data.leadIds);
         return { allocated: result.length };
-      });
-    });
-
-    // Notification sync
-    await this.jobService.work(JOB_TYPES.NOTIFICATION_SYNC, async (data) => {
-      await this.logJob(JOB_TYPES.NOTIFICATION_SYNC, data, async () => {
+      }},
+      { type: JOB_TYPES.NOTIFICATION_SYNC, handler: async (data: any) => {
         await this.notificationsService.syncNotificationsForUser(data.userId);
         return { success: true };
-      });
-    });
-
-    // Outbox event processing
-    await this.jobService.work(JOB_TYPES.OUTBOX_PUBLISH, async (data) => {
-      await this.logJob(JOB_TYPES.OUTBOX_PUBLISH, data, async () => {
+      }},
+      { type: JOB_TYPES.OUTBOX_PUBLISH, handler: async (data: any) => {
         const count = await this.outboxService.processPendingEvents(data.batchSize || 50);
         return { processed: count };
-      });
-    });
+      }},
+      { type: JOB_TYPES.BACKUP_DATABASE, handler: async (data: any) => {
+        return await this.backupService.createBackup(data.retentionDays || 7);
+      }},
+    ];
 
-    // Database backup
-    await this.jobService.work(JOB_TYPES.BACKUP_DATABASE, async (data) => {
-      await this.logJob(JOB_TYPES.BACKUP_DATABASE, data, async () => {
-        const result = await this.backupService.createBackup(data.retentionDays || 7);
-        return result;
-      });
-    });
-
-    this.logger.log('All job processors registered');
+    let registered = 0;
+    for (const proc of processors) {
+      try {
+        await this.jobService.work(proc.type, async (data: any) => {
+          await this.logJob(proc.type, data, async () => proc.handler(data));
+        });
+        registered++;
+      } catch (error: any) {
+        this.logger.error(`Failed to register processor ${proc.type}: ${error.message}`);
+      }
+    }
+    this.logger.log(`Registered ${registered}/${processors.length} job processors`);
   }
 
   private async logJob(
@@ -171,36 +115,43 @@ export class JobProcessors {
     payload: any,
     handler: () => Promise<any>,
   ): Promise<any> {
-    const [log] = await this.database.db
-      .insert(jobLogs)
-      .values({
-        jobType,
-        payload,
-        status: 'running',
-        startedAt: new Date(),
-      })
-      .returning();
+    // Non-blocking: log insert failure doesn't block the job
+    let logId: string | null = null;
+    try {
+      const [log] = await this.database.db
+        .insert(jobLogs)
+        .values({
+          jobType,
+          payload,
+          status: 'running',
+          startedAt: new Date(),
+        })
+        .returning();
+      logId = log.id;
+    } catch (logError: any) {
+      this.logger.warn(`Job log insert failed: ${logError.message}`);
+    }
 
     try {
       const result = await handler();
-      await this.database.db
-        .update(jobLogs)
-        .set({
-          status: 'completed',
-          result,
-          completedAt: new Date(),
-        })
-        .where(eq(jobLogs.id, log.id));
+      if (logId) {
+        try {
+          await this.database.db
+            .update(jobLogs)
+            .set({ status: 'completed', result, completedAt: new Date() })
+            .where(eq(jobLogs.id, logId));
+        } catch {}
+      }
       return result;
     } catch (error: any) {
-      await this.database.db
-        .update(jobLogs)
-        .set({
-          status: 'failed',
-          error: error.message,
-          completedAt: new Date(),
-        })
-        .where(eq(jobLogs.id, log.id));
+      if (logId) {
+        try {
+          await this.database.db
+            .update(jobLogs)
+            .set({ status: 'failed', error: error.message, completedAt: new Date() })
+            .where(eq(jobLogs.id, logId));
+        } catch {}
+      }
       throw error;
     }
   }

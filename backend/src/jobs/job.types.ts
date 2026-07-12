@@ -11,7 +11,7 @@ export const JOB_TYPES = {
 
   // Integrations
   INDIAMART_FETCH: 'indiamart-fetch',
-  INDIAIART_AUTO_IMPORT: 'indiamart-auto-import',
+  INDIAMART_AUTO_IMPORT: 'indiamart-auto-import',
 
   // Notifications
   NOTIFICATION_SYNC: 'notification-sync',

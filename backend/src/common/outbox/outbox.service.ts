@@ -141,7 +141,7 @@ export class OutboxService {
       .where(
         and(
           eq(outboxEvents.published, true),
-          sql`${outboxEvents.publishedAt} < NOW() - INTERVAL '${retentionDays} days'`,
+          sql`${outboxEvents.publishedAt} < NOW() - (${retentionDays} * INTERVAL '1 day')`,
         ),
       );
     const deleted = (result as any).rowCount || 0;

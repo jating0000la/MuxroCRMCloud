@@ -154,13 +154,10 @@ export class AdminDashboardController {
         heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`,
         heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`,
         rss: `${Math.round(memUsage.rss / 1024 / 1024)}MB`,
-        external: `${Math.round(memUsage.external / 1024 / 1024)}MB`,
       },
       system: {
-        platform: os.platform(),
         nodeVersion: process.version,
         cpuCount: os.cpus().length,
-        loadAvg: os.loadavg(),
       },
     };
   }

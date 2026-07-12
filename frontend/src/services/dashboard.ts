@@ -39,13 +39,13 @@ export const dashboardService = {
   getFollowupDashboard: async (campaignId?: string): Promise<Followup[]> => {
     const params = campaignId ? { campaignId } : {};
     const { data } = await api.get('/dashboard/followups', { params });
-    return data;
+    return Array.isArray(data) ? data : data.data || [];
   },
 
   getAllLeadsDashboard: async (campaignId?: string): Promise<Lead[]> => {
     const params = campaignId ? { campaignId } : {};
     const { data } = await api.get('/dashboard/leads', { params });
-    return data;
+    return Array.isArray(data) ? data : data.data || [];
   },
 
   getCampaignStats: async (campaignId: string) => {

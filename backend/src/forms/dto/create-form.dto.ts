@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 class FormFieldDto {
@@ -10,7 +11,7 @@ class FormFieldDto {
   @IsString()
   label: string;
 
-  @ApiProperty({ enum: ['text', 'email', 'phone', 'number', 'textarea', 'select', 'date'] })
+  @ApiProperty()
   @IsString()
   type: string;
 
@@ -20,7 +21,31 @@ class FormFieldDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  placeholder?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   options?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  min?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  max?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  rows?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  columns?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  meta?: any;
 }
 
 export class CreateFormDto {
@@ -32,5 +57,7 @@ export class CreateFormDto {
   @ApiPropertyOptional({ type: [FormFieldDto] })
   @IsOptional()
   @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => FormFieldDto)
   fields?: FormFieldDto[];
 }

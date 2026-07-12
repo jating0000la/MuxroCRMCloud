@@ -1,8 +1,9 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, UseGuards,
+  Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CampaignStatusesService } from './campaign-statuses.service';
+import { AuthorizationService } from '../common/authorization/authorization.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -12,11 +13,15 @@ import { Roles } from '../auth/decorators/roles.decorator';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('campaigns/:campaignId/statuses')
 export class CampaignStatusesController {
-  constructor(private statusesService: CampaignStatusesService) {}
+  constructor(
+    private statusesService: CampaignStatusesService,
+    private authService: AuthorizationService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all statuses for campaign' })
-  findAll(@Param('campaignId') campaignId: string) {
+  async findAll(@Param('campaignId') campaignId: string, @Request() req) {
+    await this.authService.ensureCampaignAccess(campaignId, req.user.id, req.user.role);
     return this.statusesService.findAll(campaignId);
   }
 

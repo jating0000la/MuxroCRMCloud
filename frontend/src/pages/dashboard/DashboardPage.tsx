@@ -51,7 +51,11 @@ export default function DashboardPage() {
 
       if (statsResult.status === 'fulfilled') setStats(statsResult.value);
       if (campaignsResult.status === 'fulfilled') setCampaigns(campaignsResult.value);
-      if (followupsResult.status === 'fulfilled') setRecentFollowups(followupsResult.value.slice(0, 5));
+      if (followupsResult.status === 'fulfilled') {
+        const val = followupsResult.value as any;
+        const followupData = Array.isArray(val) ? val : val.data;
+        setRecentFollowups(followupData.slice(0, 5));
+      }
 
       const anyFailed = results.some((r) => r.status === 'rejected');
       if (anyFailed && statsResult.status === 'rejected') {

@@ -35,7 +35,7 @@ export class DashboardService {
       totalCampaigns = total;
     }
 
-    const leadConditions: any[] = [];
+    const leadConditions: any[] = [eq(leads.isDeleted, false)];
     if (role === 'USER') {
       leadConditions.push(eq(leads.doerId, userId));
     }
@@ -72,7 +72,7 @@ export class DashboardService {
     const [{ totalLeads }] = await this.database.db
       .select({ totalLeads: sql<number>`count(*)::int` })
       .from(leads)
-      .where(eq(leads.campaignId, campaignId));
+      .where(and(eq(leads.campaignId, campaignId), eq(leads.isDeleted, false)));
 
     const byStatusResults = await this.database.db
       .select({
@@ -92,7 +92,7 @@ export class DashboardService {
         count: sql<number>`count(*)::int`,
       })
       .from(leads)
-      .where(eq(leads.campaignId, campaignId))
+      .where(and(eq(leads.campaignId, campaignId), eq(leads.isDeleted, false)))
       .groupBy(leads.source);
 
     return {
@@ -103,7 +103,7 @@ export class DashboardService {
   }
 
   async getFollowupDashboard(userId: string, role: string, campaignId?: string, page: number = 1, limit: number = 50) {
-    const conditions: any[] = [];
+    const conditions: any[] = [eq(leads.isDeleted, false)];
     if (role === 'USER') {
       conditions.push(eq(followups.userId, userId));
     }
@@ -200,7 +200,7 @@ export class DashboardService {
   }
 
   async getAllLeadsDashboard(userId: string, role: string, campaignId?: string, page: number = 1, limit: number = 50) {
-    const conditions: any[] = [];
+    const conditions: any[] = [eq(leads.isDeleted, false)];
     if (campaignId) conditions.push(eq(leads.campaignId, campaignId));
     if (role === 'USER') conditions.push(eq(leads.doerId, userId));
 
@@ -267,7 +267,7 @@ export class DashboardService {
   }
 
   async getSalesFunnel(userId: string, role: string, campaignId?: string) {
-    const leadConditions: any[] = [];
+    const leadConditions: any[] = [eq(leads.isDeleted, false)];
     if (role === 'USER') leadConditions.push(eq(leads.doerId, userId));
     if (campaignId) leadConditions.push(eq(leads.campaignId, campaignId));
 
@@ -331,7 +331,7 @@ export class DashboardService {
   }
 
   async getUserConversion(userId: string, role: string, campaignId?: string, startDate?: string, endDate?: string) {
-    const leadConditions: any[] = [];
+    const leadConditions: any[] = [eq(leads.isDeleted, false)];
     if (role === 'MANAGER') {
       // MANAGER role filter (simplified)
     }

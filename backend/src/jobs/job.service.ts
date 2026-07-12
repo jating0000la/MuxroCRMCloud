@@ -47,7 +47,7 @@ export class JobService implements OnModuleInit, OnModuleDestroy {
     const jobId = await this.boss.send(queueName, data, {
       priority: options?.priority,
       startAfter: options?.startAfter,
-      singletonKey: options?.singletonKey,
+      singletonKey: options?.singletonKey || options?.idempotencyKey,
       retryLimit: options?.retryLimit ?? 3,
       retryBackoff: options?.retryBackoff ?? true,
     });

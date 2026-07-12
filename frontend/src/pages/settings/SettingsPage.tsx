@@ -547,8 +547,8 @@ export default function SettingsPage() {
                   <div>
                     <label className={labelCls}>Gupshup Webhook URL (for inbound messages)</label>
                     <div className="flex gap-2">
-                      <input type="text" readOnly value={`${window.location.origin}/api/integrations/gupshup/webhook`} className={inputCls + ' bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm'} />
-                      <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/integrations/gupshup/webhook`); toast.success('Copied!'); }} className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 whitespace-nowrap">Copy</button>
+                      <input type="text" readOnly value={`${window.location.origin}/api/v1/integrations/gupshup/webhook`} className={inputCls + ' bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm'} />
+                      <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/v1/integrations/gupshup/webhook`); toast.success('Copied!'); }} className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 whitespace-nowrap">Copy</button>
                     </div>
                     <p className={hintCls}>Paste this in Gupshup Console &gt; Settings &gt; Webhooks</p>
                   </div>

@@ -52,9 +52,14 @@ export class AuthService {
     const payload = { sub: user.id, username: user.username, role: user.role };
     const token = this.jwtService.sign(payload);
 
-    // Create a DB-backed session
-    const expiresAt = new Date(Date.now() + this.getExpirationMs());
-    await this.refreshSessionService.createSession(user.id, token, expiresAt);
+    // Create a DB-backed session (if this fails, revoke the token)
+    try {
+      const expiresAt = new Date(Date.now() + this.getExpirationMs());
+      await this.refreshSessionService.createSession(user.id, token, expiresAt);
+    } catch (sessionError) {
+      await this.refreshSessionService.revokeSession(token);
+      throw new UnauthorizedException('Login failed. Please try again.');
+    }
 
     return {
       access_token: token,
@@ -91,9 +96,14 @@ export class AuthService {
     const payload = { sub: user.id, username: user.username, role: user.role };
     const token = this.jwtService.sign(payload);
 
-    // Create a DB-backed session
-    const expiresAt = new Date(Date.now() + this.getExpirationMs());
-    await this.refreshSessionService.createSession(user.id, token, expiresAt);
+    // Create a DB-backed session (if this fails, revoke the token)
+    try {
+      const expiresAt = new Date(Date.now() + this.getExpirationMs());
+      await this.refreshSessionService.createSession(user.id, token, expiresAt);
+    } catch (sessionError) {
+      await this.refreshSessionService.revokeSession(token);
+      throw new ConflictException('Registration failed. Please try again.');
+    }
 
     return {
       access_token: token,

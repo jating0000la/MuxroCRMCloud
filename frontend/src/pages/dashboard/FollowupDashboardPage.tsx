@@ -113,10 +113,11 @@ export default function FollowupDashboardPage() {
   const refreshSilently = async () => {
     setIsRefreshing(true);
     try {
-      const [leadsData, campaignsData] = await Promise.all([
+      const [leadsRaw, campaignsData] = await Promise.all([
         dashboardService.getAllLeadsDashboard(selectedCampaign || undefined),
         campaignService.getAll(),
       ]);
+      const leadsData = Array.isArray(leadsRaw) ? leadsRaw : (leadsRaw as any).data;
       setLeads(leadsData);
       setCampaigns(campaignsData);
       setLastRefreshed(new Date());
@@ -130,10 +131,11 @@ export default function FollowupDashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const [leadsData, campaignsData] = await Promise.all([
+      const [leadsRaw, campaignsData] = await Promise.all([
         dashboardService.getAllLeadsDashboard(selectedCampaign || undefined),
         campaignService.getAll(),
       ]);
+      const leadsData = Array.isArray(leadsRaw) ? leadsRaw : (leadsRaw as any).data;
       setLeads(leadsData);
       setCampaigns(campaignsData);
       setLastRefreshed(new Date());

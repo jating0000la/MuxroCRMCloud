@@ -53,6 +53,15 @@ async function bootstrap() {
 
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
+
+  // Prevent silent worker death
+  process.on('uncaughtException', (err) => {
+    logger.error(`Uncaught Exception: ${err.message}`, err.stack);
+    // Don't exit - let worker continue processing other jobs
+  });
+  process.on('unhandledRejection', (reason: any) => {
+    logger.error(`Unhandled Rejection: ${reason?.message || reason}`);
+  });
 }
 
 bootstrap().catch((err) => {

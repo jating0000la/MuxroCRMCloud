@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { eq, and, desc, asc } from 'drizzle-orm';
+import { eq, and, desc, asc, inArray } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
 import { forms, enquiries, leads, campaignStatuses, followups, campaigns } from '../db/schema';
 import { PaginationDto } from '../common/pagination.dto';
@@ -98,60 +98,64 @@ export class FormsService {
     const fields = Array.isArray(form.fields) ? form.fields as PublicFormField[] : [];
     this.validateSubmissionData(fields, data);
 
-    const [submission] = await this.database.db
-      .insert(enquiries)
-      .values({
-        formId: form.id,
-        data,
-        ipAddress,
-      })
-      .returning();
+    // Wrap enquiry + lead + followup creation in a transaction
+    const result = await this.database.db.transaction(async (tx) => {
+      const [submission] = await tx
+        .insert(enquiries)
+        .values({
+          formId: form.id,
+          data,
+          ipAddress,
+        })
+        .returning();
 
-    const name = data.name || data.Name || 'Unknown';
-    const email = data.email || data.Email || null;
-    const phone = data.phone || data.Phone || null;
+      const name = data.name || data.Name || 'Unknown';
+      const email = data.email || data.Email || null;
+      const phone = data.phone || data.Phone || null;
 
-    const doerId = await this.roundRobinService.getNextRoundRobinUser(form.campaignId);
+      const doerId = await this.roundRobinService.getNextRoundRobinUser(form.campaignId);
 
-    const [firstStatus] = await this.database.db
-      .select()
-      .from(campaignStatuses)
-      .where(eq(campaignStatuses.campaignId, form.campaignId))
-      .orderBy(asc(campaignStatuses.order))
-      .limit(1);
+      const [firstStatus] = await tx
+        .select()
+        .from(campaignStatuses)
+        .where(eq(campaignStatuses.campaignId, form.campaignId))
+        .orderBy(asc(campaignStatuses.order))
+        .limit(1);
 
-    const [lead] = await this.database.db
-      .insert(leads)
-      .values({
-        campaignId: form.campaignId,
-        enquiryId: submission.id,
-        name,
-        email,
-        phone,
-        source: 'form',
-        customData: data,
-        doerId,
-        statusId: firstStatus?.id || null,
-      })
-      .returning();
+      const [lead] = await tx
+        .insert(leads)
+        .values({
+          campaignId: form.campaignId,
+          enquiryId: submission.id,
+          name,
+          email,
+          phone,
+          source: 'form',
+          customData: data,
+          doerId,
+          statusId: firstStatus?.id || null,
+        })
+        .returning();
 
-    const statusLabel = firstStatus?.label || 'New';
-    await this.database.db.insert(followups).values({
-      leadId: lead.id,
-      userId: doerId,
-      status: statusLabel,
-      remarks: 'Form submitted',
+      const statusLabel = firstStatus?.label || 'New';
+      await tx.insert(followups).values({
+        leadId: lead.id,
+        userId: doerId,
+        status: statusLabel,
+        remarks: 'Form submitted',
+      });
+
+      return { submission, lead, phone, name, data, doerId };
     });
 
-    // Extract per-form communication config from meta
+    // Send greeting outside transaction (non-blocking)
     const metaField = fields.find((f: any) => f.type === '__design_meta' || f.name === '__form_meta');
     const formComm = (metaField as any)?.meta?.communication || {};
-
-    this.sendFormGreeting(phone, name, formComm, data).catch((err) => {
+    this.sendFormGreeting(result.phone, result.name, formComm, result.data).catch((err) => {
       this.logger.warn(`Form greeting failed: ${err.message}`);
     });
 
-    return { submission, lead };
+    return { submission: result.submission, lead: result.lead };
   }
 
   async update(id: string, dto: UpdateFormDto) {
@@ -190,11 +194,29 @@ export class FormsService {
 
   async remove(id: string) {
     await this.findOne(id);
-    const [deleted] = await this.database.db
-      .delete(forms)
-      .where(eq(forms.id, id))
-      .returning();
-    return deleted;
+
+    return await this.database.db.transaction(async (tx) => {
+      // Null out enquiryId on any leads that reference this form's enquiries
+      // to avoid FK violation when cascade-deleting enquiries
+      const formEnquiries = await tx
+        .select({ id: enquiries.id })
+        .from(enquiries)
+        .where(eq(enquiries.formId, id));
+
+      if (formEnquiries.length > 0) {
+        const enquiryIds = formEnquiries.map((e) => e.id);
+        await tx
+          .update(leads)
+          .set({ enquiryId: null })
+          .where(inArray(leads.enquiryId, enquiryIds));
+      }
+
+      const [deleted] = await tx
+        .delete(forms)
+        .where(eq(forms.id, id))
+        .returning();
+      return deleted;
+    });
   }
 
   async getSubmissions(formId: string, pagination?: PaginationDto) {

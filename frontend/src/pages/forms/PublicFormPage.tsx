@@ -110,7 +110,7 @@ export default function PublicFormPage() {
     fields.forEach((field) => {
       const value = formData[field.name];
       if (field.required && (!value || value.toString().trim() === '')) {
-        newErrors[field.name] = `${field.label} is required`;
+        newErrors[field.name] = `${field.label ?? 'This field'} is required`;
       }
       if (value && field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
         newErrors[field.name] = 'Please enter a valid email address';
@@ -280,7 +280,7 @@ export default function PublicFormPage() {
               hasError ? 'border-red-300' : 'border-gray-300 bg-white text-gray-900'
             }`}
             rows={4}
-            placeholder={`Enter ${field.label.toLowerCase()}`}
+            placeholder={`Enter ${field.label?.toLowerCase() ?? ''}`}
           />
         );
 
@@ -293,7 +293,7 @@ export default function PublicFormPage() {
               hasError ? 'border-red-300' : 'border-gray-300 bg-white text-gray-900'
             }`}
           >
-            <option value="">Select {field.label.toLowerCase()}...</option>
+            <option value="">Select {field.label?.toLowerCase() ?? ''}...</option>
             {field.options?.map((opt) => (
               <option key={opt} value={opt}>{opt}</option>
             ))}
@@ -505,7 +505,7 @@ export default function PublicFormPage() {
             className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors ${
               hasError ? 'border-red-300' : 'border-gray-300 bg-white text-gray-900'
             }`}
-            placeholder={`Enter ${field.label.toLowerCase()}`}
+            placeholder={`Enter ${field.label?.toLowerCase() ?? ''}`}
           />
         );
     }

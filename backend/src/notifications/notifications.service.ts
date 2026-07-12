@@ -148,11 +148,11 @@ export class NotificationsService {
     }));
   }
 
-  async markAsRead(notificationId: string) {
+  async markAsRead(notificationId: string, userId: string) {
     const [updated] = await this.database.db
       .update(notifications)
       .set({ isRead: true })
-      .where(eq(notifications.id, notificationId))
+      .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)))
       .returning();
     return updated;
   }

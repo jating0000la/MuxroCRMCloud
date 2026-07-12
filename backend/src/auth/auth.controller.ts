@@ -41,8 +41,9 @@ export class AuthController {
     res.cookie('auth_token', result.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge,
+      path: '/',
     });
     return res.json({ user: result.user, message: 'Login successful' });
   }
@@ -74,7 +75,12 @@ export class AuthController {
     if (token) {
       await this.tokenBlacklist.revoke(token);
     }
-    res.clearCookie('auth_token');
+    res.clearCookie('auth_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+    });
     return res.json({ message: 'Logged out successfully' });
   }
 

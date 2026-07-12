@@ -154,6 +154,16 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
   const slugify = (text: string) =>
     text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'field';
 
+  const uniqueName = (base: string, excludeIndex?: number) => {
+    let candidate = base;
+    let counter = 1;
+    while (fields.some((f, i) => f.name === candidate && i !== excludeIndex)) {
+      counter++;
+      candidate = `${base}_${counter}`;
+    }
+    return candidate;
+  };
+
   const addField = (type: string) => {
     const newField: FormBuilderField = {
       name: '',
@@ -169,7 +179,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
       rows: type === 'multiple_choice_grid' || type === 'checkbox_grid' ? ['Row 1', 'Row 2'] : undefined,
       columns: type === 'multiple_choice_grid' || type === 'checkbox_grid' ? ['Col 1', 'Col 2'] : undefined,
     };
-    newField.name = slugify(newField.label);
+    newField.name = uniqueName(slugify(newField.label));
     const newFields = [...fields, newField];
     setFields(newFields);
     setSelectedFieldIndex(newFields.length - 1);
@@ -178,7 +188,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
   const updateField = (index: number, key: string, value: any) => {
     const updated = [...fields];
     updated[index] = { ...updated[index], [key]: value };
-    if (key === 'label') updated[index].name = slugify(value);
+    if (key === 'label') updated[index].name = uniqueName(slugify(value), index);
     if (key === 'type') {
       const field = updated[index];
       delete field.options;
@@ -249,7 +259,7 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
     const copiedLabel = `${field.label} Copy`;
     const copied: FormBuilderField = {
       ...field,
-      name: slugify(copiedLabel),
+      name: uniqueName(slugify(copiedLabel)),
       label: copiedLabel,
     };
     const updated = [...fields];

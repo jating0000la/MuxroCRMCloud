@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -8,7 +8,7 @@ import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../../db/database.service';
 import { jobLogs } from '../../db/schema';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 @Injectable()
 export class BackupService {
@@ -25,6 +25,18 @@ export class BackupService {
     }
   }
 
+  private parseDatabaseUrl(dbUrl: string) {
+    const url = new URL(dbUrl);
+    const dbName = url.pathname.slice(1).split('?')[0];
+    return {
+      host: url.hostname,
+      port: url.port || '5432',
+      user: url.username,
+      database: dbName,
+      password: url.password,
+    };
+  }
+
   async createBackup(retentionDays: number = 7): Promise<{
     file: string;
     size: number;
@@ -34,7 +46,7 @@ export class BackupService {
     const dbUrl = this.configService.get<string>('DATABASE_URL');
     if (!dbUrl) throw new Error('DATABASE_URL not configured');
 
-    const url = new URL(dbUrl);
+    const db = this.parseDatabaseUrl(dbUrl);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `crm_db_${timestamp}.sql.gz`;
     const filepath = path.join(this.backupDir, filename);
@@ -42,11 +54,17 @@ export class BackupService {
     this.logger.log(`Starting backup: ${filename}`);
 
     try {
-      const dumpCmd = `PGPASSWORD="${url.password}" pg_dump -h ${url.hostname} -p ${url.port} -U ${url.username} -d ${url.pathname.slice(1).split('?')[0]} --format=custom --compress=6`;
-
-      const { stdout } = await execAsync(dumpCmd, {
+      const { stdout } = await execFileAsync('pg_dump', [
+        '-h', db.host,
+        '-p', db.port,
+        '-U', db.user,
+        '-d', db.database,
+        '--format=custom',
+        '--compress=6',
+      ], {
         maxBuffer: 50 * 1024 * 1024,
         timeout: 300000,
+        env: { ...process.env, PGPASSWORD: db.password },
       });
 
       fs.writeFileSync(filepath, stdout);
@@ -56,27 +74,31 @@ export class BackupService {
 
       this.logger.log(`Backup completed: ${filename} (${(stats.size / 1024 / 1024).toFixed(2)}MB, ${duration}ms)`);
 
-      await this.database.db.insert(jobLogs).values({
-        jobType: 'backup-database',
-        status: 'completed',
-        payload: { filename, size: stats.size },
-        result: { filename, size: stats.size, duration },
-        startedAt: new Date(startTime),
-        completedAt: new Date(),
-      });
+      try {
+        await this.database.db.insert(jobLogs).values({
+          jobType: 'backup-database',
+          status: 'completed',
+          payload: { filename, size: stats.size },
+          result: { filename, size: stats.size, duration },
+          startedAt: new Date(startTime),
+          completedAt: new Date(),
+        });
+      } catch { /* log failure is non-blocking */ }
 
       await this.cleanupOldBackups(retentionDays);
 
       return { file: filename, size: stats.size, duration };
     } catch (error: any) {
       this.logger.error(`Backup failed: ${error.message}`);
-      await this.database.db.insert(jobLogs).values({
-        jobType: 'backup-database',
-        status: 'failed',
-        error: error.message,
-        startedAt: new Date(startTime),
-        completedAt: new Date(),
-      });
+      try {
+        await this.database.db.insert(jobLogs).values({
+          jobType: 'backup-database',
+          status: 'failed',
+          error: error.message,
+          startedAt: new Date(startTime),
+          completedAt: new Date(),
+        });
+      } catch { /* non-blocking */ }
       throw error;
     }
   }
@@ -98,12 +120,16 @@ export class BackupService {
     const backups = this.listBackups();
     const latest = backups[0];
 
-    const [lastJob] = await this.database.db
-      .select()
-      .from(jobLogs)
-      .where(eq(jobLogs.jobType, 'backup-database'))
-      .orderBy(jobLogs.createdAt)
-      .limit(1);
+    let lastJob: any = null;
+    try {
+      const [job] = await this.database.db
+        .select()
+        .from(jobLogs)
+        .where(eq(jobLogs.jobType, 'backup-database'))
+        .orderBy(jobLogs.createdAt)
+        .limit(1);
+      lastJob = job;
+    } catch { /* non-blocking */ }
 
     return {
       totalBackups: backups.length,
@@ -114,7 +140,6 @@ export class BackupService {
       } : null,
       lastJobStatus: lastJob?.status,
       lastJobError: lastJob?.error,
-      backupDir: this.backupDir,
     };
   }
 

@@ -141,36 +141,40 @@ export class LeadsService {
       statusId = firstStatus?.id || undefined;
     }
 
-    const [lead] = await this.database.db
-      .insert(leads)
-      .values({
-        campaignId: dto.campaignId,
-        name: dto.name,
-        email: dto.email,
-        phone: dto.phone,
-        doerId,
-        statusId,
-        source: dto.source || 'manual',
-        customData: dto.customData,
-      })
-      .returning();
+    const lead = await this.database.db.transaction(async (tx) => {
+      const [newLead] = await tx
+        .insert(leads)
+        .values({
+          campaignId: dto.campaignId,
+          name: dto.name,
+          email: dto.email,
+          phone: dto.phone,
+          doerId,
+          statusId,
+          source: dto.source || 'manual',
+          customData: dto.customData,
+        })
+        .returning();
 
-    // Auto-create initial followup
-    let statusLabel = 'New';
-    if (statusId) {
-      const [status] = await this.database.db
-        .select()
-        .from(campaignStatuses)
-        .where(eq(campaignStatuses.id, statusId))
-        .limit(1);
-      statusLabel = status?.label || 'New';
-    }
+      // Auto-create initial followup
+      let statusLabel = 'New';
+      if (statusId) {
+        const [status] = await tx
+          .select()
+          .from(campaignStatuses)
+          .where(eq(campaignStatuses.id, statusId))
+          .limit(1);
+        statusLabel = status?.label || 'New';
+      }
 
-    await this.database.db.insert(followups).values({
-      leadId: lead.id,
-      userId: doerId,
-      status: statusLabel,
-      remarks: dto.source === 'form' ? 'Form submitted' : dto.source === 'bulk' ? 'Imported via bulk upload' : 'Lead created',
+      await tx.insert(followups).values({
+        leadId: newLead.id,
+        userId: doerId,
+        status: statusLabel,
+        remarks: dto.source === 'form' ? 'Form submitted' : dto.source === 'bulk' ? 'Imported via bulk upload' : 'Lead created',
+      });
+
+      return newLead;
     });
 
     return lead;
