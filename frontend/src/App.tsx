@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import CampaignsPage from './pages/campaigns/CampaignsPage';
@@ -48,26 +49,28 @@ function ThemedToaster() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <NotificationProvider>
-          <BrowserRouter>
-            <ThemedToaster />
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/form/:slug" element={<PublicFormPage />} />
-              <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
-              <Route path="/campaigns" element={<PrivateRoute><AdminRoute><CampaignsPage /></AdminRoute></PrivateRoute>} />
-              <Route path="/campaigns/:id" element={<PrivateRoute><AdminRoute><CampaignDetailPage /></AdminRoute></PrivateRoute>} />
-              <Route path="/followups" element={<PrivateRoute><FollowupDashboardPage /></PrivateRoute>} />
-              <Route path="/dnd" element={<PrivateRoute><DndPage /></PrivateRoute>} />
-              <Route path="/admin/users" element={<PrivateRoute><AdminRoute><AdminUsersPage /></AdminRoute></PrivateRoute>} />
-              <Route path="/settings" element={<PrivateRoute><AdminRoute><SettingsPage /></AdminRoute></PrivateRoute>} />
-              <Route path="*" element={<Navigate to="/dashboard" />} />
-            </Routes>
-          </BrowserRouter>
-        </NotificationProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <NotificationProvider>
+            <BrowserRouter>
+              <ThemedToaster />
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/form/:slug" element={<PublicFormPage />} />
+                <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+                <Route path="/campaigns" element={<PrivateRoute><AdminRoute><CampaignsPage /></AdminRoute></PrivateRoute>} />
+                <Route path="/campaigns/:id" element={<PrivateRoute><AdminRoute><CampaignDetailPage /></AdminRoute></PrivateRoute>} />
+                <Route path="/followups" element={<PrivateRoute><FollowupDashboardPage /></PrivateRoute>} />
+                <Route path="/dnd" element={<PrivateRoute><DndPage /></PrivateRoute>} />
+                <Route path="/admin/users" element={<PrivateRoute><AdminRoute><AdminUsersPage /></AdminRoute></PrivateRoute>} />
+                <Route path="/settings" element={<PrivateRoute><AdminRoute><SettingsPage /></AdminRoute></PrivateRoute>} />
+                <Route path="*" element={<Navigate to="/dashboard" />} />
+              </Routes>
+            </BrowserRouter>
+          </NotificationProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

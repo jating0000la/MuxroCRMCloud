@@ -140,6 +140,8 @@ export const leads = pgTable(
     source: varchar('source', { length: 100 }).notNull().default('manual'),
     customData: json('customData'),
     dnd: boolean('dnd').notNull().default(false),
+    isDeleted: boolean('isDeleted').notNull().default(false),
+    deletedAt: timestamp('deletedAt'),
     createdAt: timestamp('createdAt').notNull().defaultNow(),
     updatedAt: timestamp('updatedAt').notNull().defaultNow(),
     doerId: uuid('doerId').references(() => users.id),

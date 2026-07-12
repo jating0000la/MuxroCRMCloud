@@ -12,7 +12,7 @@ export class LeadsService {
   constructor(private database: DatabaseService) {}
 
   async findByCampaign(campaignId: string, userId?: string, role?: string, pagination?: PaginationDto) {
-    const conditions: any[] = [eq(leads.campaignId, campaignId)];
+    const conditions: any[] = [eq(leads.campaignId, campaignId), eq(leads.isDeleted, false)];
     if (role === 'USER' && userId) {
       conditions.push(eq(leads.doerId, userId));
     }
@@ -89,7 +89,7 @@ export class LeadsService {
       .leftJoin(users, eq(leads.doerId, users.id))
       .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
       .leftJoin(campaigns, eq(leads.campaignId, campaigns.id))
-      .where(eq(leads.id, id))
+      .where(and(eq(leads.id, id), eq(leads.isDeleted, false)))
       .limit(1);
 
     if (!result) throw new NotFoundException('Lead not found');
@@ -245,7 +245,7 @@ export class LeadsService {
   }
 
   async findDnd(userId?: string, role?: string, pagination?: PaginationDto) {
-    const conditions: any[] = [eq(leads.dnd, true)];
+    const conditions: any[] = [eq(leads.dnd, true), eq(leads.isDeleted, false)];
     if (role === 'USER' && userId) {
       conditions.push(eq(leads.doerId, userId));
     }
@@ -320,7 +320,8 @@ export class LeadsService {
       throw new ForbiddenException('You cannot delete leads');
     }
     const [deleted] = await this.database.db
-      .delete(leads)
+      .update(leads)
+      .set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() })
       .where(eq(leads.id, id))
       .returning();
     return deleted;
