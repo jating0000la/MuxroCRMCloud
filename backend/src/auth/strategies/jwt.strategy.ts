@@ -25,15 +25,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(req: any, payload: any) {
-    // Extract token from request (Bearer or cookie) for blacklist check
     let token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
     if (!token && req.cookies) {
       token = req.cookies.auth_token;
     }
 
-    // Check if token has been revoked/blacklisted
-    if (token && this.tokenBlacklist.isBlacklisted(token)) {
-      throw new UnauthorizedException('Token has been revoked. Please log in again.');
+    // Check if token has been revoked in the database
+    if (token) {
+      const isRevoked = await this.tokenBlacklist.isBlacklisted(token);
+      if (isRevoked) {
+        throw new UnauthorizedException('Token has been revoked. Please log in again.');
+      }
     }
 
     return { id: payload.sub, username: payload.username, role: payload.role };

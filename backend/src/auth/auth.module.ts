@@ -6,23 +6,26 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { TokenBlacklistService } from './services/token-blacklist.service';
+import { RefreshSessionService } from './services/refresh-session.service';
 import { UsersModule } from '../users/users.module';
+import { DatabaseModule } from '../db/database.module';
 
 @Module({
   imports: [
     UsersModule,
     PassportModule,
+    DatabaseModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: configService.get<string>('JWT_EXPIRATION', '15m') as any },
+        signOptions: { expiresIn: configService.get<string>('JWT_EXPIRATION', '7d') as any },
       }),
       inject: [ConfigService],
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, TokenBlacklistService],
-  exports: [AuthService, TokenBlacklistService],
+  providers: [AuthService, JwtStrategy, TokenBlacklistService, RefreshSessionService],
+  exports: [AuthService, TokenBlacklistService, RefreshSessionService],
 })
 export class AuthModule {}

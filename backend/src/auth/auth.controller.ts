@@ -72,7 +72,7 @@ export class AuthController {
   async logout(@Request() req, @Response() res) {
     let token = ExtractJwt.fromAuthHeaderAsBearerToken()(req) || req.cookies?.auth_token;
     if (token) {
-      this.tokenBlacklist.revoke(token, 24 * 60 * 60);
+      await this.tokenBlacklist.revoke(token);
     }
     res.clearCookie('auth_token');
     return res.json({ message: 'Logged out successfully' });

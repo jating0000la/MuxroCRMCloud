@@ -1,43 +1,32 @@
 import { Injectable } from '@nestjs/common';
+import { RefreshSessionService } from './refresh-session.service';
 
 /**
- * JWT Token blacklist service for logout/revocation
- * In production, use Redis instead of in-memory storage
+ * JWT Token blacklist service backed by database sessions.
+ * Replaces the in-memory Set with persistent DB-backed revocation.
  */
 @Injectable()
 export class TokenBlacklistService {
-  private blacklist = new Set<string>();
+  constructor(private refreshSessionService: RefreshSessionService) {}
 
   /**
-   * Add token to blacklist
+   * Add token to blacklist (revoke session)
    */
-  revoke(token: string, expiresIn: number = 86400): void {
-    this.blacklist.add(token);
-    
-    // Auto-remove from memory after expiration (TTL)
-    setTimeout(() => {
-      this.blacklist.delete(token);
-    }, expiresIn * 1000);
+  async revoke(token: string): Promise<void> {
+    await this.refreshSessionService.revokeSession(token);
   }
 
   /**
-   * Check if token is blacklisted
+   * Revoke all sessions for a user
    */
-  isBlacklisted(token: string): boolean {
-    return this.blacklist.has(token);
+  async revokeAllForUser(userId: string): Promise<void> {
+    await this.refreshSessionService.revokeAllUserSessions(userId);
   }
 
   /**
-   * Clear entire blacklist (for testing/maintenance)
+   * Check if token is blacklisted/revoked
    */
-  clear(): void {
-    this.blacklist.clear();
-  }
-
-  /**
-   * Get blacklist size
-   */
-  size(): number {
-    return this.blacklist.size;
+  async isBlacklisted(token: string): Promise<boolean> {
+    return this.refreshSessionService.isRevoked(token);
   }
 }

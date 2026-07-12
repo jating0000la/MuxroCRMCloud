@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
@@ -15,18 +15,25 @@ import { IntegrationsModule } from './integrations/integrations.module';
 import { SettingsModule } from './settings/settings.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { HealthController } from './health.controller';
+import { AdminDashboardController } from './admin-dashboard.controller';
+
+// New infrastructure modules
+import { JobModule } from './jobs/job.module';
+import { AuthorizationModule } from './common/authorization/authorization.module';
+import { OutboxModule } from './common/outbox/outbox.module';
+import { BackupModule } from './common/backup/backup.module';
+
+// Middleware
+import { StructuredLoggingMiddleware } from './common/logging/structured-logging.middleware';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    // ✅ FIXED: Reduced rate limits and added endpoint-specific throttling
-    // Default: 100 requests per minute
-    // Auth endpoints will override with stricter limits
     ThrottlerModule.forRoot([
       {
-        ttl: 60000,        // 1 minute
-        limit: 100,        // 100 requests per minute (default)
-        blockDuration: 5000,  // Block for 5 seconds after limit exceeded
+        ttl: 60000,
+        limit: 100,
+        blockDuration: 5000,
       },
     ]),
     DatabaseModule,
@@ -41,8 +48,13 @@ import { HealthController } from './health.controller';
     IntegrationsModule,
     SettingsModule,
     NotificationsModule,
+    // New infrastructure
+    JobModule,
+    AuthorizationModule,
+    OutboxModule,
+    BackupModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, AdminDashboardController],
   providers: [
     {
       provide: APP_GUARD,
@@ -50,4 +62,8 @@ import { HealthController } from './health.controller';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(StructuredLoggingMiddleware).forRoutes('*');
+  }
+}

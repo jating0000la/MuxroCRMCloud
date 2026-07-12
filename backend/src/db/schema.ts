@@ -269,3 +269,83 @@ export type NewSetting = typeof settings.$inferInsert;
 export type SettingAuditLog = typeof settingAuditLogs.$inferSelect;
 export type NewSettingAuditLog = typeof settingAuditLogs.$inferInsert;
 export type Role = (typeof roleEnum.enumValues)[number];
+
+// ─── Refresh Sessions (DB-backed token revocation) ───────────────────────────
+
+export const refreshSessions = pgTable(
+  'RefreshSession',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('userId')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: varchar('tokenHash', { length: 255 }).notNull(),
+    expiresAt: timestamp('expiresAt').notNull(),
+    revokedAt: timestamp('revokedAt'),
+    createdAt: timestamp('createdAt').notNull().defaultNow(),
+  },
+  (table) => [
+    index('RefreshSession_userId_idx').on(table.userId),
+    index('RefreshSession_tokenHash_idx').on(table.tokenHash),
+    index('RefreshSession_expiresAt_idx').on(table.expiresAt),
+  ],
+);
+
+// ─── Outbox Events (Transactional Outbox Pattern) ───────────────────────────
+
+export const outboxEvents = pgTable(
+  'OutboxEvent',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    aggregateType: varchar('aggregateType', { length: 100 }).notNull(),
+    aggregateId: varchar('aggregateId', { length: 255 }).notNull(),
+    eventType: varchar('eventType', { length: 100 }).notNull(),
+    payload: json('payload').notNull(),
+    published: boolean('published').notNull().default(false),
+    publishedAt: timestamp('publishedAt'),
+    retryCount: integer('retryCount').notNull().default(0),
+    maxRetries: integer('maxRetries').notNull().default(3),
+    lastError: text('lastError'),
+    createdAt: timestamp('createdAt').notNull().defaultNow(),
+  },
+  (table) => [
+    index('OutboxEvent_published_idx').on(table.published),
+    index('OutboxEvent_eventType_idx').on(table.eventType),
+    index('OutboxEvent_createdAt_idx').on(table.createdAt),
+    index('OutboxEvent_aggregateType_aggregateId_idx').on(table.aggregateType, table.aggregateId),
+  ],
+);
+
+// ─── Job Logs (Background job tracking & failed job handling) ────────────────
+
+export const jobLogs = pgTable(
+  'JobLog',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    jobType: varchar('jobType', { length: 100 }).notNull(),
+    jobId: varchar('jobId', { length: 255 }),
+    status: varchar('status', { length: 50 }).notNull().default('pending'),
+    payload: json('payload'),
+    result: json('result'),
+    error: text('error'),
+    retryCount: integer('retryCount').notNull().default(0),
+    maxRetries: integer('maxRetries').notNull().default(3),
+    idempotencyKey: varchar('idempotencyKey', { length: 255 }),
+    startedAt: timestamp('startedAt'),
+    completedAt: timestamp('completedAt'),
+    createdAt: timestamp('createdAt').notNull().defaultNow(),
+  },
+  (table) => [
+    index('JobLog_jobType_idx').on(table.jobType),
+    index('JobLog_status_idx').on(table.status),
+    index('JobLog_idempotencyKey_idx').on(table.idempotencyKey),
+    index('JobLog_createdAt_idx').on(table.createdAt),
+  ],
+);
+
+export type RefreshSession = typeof refreshSessions.$inferSelect;
+export type NewRefreshSession = typeof refreshSessions.$inferInsert;
+export type OutboxEvent = typeof outboxEvents.$inferSelect;
+export type NewOutboxEvent = typeof outboxEvents.$inferInsert;
+export type JobLog = typeof jobLogs.$inferSelect;
+export type NewJobLog = typeof jobLogs.$inferInsert;
