@@ -102,11 +102,22 @@ export class DashboardService {
     };
   }
 
-  async getFollowupDashboard(userId: string, role: string, campaignId?: string) {
+  async getFollowupDashboard(userId: string, role: string, campaignId?: string, page: number = 1, limit: number = 50) {
     const conditions: any[] = [];
     if (role === 'USER') {
       conditions.push(eq(followups.userId, userId));
     }
+
+    const offset = (page - 1) * limit;
+
+    const countConditions: any[] = [...conditions];
+    if (campaignId) countConditions.push(eq(leads.campaignId, campaignId));
+
+    const [{ total }] = await this.database.db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(followups)
+      .innerJoin(leads, eq(followups.leadId, leads.id))
+      .where(countConditions.length > 0 ? and(...countConditions) : undefined);
 
     let results;
     if (campaignId) {
@@ -138,7 +149,9 @@ export class DashboardService {
         .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
         .leftJoin(users, eq(followups.userId, users.id))
         .where(and(eq(leads.campaignId, campaignId), ...(conditions.length > 0 ? conditions : [])))
-        .orderBy(desc(followups.createdAt));
+        .orderBy(desc(followups.createdAt))
+        .offset(offset)
+        .limit(limit);
     } else {
       results = await this.database.db
         .select({
@@ -168,20 +181,35 @@ export class DashboardService {
         .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
         .leftJoin(users, eq(followups.userId, users.id))
         .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(desc(followups.createdAt));
+        .orderBy(desc(followups.createdAt))
+        .offset(offset)
+        .limit(limit);
     }
 
-    return results.map((r) => ({
-      ...r.followup,
-      lead: r.lead,
-      user: r.user,
-    }));
+    return {
+      data: results.map((r) => ({
+        ...r.followup,
+        lead: r.lead,
+        user: r.user,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
-  async getAllLeadsDashboard(userId: string, role: string, campaignId?: string) {
+  async getAllLeadsDashboard(userId: string, role: string, campaignId?: string, page: number = 1, limit: number = 50) {
     const conditions: any[] = [];
     if (campaignId) conditions.push(eq(leads.campaignId, campaignId));
     if (role === 'USER') conditions.push(eq(leads.doerId, userId));
+
+    const offset = (page - 1) * limit;
+
+    const [{ total }] = await this.database.db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(leads)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
 
     const results = await this.database.db
       .select({
@@ -202,9 +230,10 @@ export class DashboardService {
       .leftJoin(users, eq(leads.doerId, users.id))
       .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(leads.updatedAt));
+      .orderBy(desc(leads.updatedAt))
+      .offset(offset)
+      .limit(limit);
 
-    // Get latest followup for each lead
     const leadIds = results.map((r) => r.lead.id);
     let latestFollowups: any[] = [];
     if (leadIds.length > 0) {
@@ -222,13 +251,19 @@ export class DashboardService {
       }
     }
 
-    return results.map((r) => ({
-      ...r.lead,
-      campaign: r.campaign,
-      doer: r.doer,
-      status: r.status,
-      followups: followupMap.has(r.lead.id) ? [followupMap.get(r.lead.id)] : [],
-    }));
+    return {
+      data: results.map((r) => ({
+        ...r.lead,
+        campaign: r.campaign,
+        doer: r.doer,
+        status: r.status,
+        followups: followupMap.has(r.lead.id) ? [followupMap.get(r.lead.id)] : [],
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async getSalesFunnel(userId: string, role: string, campaignId?: string) {

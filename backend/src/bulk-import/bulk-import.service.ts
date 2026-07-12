@@ -1,13 +1,17 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { eq, and, ne, desc, asc, sql, inArray } from 'drizzle-orm';
+import { eq, and, asc, inArray } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
-import { leads, followups, campaignStatuses, campaignUsers, users } from '../db/schema';
+import { leads, followups, campaignStatuses } from '../db/schema';
 import { parse } from 'csv-parse/sync';
 import { BulkLeadRowSchema, sanitizeJson } from '../common/validation';
+import { RoundRobinService } from '../common/services/round-robin.service';
 
 @Injectable()
 export class BulkImportService {
-  constructor(private database: DatabaseService) {}
+  constructor(
+    private database: DatabaseService,
+    private roundRobinService: RoundRobinService,
+  ) {}
 
   async importFromCSV(campaignId: string, fileBuffer: Buffer, allocateRoundRobin: boolean = true) {
     let records: any[];
@@ -66,7 +70,7 @@ export class BulkImportService {
     ).returning();
 
     if (allocateRoundRobin && newLeads.length > 0) {
-      await this.allocateRoundRobin(campaignId, newLeads.map((l) => l.id));
+      await this.roundRobinService.allocateRoundRobin(campaignId, newLeads.map((l) => l.id));
     }
 
     // Re-fetch new leads to get updated doerId after allocation
@@ -140,7 +144,7 @@ export class BulkImportService {
     ).returning();
 
     if (allocateRoundRobin && newLeads.length > 0) {
-      await this.allocateRoundRobin(campaignId, newLeads.map((l) => l.id));
+      await this.roundRobinService.allocateRoundRobin(campaignId, newLeads.map((l) => l.id));
     }
 
     const newLeadIds = newLeads.map((l) => l.id);
@@ -168,47 +172,5 @@ export class BulkImportService {
       total: data.length,
       leads: updatedLeads,
     };
-  }
-
-  private async allocateRoundRobin(campaignId: string, leadIds: string[]) {
-    const activeUsers = await this.database.db
-      .select({
-        userId: campaignUsers.userId,
-        role: users.role,
-      })
-      .from(campaignUsers)
-      .innerJoin(users, eq(campaignUsers.userId, users.id))
-      .where(and(eq(campaignUsers.campaignId, campaignId), eq(campaignUsers.isActive, true)))
-      .orderBy(asc(campaignUsers.assignedAt));
-
-    const eligibleUsers = activeUsers.filter((au) => au.role === 'USER');
-
-    if (eligibleUsers.length === 0) {
-      throw new BadRequestException('No telecaller users assigned to this campaign. Please assign USER role users before importing leads.');
-    }
-
-    const [lastAssignedLead] = await this.database.db
-      .select({ doerId: leads.doerId })
-      .from(leads)
-      .where(and(eq(leads.campaignId, campaignId), sql`${leads.doerId} IS NOT NULL`))
-      .orderBy(desc(leads.createdAt))
-      .limit(1);
-
-    let startIndex = 0;
-    if (lastAssignedLead?.doerId) {
-      const lastIndex = eligibleUsers.findIndex((u) => u.userId === lastAssignedLead.doerId);
-      if (lastIndex !== -1) {
-        startIndex = (lastIndex + 1) % eligibleUsers.length;
-      }
-    }
-
-    // Batch update doerId
-    for (let i = 0; i < leadIds.length; i++) {
-      const userIndex = (startIndex + i) % eligibleUsers.length;
-      await this.database.db
-        .update(leads)
-        .set({ doerId: eligibleUsers[userIndex].userId })
-        .where(eq(leads.id, leadIds[i]));
-    }
   }
 }

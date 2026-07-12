@@ -31,4 +31,4 @@ USER appuser
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx drizzle-kit push --force && node dist/main"]
+CMD ["node", "dist/main"]

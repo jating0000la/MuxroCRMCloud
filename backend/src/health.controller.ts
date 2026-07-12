@@ -1,7 +1,10 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { DatabaseService } from './db/database.service';
 import { sql } from 'drizzle-orm';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { RolesGuard } from './auth/guards/roles.guard';
+import { Roles } from './auth/decorators/roles.decorator';
 
 @ApiTags('Health')
 @Controller()
@@ -11,31 +14,43 @@ export class HealthController {
   @Get('health')
   @ApiOperation({ summary: 'Health check endpoint' })
   async check() {
-    const checks: Record<string, string> = {};
-    let healthy = true;
-
+    let dbStatus = 'ok';
     try {
       await this.database.db.execute(sql`SELECT 1`);
-      checks.database = 'ok';
     } catch {
-      checks.database = 'error';
-      healthy = false;
+      dbStatus = 'error';
+    }
+
+    return {
+      status: dbStatus === 'ok' ? 'ok' : 'error',
+      timestamp: new Date().toISOString(),
+      checks: { database: dbStatus },
+    };
+  }
+
+  @Get('health/detailed')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Detailed health check (Admin only)' })
+  async detailedCheck() {
+    let dbStatus = 'ok';
+    try {
+      await this.database.db.execute(sql`SELECT 1`);
+    } catch {
+      dbStatus = 'error';
     }
 
     const memUsage = process.memoryUsage();
-    const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
-    const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
-    const rssMB = Math.round(memUsage.rss / 1024 / 1024);
 
     return {
-      status: healthy ? 'ok' : 'error',
+      status: dbStatus === 'ok' ? 'ok' : 'error',
       timestamp: new Date().toISOString(),
       uptime: Math.round(process.uptime()),
-      checks,
+      checks: { database: dbStatus },
       memory: {
-        heapUsed: `${heapUsedMB}MB`,
-        heapTotal: `${heapTotalMB}MB`,
-        rss: `${rssMB}MB`,
+        heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`,
+        heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`,
+        rss: `${Math.round(memUsage.rss / 1024 / 1024)}MB`,
       },
       node: process.version,
     };

@@ -4,9 +4,10 @@ import { FormsController } from './forms.controller';
 import { PublicFormsController } from './public-forms.controller';
 import { IntegrationsModule } from '../integrations/integrations.module';
 import { SettingsModule } from '../settings/settings.module';
+import { RoundRobinModule } from '../common/common.module';
 
 @Module({
-  imports: [IntegrationsModule, SettingsModule],
+  imports: [IntegrationsModule, SettingsModule, RoundRobinModule],
   controllers: [FormsController, PublicFormsController],
   providers: [FormsService],
   exports: [FormsService],

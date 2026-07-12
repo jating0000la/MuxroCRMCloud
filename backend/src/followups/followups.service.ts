@@ -259,7 +259,8 @@ export class FollowupsService {
     const leadConditions: any[] = [];
     if (phone) {
       const normalized = phone.replace(/\D/g, '');
-      leadConditions.push(or(eq(leads.phone, normalized), like(leads.phone, `%${normalized}%`)));
+      const escaped = normalized.replace(/[%_]/g, '\\$&');
+      leadConditions.push(or(eq(leads.phone, normalized), like(leads.phone, `%${escaped}%`)));
     }
     if (email) {
       leadConditions.push(eq(leads.email, email.toLowerCase()));

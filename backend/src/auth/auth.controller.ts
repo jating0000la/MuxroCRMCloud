@@ -10,6 +10,20 @@ import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
 import { ExtractJwt } from 'passport-jwt';
 
+function parseExpirationToMs(expiration: string): number {
+  const match = expiration.match(/^(\d+)([smhd])$/);
+  if (!match) return 7 * 24 * 60 * 60 * 1000;
+  const value = parseInt(match[1]);
+  const unit = match[2];
+  switch (unit) {
+    case 's': return value * 1000;
+    case 'm': return value * 60 * 1000;
+    case 'h': return value * 60 * 60 * 1000;
+    case 'd': return value * 24 * 60 * 60 * 1000;
+    default: return 7 * 24 * 60 * 60 * 1000;
+  }
+}
+
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
@@ -19,18 +33,17 @@ export class AuthController {
   ) {}
 
   @Post('login')
-  @StrictThrottle()  // ✅ FIXED: Strict rate limit (5 per minute)
+  @StrictThrottle()
   @ApiOperation({ summary: 'Login with username and password' })
   async login(@Body() loginDto: LoginDto, @Response() res) {
     const result = await this.authService.login(loginDto);
-    // ✅ FIXED: Set httpOnly cookie (secure=true in production, sameSite=strict)
+    const maxAge = parseExpirationToMs(process.env.JWT_EXPIRATION || '7d');
     res.cookie('auth_token', result.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge,
     });
-    // Return user info without token (token in httpOnly cookie)
     return res.json({ user: result.user, message: 'Login successful' });
   }
 
@@ -39,16 +52,9 @@ export class AuthController {
   @Roles('ADMIN')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Register new user (Admin only)' })
-  async register(@Body() registerDto: RegisterDto, @Response() res) {
+  async register(@Body() registerDto: RegisterDto) {
     const result = await this.authService.register(registerDto);
-    // ✅ FIXED: Set httpOnly cookie for new user
-    res.cookie('auth_token', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
-    return res.json({ user: result.user, message: 'Registration successful' });
+    return { user: result.user, message: 'Registration successful' };
   }
 
   @Get('profile')
@@ -64,14 +70,22 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Logout and revoke current token' })
   async logout(@Request() req, @Response() res) {
-    // Extract token from Authorization header (fallback) or cookie
     let token = ExtractJwt.fromAuthHeaderAsBearerToken()(req) || req.cookies?.auth_token;
     if (token) {
-      // Add token to blacklist (TTL: 24 hours)
       this.tokenBlacklist.revoke(token, 24 * 60 * 60);
     }
-    // ✅ FIXED: Clear httpOnly cookie
     res.clearCookie('auth_token');
     return res.json({ message: 'Logged out successfully' });
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change current user password' })
+  async changePassword(
+    @Request() req,
+    @Body() body: { currentPassword: string; newPassword: string },
+  ) {
+    return this.authService.changePassword(req.user.id, body.currentPassword, body.newPassword);
   }
 }

@@ -180,13 +180,60 @@ export class NotificationsService {
 
   async syncNotificationsForUser(userId: string): Promise<void> {
     const followupsList = await this.database.db
-      .select({ id: followups.id })
+      .select({
+        id: followups.id,
+        nextCallDate: followups.nextCallDate,
+      })
       .from(followups)
       .innerJoin(leads, eq(followups.leadId, leads.id))
       .where(and(eq(followups.userId, userId), eq(leads.dnd, false)));
 
-    for (const f of followupsList) {
-      await this.createNotificationForFollowup(userId, f.id);
+    const followupIds = followupsList.map((f) => f.id);
+    if (followupIds.length === 0) {
+      await this.cleanupOldNotifications(userId);
+      return;
+    }
+
+    const existingNotifications = await this.database.db
+      .select()
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.userId, userId),
+          inArray(notifications.followupId, followupIds),
+        ),
+      );
+
+    const existingMap = new Map(existingNotifications.map((n) => [n.followupId, n]));
+    const followupMap = new Map(followupsList.map((f) => [f.id, f]));
+
+    const toInsert: { userId: string; followupId: string; type: string }[] = [];
+    const toUpdate: { id: string; type: string }[] = [];
+
+    for (const followupId of followupIds) {
+      const followup = followupMap.get(followupId);
+      if (!followup?.nextCallDate) continue;
+
+      const type = this.getNotificationType(followup.nextCallDate);
+      const existing = existingMap.get(followupId);
+
+      if (existing && existing.type !== type) {
+        toUpdate.push({ id: existing.id, type });
+      } else if (!existing) {
+        toInsert.push({ userId, followupId, type });
+      }
+    }
+
+    if (toInsert.length > 0) {
+      await this.database.db.insert(notifications).values(toInsert);
+    }
+    if (toUpdate.length > 0) {
+      for (const update of toUpdate) {
+        await this.database.db
+          .update(notifications)
+          .set({ type: update.type })
+          .where(eq(notifications.id, update.id));
+      }
     }
 
     await this.cleanupOldNotifications(userId);

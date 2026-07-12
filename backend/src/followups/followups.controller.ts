@@ -4,10 +4,12 @@ import { FollowupsService } from './followups.service';
 import { CreateFollowupDto } from './dto/create-followup.dto';
 import { UpdateFollowupDto } from './dto/update-followup.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { PaginationDto } from '../common/pagination.dto';
 
 @ApiTags('Followups')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('followups')
 export class FollowupsController {
   constructor(private followupsService: FollowupsService) {}
@@ -41,8 +43,8 @@ export class FollowupsController {
   @Get('my')
   @ApiOperation({ summary: 'Get my follow-ups' })
   @ApiQuery({ name: 'campaignId', required: false })
-  getMyFollowups(@Request() req, @Query('campaignId') campaignId?: string) {
-    return this.followupsService.getMyFollowups(req.user.id, campaignId);
+  getMyFollowups(@Request() req, @Query('campaignId') campaignId?: string, @Query() pagination?: PaginationDto) {
+    return this.followupsService.getMyFollowups(req.user.id, campaignId, pagination);
   }
 
   @Get('upcoming')

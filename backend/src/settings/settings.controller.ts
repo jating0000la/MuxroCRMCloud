@@ -10,94 +10,83 @@ import {
   HttpCode,
   HttpStatus,
   Query,
-  ForbiddenException,
+  MethodNotAllowedException,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SettingsService } from './settings.service';
 import { CreateSettingDto, UpdateSettingDto, SettingResponseDto } from './dto/setting.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
+@ApiTags('Settings')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMIN')
 @Controller('settings')
-@UseGuards(JwtAuthGuard)
 export class SettingsController {
   constructor(private settingsService: SettingsService) {}
 
-  private ensureAdmin(user: any) {
-    if (user?.role !== 'ADMIN') {
-      throw new ForbiddenException('Only admins can manage settings');
-    }
-  }
-
   @Get()
+  @ApiOperation({ summary: 'Get all settings (Admin only)' })
   async getAllSettings(
     @Query('masked') masked: string = 'true',
-    @CurrentUser() user: any,
   ): Promise<SettingResponseDto[]> {
-    this.ensureAdmin(user);
     const showMasked = masked !== 'false';
     return this.settingsService.getAllSettings(showMasked);
   }
 
   @Get('/:key')
+  @ApiOperation({ summary: 'Get setting by key (Admin only)' })
   async getSetting(
     @Param('key') key: string,
     @Query('masked') masked: string = 'true',
-    @CurrentUser() user: any,
   ): Promise<SettingResponseDto> {
-    this.ensureAdmin(user);
     const showMasked = masked !== 'false';
     return this.settingsService.getSetting(key, showMasked);
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create setting (Admin only)' })
   async createSetting(
     @Body() dto: CreateSettingDto,
-    @CurrentUser() user: any,
   ): Promise<SettingResponseDto> {
-    this.ensureAdmin(user);
-    return this.settingsService.createSetting(dto, user?.id);
+    return this.settingsService.createSetting(dto);
   }
 
   @Put('/:key')
+  @ApiOperation({ summary: 'Update setting (Admin only)' })
   async updateSetting(
     @Param('key') key: string,
     @Body() dto: UpdateSettingDto,
-    @CurrentUser() user: any,
   ): Promise<SettingResponseDto> {
-    this.ensureAdmin(user);
-    return this.settingsService.updateSetting(key, dto, user?.id);
+    return this.settingsService.updateSetting(key, dto);
   }
 
   @Delete('/:key')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteSetting(@Param('key') key: string, @CurrentUser() user: any): Promise<void> {
-    this.ensureAdmin(user);
-    // This would be optional - typically you don't delete settings, just archive them
-    throw new Error('Setting deletion not implemented');
+  @HttpCode(HttpStatus.METHOD_NOT_ALLOWED)
+  @ApiOperation({ summary: 'Delete setting (not implemented)' })
+  async deleteSetting(): Promise<void> {
+    throw new MethodNotAllowedException('Setting deletion not implemented. Use archive instead.');
   }
 
   @Get('/:key/audit-log')
-  async getAuditLog(@Param('key') key: string, @CurrentUser() user: any): Promise<any[]> {
-    this.ensureAdmin(user);
+  @ApiOperation({ summary: 'Get audit log for setting (Admin only)' })
+  async getAuditLog(@Param('key') key: string): Promise<any[]> {
     return this.settingsService.getAuditLog(key);
   }
 
   @Post('/:key/test')
+  @ApiOperation({ summary: 'Test setting connection (Admin only)' })
   async testSetting(
     @Param('key') key: string,
-    @CurrentUser() user: any,
   ): Promise<{ success: boolean; message: string; lastTestedAt: Date | null }> {
-    this.ensureAdmin(user);
-    // This endpoint allows testing the connection/validity of a setting
-    // Implementation depends on the setting type (Indiamart, Process Sutra, etc.)
     const setting = await this.settingsService.getSetting(key, false);
     
-    // Update last tested timestamp
     const updated = await this.settingsService.updateSetting(
       key,
       { value: setting.value, lastTestedAt: new Date().toISOString(), reason: 'Manual test' },
-      user?.id,
     );
 
     return {

@@ -3,13 +3,17 @@ import { eq, and, ne, inArray, desc, asc, sql } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
 import { leads, followups, campaignStatuses, campaignUsers, users, campaigns } from '../db/schema';
 import { PaginationDto } from '../common/pagination.dto';
+import { RoundRobinService } from '../common/services/round-robin.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 
 @Injectable()
 export class LeadsService {
-  constructor(private database: DatabaseService) {}
+  constructor(
+    private database: DatabaseService,
+    private roundRobinService: RoundRobinService,
+  ) {}
 
   async findByCampaign(campaignId: string, userId?: string, role?: string, pagination?: PaginationDto) {
     const conditions: any[] = [eq(leads.campaignId, campaignId), eq(leads.isDeleted, false)];
@@ -124,7 +128,7 @@ export class LeadsService {
   async create(dto: CreateLeadDto, userId?: string, role?: string) {
     await this.ensureCampaignAccess(dto.campaignId, userId, role);
 
-    const doerId = dto.doerId || await this.getNextRoundRobinUser(dto.campaignId);
+    const doerId = dto.doerId || await this.roundRobinService.getNextRoundRobinUser(dto.campaignId);
 
     let statusId = dto.statusId;
     if (!statusId) {
@@ -170,39 +174,6 @@ export class LeadsService {
     });
 
     return lead;
-  }
-
-  private async getNextRoundRobinUser(campaignId: string): Promise<string> {
-    const activeUsers = await this.database.db
-      .select({
-        userId: campaignUsers.userId,
-        role: users.role,
-      })
-      .from(campaignUsers)
-      .innerJoin(users, eq(campaignUsers.userId, users.id))
-      .where(and(eq(campaignUsers.campaignId, campaignId), eq(campaignUsers.isActive, true)))
-      .orderBy(asc(campaignUsers.assignedAt));
-
-    const eligibleUsers = activeUsers.filter((au) => au.role === 'USER');
-
-    if (eligibleUsers.length === 0) {
-      throw new BadRequestException('No telecaller users assigned to this campaign. Please assign USER role users before creating leads.');
-    }
-
-    const [lastAssignedLead] = await this.database.db
-      .select({ doerId: leads.doerId })
-      .from(leads)
-      .where(and(eq(leads.campaignId, campaignId), sql`${leads.doerId} IS NOT NULL`))
-      .orderBy(desc(leads.createdAt))
-      .limit(1);
-
-    if (!lastAssignedLead?.doerId) {
-      return eligibleUsers[0].userId;
-    }
-
-    const lastIndex = eligibleUsers.findIndex((u) => u.userId === lastAssignedLead.doerId);
-    const nextIndex = (lastIndex + 1) % eligibleUsers.length;
-    return eligibleUsers[nextIndex].userId;
   }
 
   async update(id: string, dto: UpdateLeadDto, userId?: string, role?: string) {
@@ -286,32 +257,7 @@ export class LeadsService {
 
   async allocateRoundRobin(campaignId: string, leadIds: string[], userId?: string, role?: string) {
     await this.ensureCampaignAccess(campaignId, userId, role);
-
-    const activeUsers = await this.database.db
-      .select({
-        userId: campaignUsers.userId,
-        role: users.role,
-      })
-      .from(campaignUsers)
-      .innerJoin(users, eq(campaignUsers.userId, users.id))
-      .where(and(eq(campaignUsers.campaignId, campaignId), eq(campaignUsers.isActive, true)))
-      .orderBy(asc(campaignUsers.assignedAt));
-
-    const eligibleUsers = activeUsers.filter((au) => au.role === 'USER');
-    if (eligibleUsers.length === 0) return { message: 'No telecaller users in campaign' };
-
-    const allocations: any[] = [];
-    for (let i = 0; i < leadIds.length; i++) {
-      const userIndex = i % eligibleUsers.length;
-      const [updated] = await this.database.db
-        .update(leads)
-        .set({ doerId: eligibleUsers[userIndex].userId })
-        .where(eq(leads.id, leadIds[i]))
-        .returning();
-      allocations.push(updated);
-    }
-
-    return allocations;
+    return this.roundRobinService.allocateRoundRobin(campaignId, leadIds);
   }
 
   async remove(id: string, userId?: string, role?: string) {
@@ -346,6 +292,17 @@ export class LeadsService {
   }
 
   private async ensureCampaignAccess(campaignId: string, userId?: string, role?: string) {
-    return;
+    if (role === 'ADMIN') return;
+    if (!userId) throw new ForbiddenException('User ID required');
+
+    const [assignment] = await this.database.db
+      .select()
+      .from(campaignUsers)
+      .where(and(eq(campaignUsers.campaignId, campaignId), eq(campaignUsers.userId, userId), eq(campaignUsers.isActive, true)))
+      .limit(1);
+
+    if (!assignment) {
+      throw new ForbiddenException('You are not assigned to this campaign');
+    }
   }
 }

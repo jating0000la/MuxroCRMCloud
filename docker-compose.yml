@@ -41,6 +41,8 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
       PUBLIC_FORMS_ENABLED: ${PUBLIC_FORMS_ENABLED:-true}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
+      ENCRYPTION_SALT: ${ENCRYPTION_SALT}
     depends_on:
       postgres:
         condition: service_healthy

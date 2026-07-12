@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { eq, and, desc, asc, sql } from 'drizzle-orm';
+import { eq, and, desc, asc } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
-import { forms, enquiries, leads, campaignStatuses, campaignUsers, users, followups, campaigns } from '../db/schema';
+import { forms, enquiries, leads, campaignStatuses, followups, campaigns } from '../db/schema';
 import { PaginationDto } from '../common/pagination.dto';
+import { RoundRobinService } from '../common/services/round-robin.service';
 import { CreateFormDto } from './dto/create-form.dto';
 import { UpdateFormDto } from './dto/update-form.dto';
 import { GupshupService } from '../integrations/gupshup.service';
@@ -27,6 +28,7 @@ export class FormsService {
     private database: DatabaseService,
     private gupshup: GupshupService,
     private settingsService: SettingsService,
+    private roundRobinService: RoundRobinService,
   ) {}
 
   async create(campaignId: string, dto: CreateFormDto) {
@@ -109,7 +111,7 @@ export class FormsService {
     const email = data.email || data.Email || null;
     const phone = data.phone || data.Phone || null;
 
-    const doerId = await this.getNextRoundRobinUser(form.campaignId);
+    const doerId = await this.roundRobinService.getNextRoundRobinUser(form.campaignId);
 
     const [firstStatus] = await this.database.db
       .select()
@@ -150,39 +152,6 @@ export class FormsService {
     });
 
     return { submission, lead };
-  }
-
-  private async getNextRoundRobinUser(campaignId: string): Promise<string> {
-    const activeUsers = await this.database.db
-      .select({
-        userId: campaignUsers.userId,
-        role: users.role,
-      })
-      .from(campaignUsers)
-      .innerJoin(users, eq(campaignUsers.userId, users.id))
-      .where(and(eq(campaignUsers.campaignId, campaignId), eq(campaignUsers.isActive, true)))
-      .orderBy(asc(campaignUsers.assignedAt));
-
-    const eligibleUsers = activeUsers.filter((au) => au.role === 'USER');
-
-    if (eligibleUsers.length === 0) {
-      throw new BadRequestException('No telecaller users assigned to this campaign. Please assign USER role users before creating leads.');
-    }
-
-    const [lastAssignedLead] = await this.database.db
-      .select({ doerId: leads.doerId })
-      .from(leads)
-      .where(and(eq(leads.campaignId, campaignId), sql`${leads.doerId} IS NOT NULL`))
-      .orderBy(desc(leads.createdAt))
-      .limit(1);
-
-    if (!lastAssignedLead?.doerId) {
-      return eligibleUsers[0].userId;
-    }
-
-    const lastIndex = eligibleUsers.findIndex((u) => u.userId === lastAssignedLead.doerId);
-    const nextIndex = (lastIndex + 1) % eligibleUsers.length;
-    return eligibleUsers[nextIndex].userId;
   }
 
   async update(id: string, dto: UpdateFormDto) {

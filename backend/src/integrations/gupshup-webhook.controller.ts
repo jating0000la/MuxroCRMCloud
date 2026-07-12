@@ -26,12 +26,11 @@ export class GupshupWebhookController {
   @ApiOperation({ summary: 'Receive inbound WhatsApp messages from Gupshup (no auth)' })
   async handleWebhook(
     @Body() payload: any,
-    @Query('token') token: string | undefined,
     @Req() request: Request,
   ) {
     this.logger.log('Received Gupshup webhook');
 
-    await this.assertWebhookSecret(token, request.header('x-gupshup-webhook-secret') || undefined);
+    await this.assertWebhookSecret(request.header('x-gupshup-webhook-secret') || undefined);
 
     const message = this.gupshup.parseInboundWebhook(payload);
     if (!message) {
@@ -111,7 +110,6 @@ export class GupshupWebhookController {
   }
 
   private async assertWebhookSecret(
-    queryToken: string | undefined,
     headerToken: string | undefined,
   ): Promise<void> {
     let configuredSecret = '';
@@ -128,8 +126,7 @@ export class GupshupWebhookController {
       throw new UnauthorizedException('Webhook secret not configured');
     }
 
-    const providedSecret = (queryToken || headerToken || '').trim();
-    // Timing-safe comparison to prevent timing-based secret enumeration
+    const providedSecret = (headerToken || '').trim();
     const providedBuf = Buffer.from(providedSecret);
     const expectedBuf = Buffer.from(configuredSecret);
     const secretsMatch =

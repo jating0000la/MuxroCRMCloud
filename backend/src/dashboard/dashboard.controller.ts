@@ -27,15 +27,33 @@ export class DashboardController {
   @Get('followups')
   @ApiOperation({ summary: 'Get follow-up dashboard data' })
   @ApiQuery({ name: 'campaignId', required: false })
-  getFollowupDashboard(@Request() req, @Query('campaignId') campaignId?: string) {
-    return this.dashboardService.getFollowupDashboard(req.user.id, req.user.role, campaignId);
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  getFollowupDashboard(
+    @Request() req,
+    @Query('campaignId') campaignId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = Math.max(1, parseInt(page || '1') || 1);
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit || '50') || 50));
+    return this.dashboardService.getFollowupDashboard(req.user.id, req.user.role, campaignId, pageNum, limitNum);
   }
 
   @Get('leads')
   @ApiOperation({ summary: 'Get all leads dashboard data' })
   @ApiQuery({ name: 'campaignId', required: false })
-  getAllLeadsDashboard(@Request() req, @Query('campaignId') campaignId?: string) {
-    return this.dashboardService.getAllLeadsDashboard(req.user.id, req.user.role, campaignId);
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  getAllLeadsDashboard(
+    @Request() req,
+    @Query('campaignId') campaignId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = Math.max(1, parseInt(page || '1') || 1);
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit || '50') || 50));
+    return this.dashboardService.getAllLeadsDashboard(req.user.id, req.user.role, campaignId, pageNum, limitNum);
   }
 
   @Get('sales-funnel')
