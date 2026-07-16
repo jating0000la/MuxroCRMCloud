@@ -93,4 +93,76 @@ export class DashboardController {
     }
     return this.dashboardService.getUserConversion(req.user.id, req.user.role, campaignId, startDate, endDate);
   }
+
+  @Get('kpi')
+  @ApiOperation({ summary: 'Get KPI overview' })
+  @ApiQuery({ name: 'campaignId', required: false })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  async getKpi(
+    @Request() req,
+    @Query('campaignId') campaignId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    if (campaignId) {
+      await this.authService.ensureCampaignAccess(campaignId, req.user.id, req.user.role);
+    }
+    return this.dashboardService.getKpiOverview(req.user.id, req.user.role, campaignId, startDate, endDate);
+  }
+
+  @Get('alerts')
+  @ApiOperation({ summary: 'Get business alerts' })
+  async getAlerts(@Request() req) {
+    return this.dashboardService.getBusinessAlerts(req.user.id, req.user.role);
+  }
+
+  @Get('campaign-report')
+  @ApiOperation({ summary: 'Get campaign-wise report' })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  async getCampaignReport(
+    @Request() req,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.dashboardService.getCampaignWiseReport(req.user.id, req.user.role, startDate, endDate);
+  }
+
+  @Get('status-report')
+  @ApiOperation({ summary: 'Get status-wise report' })
+  @ApiQuery({ name: 'campaignId', required: false })
+  async getStatusReport(@Request() req, @Query('campaignId') campaignId?: string) {
+    if (campaignId) {
+      await this.authService.ensureCampaignAccess(campaignId, req.user.id, req.user.role);
+    }
+    return this.dashboardService.getStatusWiseReport(req.user.id, req.user.role, campaignId);
+  }
+
+  @Get('daily-trend')
+  @ApiOperation({ summary: 'Get daily trend data' })
+  @ApiQuery({ name: 'campaignId', required: false })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  async getDailyTrend(
+    @Request() req,
+    @Query('campaignId') campaignId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    if (campaignId) {
+      await this.authService.ensureCampaignAccess(campaignId, req.user.id, req.user.role);
+    }
+    return this.dashboardService.getDailyTrend(req.user.id, req.user.role, campaignId, startDate, endDate);
+  }
+
+  @Get('missed-by-user')
+  @ApiOperation({ summary: 'Get missed followups by user' })
+  @ApiQuery({ name: 'campaignId', required: false })
+  async getMissedByUser(@Request() req, @Query('campaignId') campaignId?: string) {
+    if (campaignId) {
+      await this.authService.ensureCampaignAccess(campaignId, req.user.id, req.user.role);
+    }
+    return this.dashboardService.getMissedByUser(req.user.id, req.user.role, campaignId);
+  }
 }

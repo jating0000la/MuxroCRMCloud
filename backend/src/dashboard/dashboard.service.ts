@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { eq, and, inArray, desc, asc, sql, ilike, count } from 'drizzle-orm';
+import { eq, and, inArray, desc, asc, sql, ilike, count, lt, gte, between } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
 import {
   campaigns,
@@ -443,5 +443,381 @@ export class DashboardService {
     });
 
     return userStats.sort((a, b) => b.conversionRate - a.conversionRate);
+  }
+
+  async getKpiOverview(userId: string, role: string, campaignId?: string, startDate?: string, endDate?: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const leadConditions: any[] = [eq(leads.isDeleted, false)];
+    if (role === 'USER') leadConditions.push(eq(leads.doerId, userId));
+    if (campaignId) leadConditions.push(eq(leads.campaignId, campaignId));
+
+    if (startDate || endDate) {
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        leadConditions.push(sql`${leads.createdAt} >= ${start}`);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        leadConditions.push(sql`${leads.createdAt} <= ${end}`);
+      }
+    }
+
+    const whereClause = leadConditions.length > 0 ? and(...leadConditions) : undefined;
+
+    const [{ totalLeads }] = await this.database.db
+      .select({ totalLeads: sql<number>`count(*)::int` })
+      .from(leads)
+      .where(whereClause);
+
+    const todayLeadConditions: any[] = [eq(leads.isDeleted, false), sql`${leads.createdAt} >= ${today}`, sql`${leads.createdAt} < ${tomorrow}`];
+    if (role === 'USER') todayLeadConditions.push(eq(leads.doerId, userId));
+    if (campaignId) todayLeadConditions.push(eq(leads.campaignId, campaignId));
+
+    const [{ todayNewLeads }] = await this.database.db
+      .select({ todayNewLeads: sql<number>`count(*)::int` })
+      .from(leads)
+      .where(and(...todayLeadConditions));
+
+    const followupConditions: any[] = [sql`${followups.nextCallDate} >= ${today}`, sql`${followups.nextCallDate} < ${tomorrow}`];
+    if (role === 'USER') followupConditions.push(eq(followups.userId, userId));
+    if (campaignId) {
+      followupConditions.push(sql`${followups.leadId} IN (SELECT "id" FROM "Lead" WHERE "campaignId" = ${campaignId})`);
+    }
+
+    const [{ dueFollowups }] = await this.database.db
+      .select({ dueFollowups: sql<number>`count(*)::int` })
+      .from(followups)
+      .where(and(...followupConditions));
+
+    const missedConditions: any[] = [sql`${followups.nextCallDate} < ${today}`];
+    if (role === 'USER') missedConditions.push(eq(followups.userId, userId));
+    if (campaignId) {
+      missedConditions.push(sql`${followups.leadId} IN (SELECT "id" FROM "Lead" WHERE "campaignId" = ${campaignId})`);
+    }
+
+    const [{ missedFollowups }] = await this.database.db
+      .select({ missedFollowups: sql<number>`count(*)::int` })
+      .from(followups)
+      .where(and(...missedConditions));
+
+    const wonStatuses = await this.database.db
+      .select({ id: campaignStatuses.id })
+      .from(campaignStatuses)
+      .where(ilike(campaignStatuses.label, '%won%'));
+
+    const wonConditions: any[] = [eq(leads.isDeleted, false)];
+    if (role === 'USER') wonConditions.push(eq(leads.doerId, userId));
+    if (campaignId) wonConditions.push(eq(leads.campaignId, campaignId));
+    if (wonStatuses.length > 0) {
+      wonConditions.push(inArray(leads.statusId, wonStatuses.map((s) => s.id)));
+    } else {
+      wonConditions.push(sql`1 = 0`);
+    }
+
+    const [{ wonDeals }] = await this.database.db
+      .select({ wonDeals: sql<number>`count(*)::int` })
+      .from(leads)
+      .where(and(...wonConditions));
+
+    const convertedStatuses = await this.database.db
+      .select({ id: campaignStatuses.id })
+      .from(campaignStatuses)
+      .where(ilike(campaignStatuses.label, '%convert%'));
+
+    let overallConversion = 0;
+    if (totalLeads > 0 && convertedStatuses.length > 0) {
+      const convConditions: any[] = [eq(leads.isDeleted, false)];
+      if (role === 'USER') convConditions.push(eq(leads.doerId, userId));
+      if (campaignId) convConditions.push(eq(leads.campaignId, campaignId));
+      convConditions.push(inArray(leads.statusId, convertedStatuses.map((s) => s.id)));
+
+      const [{ converted }] = await this.database.db
+        .select({ converted: sql<number>`count(*)::int` })
+        .from(leads)
+        .where(and(...convConditions));
+
+      overallConversion = Math.round((converted / totalLeads) * 100);
+    }
+
+    return {
+      totalLeads,
+      todayNewLeads,
+      dueFollowups,
+      missedFollowups,
+      wonDeals,
+      overallConversion,
+    };
+  }
+
+  async getBusinessAlerts(userId: string, role: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const alerts: string[] = [];
+
+    const [{ missedCount }] = await this.database.db
+      .select({ missedCount: sql<number>`count(*)::int` })
+      .from(followups)
+      .where(sql`${followups.nextCallDate} < ${today}`);
+
+    if (missedCount > 0) {
+      alerts.push(`${missedCount} follow-up(s) missed today`);
+    }
+
+    const userConversion = await this.getUserConversion(userId, role);
+    if (userConversion.length > 0) {
+      const highest = userConversion[0];
+      alerts.push(`${highest.name} has highest conversion at ${highest.conversionRate}%`);
+
+      const lowest = userConversion[userConversion.length - 1];
+      if (lowest.conversionRate < highest.conversionRate) {
+        alerts.push(`${lowest.name} needs attention with ${lowest.conversionRate}% conversion`);
+      }
+    }
+
+    const campaignStats = await this.database.db
+      .select({
+        campaignId: leads.campaignId,
+        campaignName: campaigns.name,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(leads)
+      .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
+      .where(and(eq(leads.isDeleted, false), sql`${leads.statusId} IS NOT NULL`))
+      .groupBy(leads.campaignId, campaigns.name)
+      .orderBy(desc(sql`count(*)::int`))
+      .limit(1);
+
+    if (campaignStats.length > 0) {
+      alerts.push(`Top campaign: ${campaignStats[0].campaignName} with ${campaignStats[0].count} leads`);
+    }
+
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const [{ staleLeads }] = await this.database.db
+      .select({ staleLeads: sql<number>`count(*)::int` })
+      .from(leads)
+      .where(and(eq(leads.isDeleted, false), sql`${leads.updatedAt} < ${sevenDaysAgo}`));
+
+    if (staleLeads > 0) {
+      alerts.push(`${staleLeads} leads with no activity for 7+ days`);
+    }
+
+    return alerts;
+  }
+
+  async getCampaignWiseReport(userId: string, role: string, startDate?: string, endDate?: string) {
+    const leadConditions: any[] = [eq(leads.isDeleted, false)];
+    if (role === 'USER') leadConditions.push(eq(leads.doerId, userId));
+
+    if (startDate || endDate) {
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        leadConditions.push(sql`${leads.createdAt} >= ${start}`);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        leadConditions.push(sql`${leads.createdAt} <= ${end}`);
+      }
+    }
+
+    const campaignData = await this.database.db
+      .select({
+        campaignId: campaigns.id,
+        campaignName: campaigns.name,
+        totalLeads: sql<number>`count(${leads.id})::int`,
+      })
+      .from(campaigns)
+      .leftJoin(leads, and(eq(leads.campaignId, campaigns.id), ...leadConditions))
+      .where(eq(campaigns.isActive, true))
+      .groupBy(campaigns.id, campaigns.name)
+      .orderBy(desc(sql`count(${leads.id})::int`));
+
+    const convertedStatuses = await this.database.db
+      .select({ id: campaignStatuses.id })
+      .from(campaignStatuses)
+      .where(ilike(campaignStatuses.label, '%convert%'));
+
+    const wonStatuses = await this.database.db
+      .select({ id: campaignStatuses.id })
+      .from(campaignStatuses)
+      .where(ilike(campaignStatuses.label, '%won%'));
+
+    const results = await Promise.all(
+      campaignData.map(async (c) => {
+        let converted = 0;
+        let lost = 0;
+
+        if (convertedStatuses.length > 0) {
+          const [{ count }] = await this.database.db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(leads)
+            .where(and(eq(leads.campaignId, c.campaignId), eq(leads.isDeleted, false), inArray(leads.statusId, convertedStatuses.map((s) => s.id))));
+          converted = count;
+        }
+
+        const allLeads = await this.database.db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(leads)
+          .where(and(eq(leads.campaignId, c.campaignId), eq(leads.isDeleted, false)));
+        const totalLeadsCount = allLeads[0]?.count || 0;
+
+        lost = totalLeadsCount - converted;
+
+        return {
+          campaignId: c.campaignId,
+          campaignName: c.campaignName,
+          totalLeads: totalLeadsCount,
+          converted,
+          lost: Math.max(0, lost),
+          conversionRate: totalLeadsCount > 0 ? Math.round((converted / totalLeadsCount) * 100) : 0,
+        };
+      }),
+    );
+
+    return results;
+  }
+
+  async getStatusWiseReport(userId: string, role: string, campaignId?: string) {
+    const conditions: any[] = [eq(leads.isDeleted, false)];
+    if (role === 'USER') conditions.push(eq(leads.doerId, userId));
+    if (campaignId) conditions.push(eq(leads.campaignId, campaignId));
+
+    const statusConditions: any[] = [];
+    if (campaignId) statusConditions.push(eq(campaignStatuses.campaignId, campaignId));
+
+    const statuses = await this.database.db
+      .select({
+        label: campaignStatuses.label,
+        color: campaignStatuses.color,
+        count: sql<number>`count(${leads.id})::int`,
+      })
+      .from(campaignStatuses)
+      .leftJoin(leads, and(eq(campaignStatuses.id, leads.statusId), ...conditions))
+      .where(statusConditions.length > 0 ? and(...statusConditions) : undefined)
+      .groupBy(campaignStatuses.id, campaignStatuses.label, campaignStatuses.color)
+      .orderBy(asc(campaignStatuses.order));
+
+    return statuses;
+  }
+
+  async getDailyTrend(userId: string, role: string, campaignId?: string, startDate?: string, endDate?: string) {
+    const start = startDate ? new Date(startDate) : new Date();
+    start.setDate(start.getDate() - 30);
+    start.setHours(0, 0, 0, 0);
+
+    const end = endDate ? new Date(endDate) : new Date();
+    end.setHours(23, 59, 59, 999);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const days: Array<{ date: string; newLeads: number; convertedLeads: number; missedFollowups: number }> = [];
+    const current = new Date(start);
+
+    while (current <= end) {
+      const dayStart = new Date(current);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(current);
+      dayEnd.setHours(23, 59, 59, 999);
+      const dateStr = current.toISOString().split('T')[0];
+
+      const leadConditions: any[] = [
+        eq(leads.isDeleted, false),
+        sql`${leads.createdAt} >= ${dayStart}`,
+        sql`${leads.createdAt} <= ${dayEnd}`,
+      ];
+      if (role === 'USER') leadConditions.push(eq(leads.doerId, userId));
+      if (campaignId) leadConditions.push(eq(leads.campaignId, campaignId));
+
+      const [{ newLeads }] = await this.database.db
+        .select({ newLeads: sql<number>`count(*)::int` })
+        .from(leads)
+        .where(and(...leadConditions));
+
+      const convertedStatuses = await this.database.db
+        .select({ id: campaignStatuses.id })
+        .from(campaignStatuses)
+        .where(ilike(campaignStatuses.label, '%convert%'));
+
+      let convertedLeads = 0;
+      if (convertedStatuses.length > 0) {
+        const convConditions: any[] = [
+          eq(leads.isDeleted, false),
+          sql`${leads.updatedAt} >= ${dayStart}`,
+          sql`${leads.updatedAt} <= ${dayEnd}`,
+          inArray(leads.statusId, convertedStatuses.map((s) => s.id)),
+        ];
+        if (role === 'USER') convConditions.push(eq(leads.doerId, userId));
+        if (campaignId) convConditions.push(eq(leads.campaignId, campaignId));
+
+        const [{ count }] = await this.database.db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(leads)
+          .where(and(...convConditions));
+        convertedLeads = count;
+      }
+
+      const followupConditions: any[] = [
+        sql`${followups.nextCallDate} >= ${dayStart}`,
+        sql`${followups.nextCallDate} <= ${dayEnd}`,
+      ];
+      if (role === 'USER') followupConditions.push(eq(followups.userId, userId));
+
+      const [{ missedFollowups }] = await this.database.db
+        .select({ missedFollowups: sql<number>`count(*)::int` })
+        .from(followups)
+        .where(and(...followupConditions));
+
+      days.push({ date: dateStr, newLeads, convertedLeads, missedFollowups });
+
+      current.setDate(current.getDate() + 1);
+    }
+
+    return days;
+  }
+
+  async getMissedByUser(userId: string, role: string, campaignId?: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const followupConditions: any[] = [sql`${followups.nextCallDate} < ${today}`];
+    if (role === 'USER') followupConditions.push(eq(followups.userId, userId));
+    if (campaignId) {
+      followupConditions.push(sql`${followups.leadId} IN (SELECT "id" FROM "Lead" WHERE "campaignId" = ${campaignId})`);
+    }
+
+    const results = await this.database.db
+      .select({
+        userId: users.id,
+        userName: users.name,
+        username: users.username,
+        missedCount: sql<number>`count(*)::int`,
+        oldestPending: sql<Date>`min(${followups.nextCallDate})`,
+      })
+      .from(followups)
+      .innerJoin(users, eq(followups.userId, users.id))
+      .where(and(...followupConditions))
+      .groupBy(users.id, users.name, users.username)
+      .orderBy(desc(sql`count(*)::int`));
+
+    const [{ overdueCount }] = await this.database.db
+      .select({ overdueCount: sql<number>`count(*)::int` })
+      .from(followups)
+      .where(and(...followupConditions, sql`${followups.nextCallDate} < ${today}`));
+
+    return results.map((r) => ({
+      ...r,
+      overdueCount,
+    }));
   }
 }

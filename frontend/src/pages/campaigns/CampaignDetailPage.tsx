@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { campaignService } from '../../services/campaigns';
@@ -8,11 +8,10 @@ import { formService } from '../../services/forms';
 import { bulkImportService } from '../../services/bulkImport';
 import { statusService } from '../../services/statuses';
 import { userService } from '../../services/users';
-import { Campaign, Lead, Form, User, CampaignStatus } from '../../types';
+import { Campaign, Lead, Form, User } from '../../types';
 import Layout from '../../components/layout/Layout';
 import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
-import StatusUpdateDialog from '../../components/leads/StatusUpdateDialog';
 import LeadDetailDialog from '../../components/leads/LeadDetailDialog';
 import FormBuilder from '../../components/forms/FormBuilder';
 
@@ -25,6 +24,7 @@ const DEFAULT_LEAD_PAGE_SIZE = 50;
 
 export default function CampaignDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { syncWithDelay } = useNotifications();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
@@ -50,8 +50,18 @@ export default function CampaignDetailPage() {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Bulk selection
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [bulkAction, setBulkAction] = useState<'status' | 'assign' | null>(null);
+  const [bulkStatusId, setBulkStatusId] = useState('');
+  const [bulkDoerId, setBulkDoerId] = useState('');
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+
+  // Inline status update
+  const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null);
+
   // Status management
-  const [newStatusLabel, setNewLabelStatus] = useState('');
+  const [newStatusLabel, setNewStatusLabel] = useState('');
   const [newStatusColor, setNewStatusColor] = useState(STATUS_COLORS[0]);
   const [newStatusWhatsapp, setNewStatusWhatsapp] = useState('');
   const [addingStatus, setAddingStatus] = useState(false);
@@ -66,6 +76,87 @@ export default function CampaignDetailPage() {
   const [savingCampaign, setSavingCampaign] = useState(false);
 
   const canManage = user?.role === 'ADMIN';
+
+  // Escape key to close modals
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showFormBuilder) { setShowFormBuilder(false); setEditingForm(null); }
+        else if (showBulkImport) { setShowBulkImport(false); setFile(null); }
+        else if (showAssignUsers) setShowAssignUsers(false);
+        else if (editingCampaign) setEditingCampaign(false);
+        else if (selectedLead) setSelectedLead(null);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [showFormBuilder, showBulkImport, showAssignUsers, editingCampaign, selectedLead]);
+
+  // Inline status update
+  const handleInlineStatusUpdate = async (leadId: string, statusId: string) => {
+    setUpdatingLeadId(leadId);
+    try {
+      await leadService.updateStatus(leadId, { status: statusId, statusId });
+      setLeads((prev) =>
+        prev.map((l) =>
+          l.id === leadId
+            ? { ...l, statusId, status: campaign?.statuses?.find((s) => s.id === statusId) || l.status }
+            : l
+        )
+      );
+      toast.success('Status updated');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to update status');
+    } finally {
+      setUpdatingLeadId(null);
+    }
+  };
+
+  // Bulk actions
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeadIds((prev) =>
+      prev.includes(leadId) ? prev.filter((id) => id !== leadId) : [...prev, leadId]
+    );
+  };
+
+  const toggleSelectAllLeads = () => {
+    if (selectedLeadIds.length === paginatedLeads.length) {
+      setSelectedLeadIds([]);
+    } else {
+      setSelectedLeadIds(paginatedLeads.map((l) => l.id));
+    }
+  };
+
+  const handleBulkAction = async () => {
+    if (selectedLeadIds.length === 0 || !bulkAction) return;
+    setBulkProcessing(true);
+    try {
+      if (bulkAction === 'status' && bulkStatusId) {
+        await Promise.all(
+          selectedLeadIds.map((leadId) =>
+            leadService.updateStatus(leadId, { status: bulkStatusId, statusId: bulkStatusId })
+          )
+        );
+        toast.success(`Updated ${selectedLeadIds.length} lead(s)`);
+      } else if (bulkAction === 'assign' && bulkDoerId) {
+        await Promise.all(
+          selectedLeadIds.map((leadId) =>
+            leadService.update(leadId, { doerId: bulkDoerId } as any)
+          )
+        );
+        toast.success(`Assigned ${selectedLeadIds.length} lead(s)`);
+      }
+      setSelectedLeadIds([]);
+      setBulkAction(null);
+      setBulkStatusId('');
+      setBulkDoerId('');
+      loadData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Bulk action failed');
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
 
   useEffect(() => {
     if (id) loadData();
@@ -178,8 +269,8 @@ export default function CampaignDetailPage() {
       } else {
         toast.error('Failed to assign users');
       }
-      } finally {
-        setAssigningUsers(false);
+    } finally {
+      setAssigningUsers(false);
     }
   };
 
@@ -267,10 +358,21 @@ export default function CampaignDetailPage() {
       <div className="sleek-page p-3 lg:p-4">
         {/* Header */}
         <div className="mb-3">
-          <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mb-1">
-            <span>Campaigns</span>
-            <span>/</span>
-            <span className="text-gray-900 dark:text-gray-100">{campaign.name}</span>
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              onClick={() => navigate('/campaigns')}
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
+              title="Back to campaigns"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
+              <span>Campaigns</span>
+              <span>/</span>
+              <span className="text-gray-900 dark:text-gray-100">{campaign.name}</span>
+            </div>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
@@ -327,6 +429,21 @@ export default function CampaignDetailPage() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Stats Bar */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+          {[
+            { label: 'Total Leads', value: leads.length, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+            { label: 'Active Leads', value: leads.filter((l) => l.statusId).length, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/20' },
+            { label: 'Forms', value: forms.length, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/20' },
+            { label: 'Team Members', value: users.length, color: 'text-primary-600 dark:text-primary-400', bg: 'bg-primary-50 dark:bg-primary-900/20' },
+          ].map((stat) => (
+            <div key={stat.label} className={`${stat.bg} rounded-lg px-3 py-2`}>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{stat.label}</p>
+              <p className={`text-lg font-bold ${stat.color}`}>{stat.value}</p>
+            </div>
+          ))}
         </div>
 
         {/* Tabs */}
@@ -418,10 +535,73 @@ export default function CampaignDetailPage() {
                 </div>
               </div>
 
+              {/* Bulk Action Bar */}
+              {selectedLeadIds.length > 0 && (
+                <div className="bg-primary-50 dark:bg-primary-900/20 border-b border-primary-200 dark:border-primary-800 px-3 py-2 flex items-center gap-3 flex-wrap">
+                  <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
+                    {selectedLeadIds.length} selected
+                  </span>
+                  <select
+                    value={bulkAction || ''}
+                    onChange={(e) => setBulkAction(e.target.value as 'status' | 'assign' || null)}
+                    className="px-2 py-1 text-sm border border-primary-300 rounded-md dark:bg-gray-700 dark:border-primary-700 dark:text-gray-100"
+                  >
+                    <option value="">Bulk action...</option>
+                    <option value="status">Change Status</option>
+                    <option value="assign">Assign To</option>
+                  </select>
+                  {bulkAction === 'status' && (
+                    <select
+                      value={bulkStatusId}
+                      onChange={(e) => setBulkStatusId(e.target.value)}
+                      className="px-2 py-1 text-sm border border-primary-300 rounded-md dark:bg-gray-700 dark:border-primary-700 dark:text-gray-100"
+                    >
+                      <option value="">Select status</option>
+                      {campaign.statuses?.map((s) => (
+                        <option key={s.id} value={s.id}>{s.label}</option>
+                      ))}
+                    </select>
+                  )}
+                  {bulkAction === 'assign' && (
+                    <select
+                      value={bulkDoerId}
+                      onChange={(e) => setBulkDoerId(e.target.value)}
+                      className="px-2 py-1 text-sm border border-primary-300 rounded-md dark:bg-gray-700 dark:border-primary-700 dark:text-gray-100"
+                    >
+                      <option value="">Select user</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    onClick={handleBulkAction}
+                    disabled={bulkProcessing || !bulkAction || (bulkAction === 'status' && !bulkStatusId) || (bulkAction === 'assign' && !bulkDoerId)}
+                    className="px-3 py-1 bg-primary-600 text-white rounded-md text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {bulkProcessing ? 'Processing...' : 'Apply'}
+                  </button>
+                  <button
+                    onClick={() => { setSelectedLeadIds([]); setBulkAction(null); setBulkStatusId(''); setBulkDoerId(''); }}
+                    className="px-2 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-900/50">
                     <tr>
+                      <th className="px-3 py-2 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedLeadIds.length === paginatedLeads.length && paginatedLeads.length > 0}
+                          onChange={toggleSelectAllLeads}
+                          className="w-4 h-4 text-primary-600 rounded"
+                        />
+                      </th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Contact</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Doer</th>
@@ -432,7 +612,15 @@ export default function CampaignDetailPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {paginatedLeads.map((lead) => (
-                      <tr key={lead.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      <tr key={lead.id} className={`transition-colors ${selectedLeadIds.includes(lead.id) ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
+                        <td className="px-3 py-2.5">
+                          <input
+                            type="checkbox"
+                            checked={selectedLeadIds.includes(lead.id)}
+                            onChange={() => toggleLeadSelection(lead.id)}
+                            className="w-4 h-4 text-primary-600 rounded"
+                          />
+                        </td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center">
                             <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center dark:bg-primary-900/30">
@@ -449,18 +637,26 @@ export default function CampaignDetailPage() {
                           {lead.doer?.name || <span className="text-gray-400 italic">Unassigned</span>}
                         </td>
                         <td className="px-3 py-2.5">
-                          {lead.status ? (
-                            <span
-                              className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
-                              style={{ backgroundColor: lead.status.color + '20', color: lead.status.color }}
-                            >
-                              {lead.status.label}
-                            </span>
+                          {updatingLeadId === lead.id ? (
+                            <span className="text-xs text-gray-400">Saving...</span>
                           ) : (
-                            <span className="text-gray-400 dark:text-gray-500 text-sm">No status</span>
+                            <select
+                              value={lead.statusId || ''}
+                              onChange={(e) => e.target.value && handleInlineStatusUpdate(lead.id, e.target.value)}
+                              className="text-xs px-2 py-1 rounded-full border-0 focus:ring-2 focus:ring-primary-500 cursor-pointer"
+                              style={{
+                                backgroundColor: (lead.status?.color || '#9CA3AF') + '20',
+                                color: lead.status?.color || '#9CA3AF',
+                              }}
+                            >
+                              <option value="">No status</option>
+                              {campaign.statuses?.map((s) => (
+                                <option key={s.id} value={s.id}>{s.label}</option>
+                              ))}
+                            </select>
                           )}
                         </td>
-                          <td className="px-3 py-2.5">
+                        <td className="px-3 py-2.5">
                           <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
                             lead.source === 'form' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
                             lead.source === 'bulk' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
@@ -470,7 +666,7 @@ export default function CampaignDetailPage() {
                             {lead.source}
                           </span>
                         </td>
-                          <td className="px-3 py-2.5">
+                        <td className="px-3 py-2.5">
                           <button
                             onClick={() => setSelectedLead(lead)}
                             className="text-primary-600 hover:text-primary-700 text-sm font-medium"
@@ -619,12 +815,6 @@ export default function CampaignDetailPage() {
                     <p className="font-medium text-gray-900 dark:text-gray-100">{u.name}</p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">{u.username}</p>
                   </div>
-                  <span className={`ml-auto px-2 py-1 text-xs rounded-full ${
-                    u.role === 'ADMIN' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                    'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                  }`}>
-                    {u.role}
-                  </span>
                 </div>
               ))}
             </div>
@@ -661,7 +851,7 @@ export default function CampaignDetailPage() {
                     <input
                       type="text"
                       value={newStatusLabel}
-                      onChange={(e) => setNewLabelStatus(e.target.value)}
+                      onChange={(e) => setNewStatusLabel(e.target.value)}
                       placeholder="e.g., Qualified, Proposal Sent"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                     />
@@ -704,7 +894,7 @@ export default function CampaignDetailPage() {
                           whatsappMessage: newStatusWhatsapp.trim() || undefined,
                         });
                         toast.success('Status added');
-                        setNewLabelStatus('');
+                        setNewStatusLabel('');
                         setNewStatusColor(STATUS_COLORS[0]);
                         setNewStatusWhatsapp('');
                         loadData();
@@ -847,7 +1037,7 @@ export default function CampaignDetailPage() {
           </div>
         )}
 
-        {/* Bulk Import Modal */}
+        {/* Edit Campaign Modal */}
         {editingCampaign && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl w-full max-w-md shadow-xl dark:bg-gray-800">
@@ -1026,7 +1216,7 @@ export default function CampaignDetailPage() {
                     </svg>
                   </button>
                 </div>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
+                <div className="space-y-2 max-h-80 overflow-y-auto">
                   {allUsers.filter((u) => u.isActive).map((u) => {
                     const isAssigned = assignUserIds.includes(u.id);
                     return (
