@@ -4,6 +4,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as zlib from 'zlib';
 import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../../db/database.service';
 import { jobLogs } from '../../db/schema';
@@ -57,6 +58,8 @@ export class BackupService {
     this.logger.log(`Starting backup: ${filename}`);
 
     try {
+      // encoding: 'buffer' is required — pg_dump's --format=custom output is a binary
+      // archive, and capturing it as a default utf8 string would silently corrupt it.
       const { stdout } = await execFileAsync('pg_dump', [
         '-h', db.host,
         '-p', db.port,
@@ -67,10 +70,14 @@ export class BackupService {
       ], {
         maxBuffer: 50 * 1024 * 1024,
         timeout: 300000,
+        encoding: 'buffer' as any,
         env: { ...process.env, PGPASSWORD: db.password },
-      });
+      }) as unknown as { stdout: Buffer };
 
-      fs.writeFileSync(filepath, stdout);
+      // Gzip the dump so the .sql.gz filename is accurate and the file is
+      // restorable the same way as scripts/backup.sh's cron-generated backups.
+      const gzipped = zlib.gzipSync(stdout);
+      fs.writeFileSync(filepath, gzipped);
 
       const stats = fs.statSync(filepath);
       const duration = Date.now() - startTime;
@@ -190,5 +197,91 @@ export class BackupService {
     const filepath = this.getBackupFilePath(filename);
     fs.unlinkSync(filepath);
     this.logger.log(`Deleted backup: ${filename}`);
+  }
+
+  /**
+   * Restore the database from a backup file. DESTRUCTIVE: overwrites all
+   * existing data. Uses `pg_restore --clean --if-exists` against the live
+   * database (rather than dropping/recreating it) so the app's own connection
+   * pool doesn't get pulled out from under it mid-restore. Callers should
+   * restart the backend and worker processes immediately after a restore to
+   * clear any cached/prepared state.
+   */
+  async restoreBackup(filename: string): Promise<{ filename: string; duration: number; warnings?: string }> {
+    const filepath = this.getBackupFilePath(filename);
+    const dbUrl = this.configService.get<string>('DATABASE_URL');
+    if (!dbUrl) throw new Error('DATABASE_URL not configured');
+
+    const db = this.parseDatabaseUrl(dbUrl);
+    const startTime = Date.now();
+    const tmpDumpPath = path.join(this.backupDir, `.restore-${Date.now()}.dump`);
+
+    this.logger.warn(`Starting restore from ${filename} — this will overwrite existing data in database "${db.database}"`);
+
+    try {
+      const gzipped = fs.readFileSync(filepath);
+      const dump = zlib.gunzipSync(gzipped);
+      fs.writeFileSync(tmpDumpPath, dump);
+
+      let stderr = '';
+      try {
+        const result = await execFileAsync('pg_restore', [
+          '-h', db.host,
+          '-p', db.port,
+          '-U', db.user,
+          '-d', db.database,
+          '--clean',
+          '--if-exists',
+          '--no-owner',
+          '--no-privileges',
+          tmpDumpPath,
+        ], {
+          maxBuffer: 50 * 1024 * 1024,
+          timeout: 300000,
+          env: { ...process.env, PGPASSWORD: db.password },
+        });
+        stderr = result.stderr;
+      } catch (err: any) {
+        // pg_restore exits with code 1 for non-fatal warnings (e.g. objects that
+        // didn't exist to be dropped). Treat that as a successful restore with
+        // warnings rather than a hard failure; any other exit code is a real error.
+        if (err.code === 1) {
+          stderr = err.stderr || err.message;
+          this.logger.warn(`Restore of ${filename} completed with warnings: ${stderr.slice(0, 2000)}`);
+        } else {
+          throw err;
+        }
+      }
+
+      const duration = Date.now() - startTime;
+      this.logger.warn(`Restore completed from ${filename} in ${duration}ms. Restart the backend and worker processes now.`);
+
+      try {
+        await this.database.db.insert(jobLogs).values({
+          jobType: 'restore-database',
+          status: 'completed',
+          payload: { filename },
+          result: { filename, duration },
+          startedAt: new Date(startTime),
+          completedAt: new Date(),
+        });
+      } catch { /* non-blocking */ }
+
+      return { filename, duration, warnings: stderr || undefined };
+    } catch (error: any) {
+      this.logger.error(`Restore failed: ${error.message}`);
+      try {
+        await this.database.db.insert(jobLogs).values({
+          jobType: 'restore-database',
+          status: 'failed',
+          error: error.message,
+          startedAt: new Date(startTime),
+          completedAt: new Date(),
+        });
+      } catch { /* non-blocking */ }
+      throw error;
+    } finally {
+      if (fs.existsSync(tmpDumpPath)) fs.unlinkSync(tmpDumpPath);
+    }
   }
 }

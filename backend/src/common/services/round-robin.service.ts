@@ -66,7 +66,7 @@ export class RoundRobinService {
       }
     }
 
-    const client = await (this.database.db as any).pool.connect();
+    const client = await this.database.getPool().connect();
     try {
       await client.query('BEGIN');
       // Advisory lock on campaign (hash campaignId to bigint)

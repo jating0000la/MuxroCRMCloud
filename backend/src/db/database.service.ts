@@ -12,6 +12,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private configService: ConfigService) {}
 
+  getPool(): Pool {
+    return this.pool;
+  }
+
   async onModuleInit() {
     const databaseUrl = this.configService.get<string>('DATABASE_URL');
     this.pool = new Pool({

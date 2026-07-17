@@ -17,6 +17,9 @@ export default function BackupsPage() {
   const [triggering, setTriggering] = useState(false);
   const [deletingFile, setDeletingFile] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BackupInfo | null>(null);
+  const [confirmRestore, setConfirmRestore] = useState<BackupInfo | null>(null);
+  const [restoreConfirmText, setRestoreConfirmText] = useState('');
+  const [restoringFile, setRestoringFile] = useState<string | null>(null);
 
   useEffect(() => {
     loadBackups();
@@ -66,6 +69,27 @@ export default function BackupsPage() {
     }
   };
 
+  const handleRestore = async () => {
+    if (!confirmRestore) return;
+    setRestoringFile(confirmRestore.filename);
+    try {
+      const result = await adminService.restoreBackup(confirmRestore.filename);
+      toast.success(
+        `Database restored from ${result.filename} in ${(result.duration / 1000).toFixed(1)}s. Restart the backend and worker now.`,
+        { duration: 8000 },
+      );
+      if (result.warnings) {
+        toast(`Restore completed with warnings — check server logs.`, { icon: '⚠️', duration: 8000 });
+      }
+      setConfirmRestore(null);
+      setRestoreConfirmText('');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Restore failed');
+    } finally {
+      setRestoringFile(null);
+    }
+  };
+
   return (
     <Layout>
       <div className="sleek-page p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
@@ -93,6 +117,12 @@ export default function BackupsPage() {
               'Create Backup Now'
             )}
           </button>
+        </div>
+
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-900/20 dark:text-blue-300">
+          Automatic backups run daily at 2:00 AM server time and old backups are cleaned up automatically based on
+          the configured retention period. Use "Create Backup Now" for an on-demand backup, or "Restore" to recover
+          the database from a specific backup.
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border dark:bg-gray-800 dark:border-gray-700 overflow-hidden">
@@ -137,6 +167,13 @@ export default function BackupsPage() {
                           Download
                         </button>
                         <button
+                          onClick={() => { setConfirmRestore(backup); setRestoreConfirmText(''); }}
+                          disabled={restoringFile === backup.filename}
+                          className="px-2.5 py-1 text-xs font-semibold rounded-md border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-60 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/30"
+                        >
+                          Restore
+                        </button>
+                        <button
                           onClick={() => setConfirmDelete(backup)}
                           disabled={deletingFile === backup.filename}
                           className="px-2.5 py-1 text-xs font-semibold rounded-md border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/30"
@@ -174,6 +211,47 @@ export default function BackupsPage() {
                 className="px-4 py-2 text-sm font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmRestore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-xl shadow-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-700 max-w-md w-full p-6">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Restore database?</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              This will <span className="font-semibold text-red-600 dark:text-red-400">overwrite all current data</span> in
+              the database with the contents of <span className="font-mono text-xs">{confirmRestore.filename}</span>.
+              This cannot be undone, and the backend/worker should be restarted immediately after.
+            </p>
+            <label className="block mt-4">
+              <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                Type RESTORE to confirm
+              </span>
+              <input
+                type="text"
+                value={restoreConfirmText}
+                onChange={(e) => setRestoreConfirmText(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                placeholder="RESTORE"
+                autoFocus
+              />
+            </label>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => { setConfirmRestore(null); setRestoreConfirmText(''); }}
+                className="px-4 py-2 text-sm font-semibold rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRestore}
+                disabled={restoreConfirmText !== 'RESTORE' || restoringFile === confirmRestore.filename}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {restoringFile === confirmRestore.filename ? 'Restoring…' : 'Restore'}
               </button>
             </div>
           </div>

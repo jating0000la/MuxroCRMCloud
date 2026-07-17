@@ -216,4 +216,10 @@ export class AdminDashboardController {
     this.backupService.deleteBackup(filename);
     return { message: 'Backup deleted successfully' };
   }
+
+  @Post('backups/:filename/restore')
+  @ApiOperation({ summary: 'Restore the database from a backup file (destructive, overwrites current data)' })
+  async restoreBackup(@Param('filename') filename: string) {
+    return this.backupService.restoreBackup(filename);
+  }
 }
