@@ -1,5 +1,36 @@
 import React, { useState, useMemo } from 'react';
 
+// Bundled stock background images, served from /public/form-bg (stable, non-hashed
+// URLs — safe to persist in a saved form's page config since they won't change
+// between deploys, unlike content-hashed assets imported from src/).
+const FORM_BG_FILES = [
+  'pexels-codioful-7135053.jpg',
+  'pexels-codioful-7135020.jpg',
+  'pexels-codioful-7135014.jpg',
+  'pexels-codioful-7135013.jpg',
+  'pexels-codioful-7135004.jpg',
+  'pexels-codioful-7134981.jpg',
+  'pexels-70588695-19248457.jpg',
+  'pexels-jess-vide-5008007.jpg',
+  'pexels-francesco-ungaro-13216333.jpg',
+  'pexels-enginakyurt-6138036.jpg',
+  'pexels-edward-jenner-4253051.jpg',
+  'pexels-nickcollins-1293120.jpg',
+  'pexels-martinpechy-2078266.jpg',
+  'pexels-padrinan-19670.jpg',
+  'pexels-padrinan-255379.jpg',
+  'pexels-steve-25372910.jpg',
+  'pexels-robert-clark-504241532-26834228.jpg',
+  'pexels-pedroesparza-248514727-12726784.jpg',
+  'pexels-steve-26771256.jpg',
+  'pexels-steve-26771259.jpg',
+];
+
+const FORM_BG_PRESETS: { url: string; label: string }[] = FORM_BG_FILES.map((file, i) => ({
+  url: `/form-bg/${file}`,
+  label: `Background ${i + 1}`,
+}));
+
 interface FormBuilderField {
   name: string;
   label: string;
@@ -1127,8 +1158,31 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
                 </div>
               </div>
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Background Image URL</label>
-                <input type="url" value={pageConfig.backgroundImage} onChange={(e) => updatePageConfig({ backgroundImage: e.target.value })} placeholder="https://example.com/bg.jpg" className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
+                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Background Image</label>
+                {FORM_BG_PRESETS.length > 0 && (
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => updatePageConfig({ backgroundImage: '' })}
+                      className={`aspect-square rounded-lg border-2 flex items-center justify-center text-[10px] font-semibold text-gray-500 dark:text-gray-400 ${!pageConfig.backgroundImage ? 'border-primary-500 ring-2 ring-primary-200 dark:ring-primary-900/50' : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'}`}
+                      title="No background image"
+                    >
+                      None
+                    </button>
+                    {FORM_BG_PRESETS.map((preset) => (
+                      <button
+                        key={preset.url}
+                        type="button"
+                        onClick={() => updatePageConfig({ backgroundImage: preset.url })}
+                        className={`aspect-square rounded-lg overflow-hidden border-2 ${pageConfig.backgroundImage === preset.url ? 'border-primary-500 ring-2 ring-primary-200 dark:ring-primary-900/50' : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'}`}
+                        title={preset.label}
+                      >
+                        <img src={preset.url} alt={preset.label} className="w-full h-full object-cover" loading="lazy" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <input type="url" value={pageConfig.backgroundImage} onChange={(e) => updatePageConfig({ backgroundImage: e.target.value })} placeholder="Or paste a custom image URL: https://example.com/bg.jpg" className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
               </div>
             </div>
           </div>
