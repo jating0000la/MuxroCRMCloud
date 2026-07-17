@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -7,6 +7,9 @@ import * as path from 'path';
 import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../../db/database.service';
 import { jobLogs } from '../../db/schema';
+
+// Filenames are generated exclusively by createBackup() as crm_db_<timestamp>.sql.gz
+const SAFE_BACKUP_FILENAME = /^[A-Za-z0-9._-]+\.sql\.gz$/;
 
 const execFileAsync = promisify(execFile);
 
@@ -158,5 +161,34 @@ export class BackupService {
     }
 
     return deleted;
+  }
+
+  /**
+   * Resolve a backup filename to a safe absolute path.
+   * Rejects path traversal and any filename not matching our own naming pattern,
+   * and verifies the file actually exists in the backup directory listing.
+   */
+  getBackupFilePath(filename: string): string {
+    if (!SAFE_BACKUP_FILENAME.test(filename) || filename.includes('..')) {
+      throw new BadRequestException('Invalid backup filename');
+    }
+
+    const resolvedDir = path.resolve(this.backupDir);
+    const resolvedPath = path.resolve(resolvedDir, filename);
+    if (!resolvedPath.startsWith(resolvedDir + path.sep)) {
+      throw new BadRequestException('Invalid backup filename');
+    }
+
+    if (!fs.existsSync(resolvedPath)) {
+      throw new NotFoundException('Backup file not found');
+    }
+
+    return resolvedPath;
+  }
+
+  deleteBackup(filename: string): void {
+    const filepath = this.getBackupFilePath(filename);
+    fs.unlinkSync(filepath);
+    this.logger.log(`Deleted backup: ${filename}`);
   }
 }

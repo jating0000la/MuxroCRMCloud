@@ -735,6 +735,26 @@ export default function CampaignDetailPage() {
                       </svg>
                       Edit
                     </button>
+                    {form.isPublished && (
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Unpublish form "${form.title}"?`)) return;
+                          try {
+                            await formService.unpublish(id!, form.id);
+                            toast.success('Form unpublished');
+                            loadData();
+                          } catch (error: any) {
+                            toast.error(error.response?.data?.message || 'Failed to unpublish');
+                          }
+                        }}
+                        className="px-3 py-2 border border-amber-200 text-amber-600 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 text-sm font-medium"
+                        title="Unpublish form"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                      </button>
+                    )}
                     <button
                       onClick={async () => {
                         if (!confirm(`Delete form "${form.title}"?`)) return;

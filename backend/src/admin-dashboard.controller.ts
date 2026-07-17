@@ -1,4 +1,5 @@
-import { Controller, Get, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Res, UseGuards, Query } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { sql } from 'drizzle-orm';
 import { DatabaseService } from './db/database.service';
@@ -192,5 +193,27 @@ export class AdminDashboardController {
   @ApiOperation({ summary: 'List available backups' })
   async getBackups() {
     return this.backupService.listBackups();
+  }
+
+  @Post('backups/trigger')
+  @ApiOperation({ summary: 'Trigger a manual database backup now' })
+  async triggerBackup(@Body() body?: { retentionDays?: number }) {
+    const retentionDays =
+      body?.retentionDays && body.retentionDays > 0 ? body.retentionDays : 7;
+    return this.backupService.createBackup(retentionDays);
+  }
+
+  @Get('backups/:filename/download')
+  @ApiOperation({ summary: 'Download a backup file' })
+  async downloadBackup(@Param('filename') filename: string, @Res() res: Response) {
+    const filepath = this.backupService.getBackupFilePath(filename);
+    res.download(filepath, filename);
+  }
+
+  @Delete('backups/:filename')
+  @ApiOperation({ summary: 'Delete a backup file' })
+  async deleteBackup(@Param('filename') filename: string) {
+    this.backupService.deleteBackup(filename);
+    return { message: 'Backup deleted successfully' };
   }
 }

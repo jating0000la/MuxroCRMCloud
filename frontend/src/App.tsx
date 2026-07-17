@@ -12,6 +12,7 @@ import CampaignDetailPage from './pages/campaigns/CampaignDetailPage';
 import FollowupDashboardPage from './pages/dashboard/FollowupDashboardPage';
 import DndPage from './pages/dnd/DndPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
+import BackupsPage from './pages/admin/BackupsPage';
 import PublicFormPage from './pages/forms/PublicFormPage';
 import SettingsPage from './pages/settings/SettingsPage';
 
@@ -64,6 +65,7 @@ export default function App() {
                 <Route path="/followups" element={<PrivateRoute><FollowupDashboardPage /></PrivateRoute>} />
                 <Route path="/dnd" element={<PrivateRoute><DndPage /></PrivateRoute>} />
                 <Route path="/admin/users" element={<PrivateRoute><AdminRoute><AdminUsersPage /></AdminRoute></PrivateRoute>} />
+                <Route path="/admin/backups" element={<PrivateRoute><AdminRoute><BackupsPage /></AdminRoute></PrivateRoute>} />
                 <Route path="/settings" element={<PrivateRoute><AdminRoute><SettingsPage /></AdminRoute></PrivateRoute>} />
                 <Route path="*" element={<Navigate to="/dashboard" />} />
               </Routes>

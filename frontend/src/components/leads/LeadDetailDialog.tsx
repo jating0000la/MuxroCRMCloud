@@ -129,6 +129,17 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
     'Request sent via email',
   ];
 
+  const handleDeleteFollowup = async (followupId: string) => {
+    if (!confirm('Delete this followup record?')) return;
+    try {
+      await followupService.remove(followupId);
+      toast.success('Followup deleted');
+      setFollowups((prev) => prev.filter((f) => f.id !== followupId));
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to delete followup');
+    }
+  };
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -305,9 +316,22 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
                             <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3">
                               <div className="flex items-center justify-between mb-1">
                                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.status}</span>
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  {format(new Date(item.createdAt), 'MMM d, h:mm a')}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {format(new Date(item.createdAt), 'MMM d, h:mm a')}
+                                  </span>
+                                  {canSendWhatsapp && (
+                                    <button
+                                      onClick={() => handleDeleteFollowup(item.id)}
+                                      className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                                      title="Delete followup"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                               {item.remarks && (
                                 <p className="text-sm text-gray-600 dark:text-gray-300">{item.remarks}</p>

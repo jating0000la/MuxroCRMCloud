@@ -7,6 +7,14 @@ import { users } from './schema';
 import { eq } from 'drizzle-orm';
 
 async function main() {
+  if (process.env.NODE_ENV === 'production' && (!process.env.SEED_ADMIN_PASSWORD || !process.env.SEED_USER_PASSWORD)) {
+    console.error(
+      'SEED_ADMIN_PASSWORD and SEED_USER_PASSWORD must both be set when running the seed script ' +
+      'with NODE_ENV=production. Refusing to create accounts with default passwords.'
+    );
+    process.exit(1);
+  }
+
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
   });

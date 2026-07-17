@@ -5,6 +5,20 @@ import { Form, FormField } from '../../types';
 import { readBranding } from '../../utils/branding';
 import toast from 'react-hot-toast';
 
+// Only allow navigating to http(s) URLs or same-origin relative paths.
+// Prevents a stored javascript:/data: URI (from form page config) from
+// executing when a public visitor's browser performs the redirect.
+function isSafeRedirectUrl(url: string): boolean {
+  if (!url) return false;
+  if (url.startsWith('/') && !url.startsWith('//')) return true;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface FormDesign {
@@ -268,7 +282,7 @@ export default function PublicFormPage() {
       await formService.submitPublicForm(slug!, formData);
       setSubmitted(true);
       const { pageConfig } = extractPublicFormConfig((form?.fields as FormField[]) || []);
-      if (pageConfig.thankYouRedirectUrl) {
+      if (pageConfig.thankYouRedirectUrl && isSafeRedirectUrl(pageConfig.thankYouRedirectUrl)) {
         setTimeout(() => { window.location.href = pageConfig.thankYouRedirectUrl; }, 3000);
       }
     } catch (err: any) {
@@ -354,7 +368,7 @@ export default function PublicFormPage() {
                 )}
               </div>
             )}
-            {pageConfig.thankYouRedirectUrl && <p className="text-xs text-gray-400 mb-4">Redirecting you in a moment...</p>}
+            {pageConfig.thankYouRedirectUrl && isSafeRedirectUrl(pageConfig.thankYouRedirectUrl) && <p className="text-xs text-gray-400 mb-4">Redirecting you in a moment...</p>}
             <button onClick={() => { setSubmitted(false); setFormData({}); }} className="px-8 py-3 font-semibold text-white rounded-xl transition-opacity hover:opacity-90" style={{ backgroundColor: primaryColor2, borderRadius: btnR2 }}>
               Submit Another Response
             </button>

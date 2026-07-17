@@ -38,4 +38,8 @@ export const followupService = {
     const { data } = await api.get('/followups/cross-campaign', { params });
     return data;
   },
+
+  remove: async (id: string): Promise<void> => {
+    await api.delete(`/followups/${id}`);
+  },
 };

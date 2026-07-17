@@ -70,6 +70,26 @@ export interface MissedByUserData {
   overdueCount: number;
 }
 
+// Backend caps page size at 200 for these endpoints and returns { data, total,
+// page, limit, totalPages }. Fetch every page (up to a safety cap) so the UI
+// never silently drops records beyond the backend's default 50-item page.
+const MAX_PAGE_LIMIT = 200;
+const MAX_PAGES_SAFETY = 25; // up to 5,000 records
+
+async function fetchAllDashboardPages<T>(url: string, params: Record<string, string>): Promise<T[]> {
+  const all: T[] = [];
+  let page = 1;
+  while (page <= MAX_PAGES_SAFETY) {
+    const { data } = await api.get(url, { params: { ...params, page, limit: MAX_PAGE_LIMIT } });
+    const batch: T[] = Array.isArray(data) ? data : data?.data || [];
+    all.push(...batch);
+    const totalPages = Array.isArray(data) ? page : data?.totalPages || page;
+    if (page >= totalPages || batch.length < MAX_PAGE_LIMIT) break;
+    page++;
+  }
+  return all;
+}
+
 export const dashboardService = {
   getOverview: async (): Promise<DashboardStats> => {
     const { data } = await api.get('/dashboard/overview');
@@ -77,15 +97,15 @@ export const dashboardService = {
   },
 
   getFollowupDashboard: async (campaignId?: string): Promise<Followup[]> => {
-    const params = campaignId ? { campaignId } : {};
-    const { data } = await api.get('/dashboard/followups', { params });
-    return Array.isArray(data) ? data : data.data || [];
+    const params: Record<string, string> = {};
+    if (campaignId) params.campaignId = campaignId;
+    return fetchAllDashboardPages<Followup>('/dashboard/followups', params);
   },
 
   getAllLeadsDashboard: async (campaignId?: string): Promise<Lead[]> => {
-    const params = campaignId ? { campaignId } : {};
-    const { data } = await api.get('/dashboard/leads', { params });
-    return Array.isArray(data) ? data : data.data || [];
+    const params: Record<string, string> = {};
+    if (campaignId) params.campaignId = campaignId;
+    return fetchAllDashboardPages<Lead>('/dashboard/leads', params);
   },
 
   getCampaignStats: async (campaignId: string) => {

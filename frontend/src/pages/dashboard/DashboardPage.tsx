@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -9,9 +9,10 @@ import {
   DailyTrendData,
   MissedByUserData,
   UserConversionData,
+  SalesFunnelData,
 } from '../../services/dashboard';
 import { campaignService } from '../../services/campaigns';
-import { Campaign } from '../../types';
+import { Followup, Lead, Campaign } from '../../types';
 import Layout from '../../components/layout/Layout';
 import { format } from 'date-fns';
 import {
@@ -56,6 +57,9 @@ export default function DashboardPage() {
   const [statusReport, setStatusReport] = useState<StatusReportData[]>([]);
   const [dailyTrend, setDailyTrend] = useState<DailyTrendData[]>([]);
   const [missedByUser, setMissedByUser] = useState<MissedByUserData[]>([]);
+  const [salesFunnel, setSalesFunnel] = useState<SalesFunnelData | null>(null);
+  const [upcomingFollowups, setUpcomingFollowups] = useState<Followup[]>([]);
+  const [recentLeads, setRecentLeads] = useState<Lead[]>([]);
 
   const loadData = useCallback(async () => {
     setRefreshing(true);
@@ -66,11 +70,14 @@ export default function DashboardPage() {
       await Promise.allSettled([
         loadKpi(),
         loadAlerts(),
+        loadSalesFunnel(),
         loadUserConversion(),
         loadCampaignReport(),
         loadStatusReport(),
         loadDailyTrend(),
         loadMissedByUser(),
+        loadUpcomingFollowups(),
+        loadRecentLeads(),
       ]);
     } catch (err) {
       console.error('Dashboard load failed', err);
@@ -95,6 +102,33 @@ export default function DashboardPage() {
       setAlerts(data);
     } catch (err) {
       console.error('Alerts load failed', err);
+    }
+  };
+
+  const loadSalesFunnel = async () => {
+    try {
+      const data = await dashboardService.getSalesFunnel(selectedCampaign || undefined);
+      setSalesFunnel(data);
+    } catch (err) {
+      console.error('Sales funnel load failed', err);
+    }
+  };
+
+  const loadUpcomingFollowups = async () => {
+    try {
+      const data = await dashboardService.getFollowupDashboard(selectedCampaign || undefined);
+      setUpcomingFollowups(data.slice(0, 5));
+    } catch (err) {
+      console.error('Upcoming followups load failed', err);
+    }
+  };
+
+  const loadRecentLeads = async () => {
+    try {
+      const data = await dashboardService.getAllLeadsDashboard(selectedCampaign || undefined);
+      setRecentLeads(data.slice(0, 5));
+    } catch (err) {
+      console.error('Recent leads load failed', err);
     }
   };
 
@@ -146,6 +180,61 @@ export default function DashboardPage() {
   useEffect(() => {
     loadData();
   }, [selectedCampaign, startDate, endDate]);
+
+  const dedupedStatusReport = useMemo(() => {
+    const map = new Map<string, StatusReportData>();
+    statusReport.forEach((s) => {
+      const key = s.label;
+      if (map.has(key)) {
+        const existing = map.get(key)!;
+        map.set(key, { ...existing, count: existing.count + s.count });
+      } else {
+        map.set(key, { ...s });
+      }
+    });
+    return Array.from(map.values());
+  }, [statusReport]);
+
+  const dedupedCampaignReport = useMemo(() => {
+    const map = new Map<string, CampaignReportData>();
+    campaignReport.forEach((c) => {
+      if (map.has(c.campaignId)) {
+        const existing = map.get(c.campaignId)!;
+        map.set(c.campaignId, {
+          ...existing,
+          totalLeads: existing.totalLeads + c.totalLeads,
+          converted: existing.converted + c.converted,
+          lost: existing.lost + c.lost,
+        });
+      } else {
+        map.set(c.campaignId, { ...c });
+      }
+    });
+    return Array.from(map.values());
+  }, [campaignReport]);
+
+  const funnelData = useMemo(() => {
+    const raw = salesFunnel?.statusFunnel?.map(item => ({
+      name: item.status,
+      value: item.count,
+      fill: item.color,
+    })) ?? [
+      { name: 'New Lead', value: kpi?.totalLeads ?? 0, fill: '#3b82f6' },
+      { name: 'Contacted', value: Math.round((kpi?.totalLeads ?? 0) * 0.7), fill: '#06b6d4' },
+      { name: 'Follow-up', value: Math.round((kpi?.totalLeads ?? 0) * 0.45), fill: '#f97316' },
+      { name: 'Qualified', value: Math.round((kpi?.totalLeads ?? 0) * 0.25), fill: '#8b5cf6' },
+      { name: 'Won', value: kpi?.wonDeals ?? 0, fill: '#22c55e' },
+    ];
+    const map = new Map<string, typeof raw[number]>();
+    raw.forEach((item) => {
+      if (map.has(item.name)) {
+        map.get(item.name)!.value += item.value;
+      } else {
+        map.set(item.name, { ...item });
+      }
+    });
+    return Array.from(map.values());
+  }, [salesFunnel, kpi]);
 
   if (loading) {
     return (
@@ -203,14 +292,6 @@ export default function DashboardPage() {
       color: 'from-purple-600 to-purple-500',
       icon: <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
     },
-  ];
-
-  const funnelData = [
-    { name: 'New Lead', value: kpi?.totalLeads ?? 0, fill: '#3b82f6' },
-    { name: 'Contacted', value: Math.round((kpi?.totalLeads ?? 0) * 0.7), fill: '#06b6d4' },
-    { name: 'Follow-up', value: Math.round((kpi?.totalLeads ?? 0) * 0.45), fill: '#f97316' },
-    { name: 'Qualified', value: Math.round((kpi?.totalLeads ?? 0) * 0.25), fill: '#8b5cf6' },
-    { name: 'Won', value: kpi?.wonDeals ?? 0, fill: '#22c55e' },
   ];
 
   return (
@@ -357,7 +438,7 @@ export default function DashboardPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={statusReport}
+                      data={dedupedStatusReport}
                       cx="50%"
                       cy="50%"
                       innerRadius={50}
@@ -366,7 +447,7 @@ export default function DashboardPage() {
                       dataKey="count"
                       nameKey="label"
                     >
-                      {statusReport.map((entry, i) => (
+                      {dedupedStatusReport.map((entry, i) => (
                         <Cell key={i} fill={entry.color || CHART_COLORS[i % CHART_COLORS.length]} />
                       ))}
                     </Pie>
@@ -407,12 +488,11 @@ export default function DashboardPage() {
               <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-3">Campaign-wise Report</h3>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={campaignReport}>
+                  <BarChart data={dedupedCampaignReport}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="campaignName" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" height={60} />
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip />
-                    <Legend />
                     <Bar dataKey="converted" name="Converted" fill="#22c55e" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="lost" name="Lost" fill="#6b7280" radius={[4, 4, 0, 0]} />
                   </BarChart>
@@ -434,7 +514,7 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {campaignReport.map((row) => (
+                    {dedupedCampaignReport.map((row) => (
                       <tr key={row.campaignId} className="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{row.campaignName}</td>
                         <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-300">{row.totalLeads}</td>
@@ -449,7 +529,7 @@ export default function DashboardPage() {
                         </td>
                       </tr>
                     ))}
-                    {campaignReport.length === 0 && (
+                    {dedupedCampaignReport.length === 0 && (
                       <tr><td colSpan={5} className="text-center py-6 text-gray-400">No campaign data</td></tr>
                     )}
                   </tbody>
@@ -500,6 +580,63 @@ export default function DashboardPage() {
               </table>
             </div>
           </section>
+
+          {/* ── Upcoming Follow-ups + Recent Leads ──────────── */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+            <section className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">Upcoming Follow-ups</h3>
+                <Link to="/followups" className="text-xs font-semibold text-primary-600 hover:text-primary-700">View All</Link>
+              </div>
+              <div className="space-y-2">
+                {upcomingFollowups.length > 0 ? (
+                  upcomingFollowups.map((f) => (
+                    <div key={f.id} className="flex items-center justify-between p-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{f.lead?.name || 'Unknown Lead'}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{f.user?.name || 'Unassigned'}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-medium text-orange-600 dark:text-orange-400">{f.nextCallDate ? format(new Date(f.nextCallDate), 'MMM d, h:mm a') : 'No date'}</p>
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400">{f.status}</span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center py-6 text-sm text-gray-400">No upcoming follow-ups</p>
+                )}
+              </div>
+            </section>
+
+            <section className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">Recent Leads</h3>
+                <Link to="/leads" className="text-xs font-semibold text-primary-600 hover:text-primary-700">View All</Link>
+              </div>
+              <div className="space-y-2">
+                {recentLeads.length > 0 ? (
+                  recentLeads.map((lead) => (
+                    <div key={lead.id} className="flex items-center justify-between p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{lead.name || 'Unknown'}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{lead.phone || lead.email || 'No contact'}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-medium text-blue-600 dark:text-blue-400">{lead.campaign?.name || '-'}</p>
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          lead.dnd ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' :
+                          lead.status ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
+                          'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                        }`}>{lead.dnd ? 'DND' : lead.status?.label || 'New'}</span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center py-6 text-sm text-gray-400">No recent leads</p>
+                )}
+              </div>
+            </section>
+          </div>
 
         </div>
       </div>
