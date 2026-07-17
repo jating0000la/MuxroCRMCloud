@@ -10,20 +10,12 @@ const FORM_BG_FILES = [
   'pexels-codioful-7135013.jpg',
   'pexels-codioful-7135004.jpg',
   'pexels-codioful-7134981.jpg',
-  'pexels-70588695-19248457.jpg',
-  'pexels-jess-vide-5008007.jpg',
-  'pexels-francesco-ungaro-13216333.jpg',
-  'pexels-enginakyurt-6138036.jpg',
   'pexels-edward-jenner-4253051.jpg',
   'pexels-nickcollins-1293120.jpg',
   'pexels-martinpechy-2078266.jpg',
   'pexels-padrinan-19670.jpg',
   'pexels-padrinan-255379.jpg',
-  'pexels-steve-25372910.jpg',
-  'pexels-robert-clark-504241532-26834228.jpg',
-  'pexels-pedroesparza-248514727-12726784.jpg',
-  'pexels-steve-26771256.jpg',
-  'pexels-steve-26771259.jpg',
+  'pexels-jess-vide-5008007.jpg'
 ];
 
 const FORM_BG_PRESETS: { url: string; label: string }[] = FORM_BG_FILES.map((file, i) => ({
