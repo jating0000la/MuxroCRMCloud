@@ -4,7 +4,7 @@ export interface Notification {
   id: string;
   userId: string;
   followupId: string;
-  type: 'overdue' | 'today' | 'tomorrow' | 'warning';
+  type: 'overdue' | 'today' | 'tomorrow' | 'warning' | 'upcoming';
   isRead: boolean;
   createdAt: string;
   followup?: {

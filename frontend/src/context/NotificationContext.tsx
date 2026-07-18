@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { notificationService, type Notification } from '../services/notifications';
-import toast from 'react-hot-toast';
 
 interface NotificationContextType {
   notifications: Notification[];
@@ -73,12 +72,8 @@ function playAlertSound(type: 'overdue' | 'today' | 'other' = 'other') {
 
 /** Show a native browser notification */
 function showBrowserNotification(title: string, body: string, icon = '/favicon.ico') {
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'granted') {
-    const n = new Notification(title, { body, icon, badge: icon });
-    // Auto-close after 6 seconds
-    setTimeout(() => n.close(), 6000);
-  }
+  // Disabled - using sound + row highlighting only for less intrusive UX
+  return;
 }
 
 /** Request browser notification permission */
@@ -118,46 +113,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
       const overdueCount = newOnes.filter((n) => n.type === 'overdue').length;
       const todayCount = newOnes.filter((n) => n.type === 'today').length;
+      const upcomingCount = newOnes.filter((n) => n.type === 'upcoming').length;
 
-      // Play sound for overdue or today notifications
-      if (soundEnabled && (overdueCount > 0 || todayCount > 0)) {
-        playAlertSound(overdueCount > 0 ? 'overdue' : 'today');
+      // Play sound for overdue, today, or upcoming notifications
+      if (soundEnabled && (overdueCount > 0 || todayCount > 0 || upcomingCount > 0)) {
+        if (overdueCount > 0) {
+          playAlertSound('overdue');
+        } else if (todayCount > 0) {
+          playAlertSound('today');
+        } else {
+          playAlertSound('other'); // For upcoming
+        }
       }
-
-      // Show browser notification
-      if (overdueCount > 0) {
-        showBrowserNotification(
-          `⚠️ ${overdueCount} Overdue Followup${overdueCount > 1 ? 's' : ''}!`,
-          newOnes.filter((n) => n.type === 'overdue')
-            .slice(0, 3)
-            .map((n) => n.followup?.lead?.name || 'Lead')
-            .join(', ')
-        );
-        const names = newOnes.filter((n) => n.type === 'overdue')
-          .slice(0, 3)
-          .map((n) => n.followup?.lead?.name || 'Lead')
-          .join(', ');
-        toast.error(
-          `${overdueCount} Overdue Followup${overdueCount > 1 ? 's' : ''}!${names ? ' — ' + names : ''}`,
-          { duration: 8000, icon: '🔴' }
-        );
-      } else if (todayCount > 0) {
-        showBrowserNotification(
-          `⏰ ${todayCount} Followup${todayCount > 1 ? 's' : ''} Due Today`,
-          newOnes.filter((n) => n.type === 'today')
-            .slice(0, 3)
-            .map((n) => n.followup?.lead?.name || 'Lead')
-            .join(', ')
-        );
-        const names = newOnes.filter((n) => n.type === 'today')
-          .slice(0, 3)
-          .map((n) => n.followup?.lead?.name || 'Lead')
-          .join(', ');
-        toast(
-          `${todayCount} Followup${todayCount > 1 ? 's' : ''} Due Today${names ? ' — ' + names : ''}`,
-          { duration: 6000, icon: '⏰' }
-        );
-      }
+      // No browser notifications or toasts - sound + row highlighting in dashboard is sufficient
     }
   };
 

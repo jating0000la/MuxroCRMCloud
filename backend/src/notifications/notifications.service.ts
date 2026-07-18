@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { eq, and, inArray, desc, asc, sql } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
 import { notifications, followups, leads, users } from '../db/schema';
-import { subHours, startOfDay, endOfDay, isBefore, isAfter } from 'date-fns';
+import { subHours, startOfDay, endOfDay, isBefore, isAfter, addMinutes } from 'date-fns';
 
 @Injectable()
 export class NotificationsService {
@@ -11,11 +11,18 @@ export class NotificationsService {
   private getNotificationType(nextCallDate: Date | null): string {
     if (!nextCallDate) return 'warning';
 
+    const now = new Date();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
+
+    // Check if the followup is within 10 minutes (upcoming)
+    const tenMinutesFromNow = addMinutes(now, 10);
+    if (isAfter(nextCallDate, now) && isBefore(nextCallDate, tenMinutesFromNow)) {
+      return 'upcoming';
+    }
 
     if (isBefore(nextCallDate, today)) {
       return 'overdue';
@@ -84,19 +91,18 @@ export class NotificationsService {
   }
 
   async getPendingNotifications(userId: string) {
+    // First get all pending notifications with their followups and leads
     const results = await this.database.db
       .select({
         notification: notifications,
-        followup: {
-          ...followups,
-          lead: {
-            id: leads.id,
-            name: leads.name,
-          },
-          user: {
-            id: users.id,
-            name: users.name,
-          },
+        followup: followups,
+        lead: {
+          id: leads.id,
+          name: leads.name,
+        },
+        user: {
+          id: users.id,
+          name: users.name,
         },
       })
       .from(notifications)
@@ -106,15 +112,29 @@ export class NotificationsService {
       .where(
         and(
           eq(notifications.userId, userId),
-          inArray(notifications.type, ['overdue', 'today', 'tomorrow']),
+          inArray(notifications.type, ['overdue', 'today', 'tomorrow', 'upcoming']),
           eq(notifications.isRead, false),
         ),
       )
-      .orderBy(desc(notifications.type), desc(notifications.createdAt));
+      .orderBy(desc(notifications.type), desc(followups.nextCallDate));
 
-    return results.map((r) => ({
+    // Deduplicate by lead - keep only the latest followup per lead (by nextCallDate)
+    const leadMap = new Map<string, typeof results[0]>();
+    for (const r of results) {
+      const leadId = r.lead.id;
+      const existing = leadMap.get(leadId);
+      if (!existing || (r.followup.nextCallDate && existing.followup.nextCallDate && new Date(r.followup.nextCallDate) > new Date(existing.followup.nextCallDate))) {
+        leadMap.set(leadId, r);
+      }
+    }
+
+    return Array.from(leadMap.values()).map((r) => ({
       ...r.notification,
-      followup: r.followup,
+      followup: {
+        ...r.followup,
+        lead: r.lead,
+        user: r.user,
+      },
     }));
   }
 
@@ -165,17 +185,25 @@ export class NotificationsService {
   }
 
   async getPendingCount(userId: string): Promise<number> {
-    const [{ count }] = await this.database.db
-      .select({ count: sql<number>`count(*)::int` })
+    // Count unique leads with pending notifications (deduplicated)
+    const results = await this.database.db
+      .select({
+        leadId: leads.id,
+      })
       .from(notifications)
+      .innerJoin(followups, eq(notifications.followupId, followups.id))
+      .innerJoin(leads, eq(followups.leadId, leads.id))
       .where(
         and(
           eq(notifications.userId, userId),
-          inArray(notifications.type, ['overdue', 'today']),
+          inArray(notifications.type, ['overdue', 'today', 'upcoming']),
           eq(notifications.isRead, false),
         ),
       );
-    return count;
+
+    // Deduplicate by leadId
+    const uniqueLeads = new Set(results.map(r => r.leadId));
+    return uniqueLeads.size;
   }
 
   async syncNotificationsForUser(userId: string): Promise<void> {

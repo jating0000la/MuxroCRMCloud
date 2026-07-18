@@ -12,14 +12,14 @@ import Layout from '../../components/layout/Layout';
 import Pagination from '../../components/common/Pagination';
 import LeadDetailDialog from '../../components/leads/LeadDetailDialog';
 import { downloadCsv } from '../../utils/csv';
-import { format, isToday, isTomorrow, isPast, startOfDay, endOfDay, addDays } from 'date-fns';
+import { format, isToday, isTomorrow, isPast, startOfDay, endOfDay, addDays, addMinutes, isAfter, isBefore, subHours } from 'date-fns';
 import toast from 'react-hot-toast';
 
 const DEFAULT_PAGE_SIZE = 50;
 
 type SortField = 'name' | 'campaign' | 'status' | 'doer' | 'dueDate' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
-type DueFilter = 'all' | 'overdue' | 'today' | 'next3' | 'completed';
+type DueFilter = 'all' | 'overdue' | 'missed' | 'due' | 'upcoming' | 'today' | 'next3' | 'completed';
 
 export default function FollowupDashboardPage() {
   const { user } = useAuth();
@@ -122,7 +122,8 @@ export default function FollowupDashboardPage() {
   useEffect(() => {
     const overdue = notifications.filter((n) => n.type === 'overdue').length;
     const today = notifications.filter((n) => n.type === 'today').length;
-    const total = overdue + today;
+    const upcoming = notifications.filter((n) => n.type === 'upcoming').length;
+    const total = overdue + today + upcoming;
     document.title = total > 0 ? `(${total}) Follow-ups` : 'Follow-ups';
     return () => { document.title = 'CRM'; };
   }, [notifications]);
@@ -240,11 +241,33 @@ export default function FollowupDashboardPage() {
   // ── Computed ──────────────────────────────────────────────────
   const uniqueSources = useMemo(() => [...new Set(leads.map((l) => l.source))], [leads]);
 
+  const now = new Date();
+  const twoHoursAgo = subHours(now, 2);
+
   const overdueCount = useMemo(() => {
-    const now = startOfDay(new Date());
     return leads.filter((l) => {
       const next = l.followups?.[0]?.nextCallDate;
-      return next && isPast(new Date(next)) && !isToday(new Date(next)) && !(l.status?.label || '').toLowerCase().includes('completed');
+      if (!next) return false;
+      const nextDate = new Date(next);
+      return isPast(nextDate) && isAfter(nextDate, twoHoursAgo) && !isToday(nextDate) && !(l.status?.label || '').toLowerCase().includes('completed');
+    }).length;
+  }, [leads]);
+
+  const missedCount = useMemo(() => {
+    return leads.filter((l) => {
+      const next = l.followups?.[0]?.nextCallDate;
+      if (!next) return false;
+      const nextDate = new Date(next);
+      return isPast(nextDate) && isBefore(nextDate, twoHoursAgo) && !(l.status?.label || '').toLowerCase().includes('completed');
+    }).length;
+  }, [leads]);
+
+  const dueCount = useMemo(() => {
+    return leads.filter((l) => {
+      const next = l.followups?.[0]?.nextCallDate;
+      if (!next) return false;
+      const nextDate = new Date(next);
+      return isPast(nextDate) && !(l.status?.label || '').toLowerCase().includes('completed');
     }).length;
   }, [leads]);
 
@@ -255,17 +278,29 @@ export default function FollowupDashboardPage() {
     }).length;
   }, [leads]);
 
+  const upcomingCount = useMemo(() => {
+    const tenMinutesFromNow = addMinutes(now, 10);
+    return leads.filter((l) => {
+      const next = l.followups?.[0]?.nextCallDate;
+      if (!next) return false;
+      const nextDate = new Date(next);
+      return isAfter(nextDate, now) && isBefore(nextDate, tenMinutesFromNow) && !(l.status?.label || '').toLowerCase().includes('completed');
+    }).length;
+  }, [leads]);
+
   const getUrgencyScore = useCallback((lead: Lead) => {
     const notif = notifications.find((n) => n.followupId === lead.followups?.[0]?.id);
     if (notif?.type === 'overdue') return 0;
-    if (notif?.type === 'today') return 1;
-    return 2;
+    if (notif?.type === 'upcoming') return 1;
+    if (notif?.type === 'today') return 2;
+    return 3;
   }, [notifications]);
 
   const getRowHighlight = useCallback((lead: Lead): string => {
     const notif = notifications.find((n) => n.followupId === lead.followups?.[0]?.id);
     if (!notif) return '';
     if (notif.type === 'overdue') return 'bg-red-50/80 dark:bg-red-950/30 border-l-[3px] border-l-red-500';
+    if (notif.type === 'upcoming') return 'bg-blue-50/80 dark:bg-blue-950/30 border-l-[3px] border-l-blue-500';
     if (notif.type === 'today') return 'bg-amber-50/80 dark:bg-amber-950/30 border-l-[3px] border-l-amber-500';
     if (notif.type === 'tomorrow') return 'bg-emerald-50/60 dark:bg-emerald-950/20 border-l-[3px] border-l-emerald-500';
     return '';
@@ -276,6 +311,8 @@ export default function FollowupDashboardPage() {
     const startToday = startOfDay(now);
     const endToday = endOfDay(now);
     const after3 = addDays(now, 3);
+    const twoHoursAgo = subHours(now, 2);
+    const tenMinutesFromNow = addMinutes(now, 10);
 
     return leads
       .filter((lead) => {
@@ -293,7 +330,10 @@ export default function FollowupDashboardPage() {
         const nextCall = lead.followups?.[0]?.nextCallDate ? new Date(lead.followups[0].nextCallDate) : null;
         const isCompleted = (lead.status?.label || '').toLowerCase().includes('completed');
 
-        if (dueFilter === 'overdue' && (!nextCall || !isPast(nextCall) || isToday(nextCall) || isCompleted)) return false;
+        if (dueFilter === 'overdue' && (!nextCall || !isPast(nextCall) || isBefore(nextCall, twoHoursAgo) || isCompleted)) return false;
+        if (dueFilter === 'missed' && (!nextCall || !isPast(nextCall) || isAfter(nextCall, twoHoursAgo) || isCompleted)) return false;
+        if (dueFilter === 'due' && (!nextCall || !isPast(nextCall) || isCompleted)) return false;
+        if (dueFilter === 'upcoming' && (!nextCall || !isAfter(nextCall, now) || !isBefore(nextCall, tenMinutesFromNow) || isCompleted)) return false;
         if (dueFilter === 'today' && (!nextCall || !isToday(nextCall) || isCompleted)) return false;
         if (dueFilter === 'next3' && (!nextCall || nextCall <= endToday || nextCall > after3 || isCompleted)) return false;
         if (dueFilter === 'completed' && !isCompleted) return false;
@@ -551,7 +591,10 @@ export default function FollowupDashboardPage() {
               <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                 {([
                   { key: 'all' as DueFilter, label: 'All', count: leads.length },
-                  { key: 'overdue' as DueFilter, label: 'Overdue', count: overdueCount },
+                  { key: 'overdue' as DueFilter, label: 'Overdue (≤2h)', count: overdueCount },
+                  { key: 'missed' as DueFilter, label: 'Missed (>2h)', count: missedCount },
+                  { key: 'due' as DueFilter, label: 'Due (All Past)', count: dueCount },
+                  { key: 'upcoming' as DueFilter, label: 'Upcoming (10 min)', count: upcomingCount },
                   { key: 'today' as DueFilter, label: 'Today', count: todayCount },
                   { key: 'next3' as DueFilter, label: 'Next 3 Days', count: 0 },
                   { key: 'completed' as DueFilter, label: 'Completed', count: 0 },
@@ -568,6 +611,15 @@ export default function FollowupDashboardPage() {
                     {chip.label}
                     {chip.key === 'overdue' && overdueCount > 0 && (
                       <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-red-100 text-red-600 rounded-full dark:bg-red-900/30 dark:text-red-400">{overdueCount}</span>
+                    )}
+                    {chip.key === 'missed' && missedCount > 0 && (
+                      <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-red-200 text-red-700 rounded-full dark:bg-red-900/50 dark:text-red-300">{missedCount}</span>
+                    )}
+                    {chip.key === 'due' && dueCount > 0 && (
+                      <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-700 rounded-full dark:bg-orange-900/30 dark:text-orange-400">{dueCount}</span>
+                    )}
+                    {chip.key === 'upcoming' && upcomingCount > 0 && (
+                      <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-600 rounded-full dark:bg-blue-900/30 dark:text-blue-400">{upcomingCount}</span>
                     )}
                     {chip.key === 'today' && todayCount > 0 && (
                       <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-amber-100 text-amber-600 rounded-full dark:bg-amber-900/30 dark:text-amber-400">{todayCount}</span>

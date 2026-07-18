@@ -95,7 +95,7 @@ function BottomBar({ filteredNav, currentPath }: { filteredNav: typeof navItems;
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
-  const { pendingCount, notifications, markAsRead, soundEnabled, toggleSound } = useNotifications();
+  const { pendingCount, notifications, markAsRead, markAllAsRead, soundEnabled, toggleSound } = useNotifications();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -232,49 +232,57 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           ? 'border-red-300 hover:bg-red-50 dark:border-red-700 dark:hover:bg-red-900/30'
                           : notifications.some(n => n.type === 'today')
                           ? 'border-amber-300 hover:bg-amber-50 dark:border-amber-700 dark:hover:bg-amber-900/30'
+                          : notifications.some(n => n.type === 'upcoming')
+                          ? 'border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/30'
                           : 'border-primary-100 hover:bg-primary-50/70 dark:border-gray-600 dark:hover:bg-gray-600'
-                      }`}
+                      }`} 
                       aria-label="Notifications"
                     >
-                      <svg className={`w-4 h-4 ${notifications.some(n => n.type === 'overdue') ? 'text-red-600' : notifications.some(n => n.type === 'today') ? 'text-amber-600' : 'text-slate-600 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className={`w-4 h-4 ${notifications.some(n => n.type === 'overdue') ? 'text-red-600' : notifications.some(n => n.type === 'today') ? 'text-amber-600' : notifications.some(n => n.type === 'upcoming') ? 'text-blue-600' : 'text-slate-600 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                       </svg>
                       {pendingCount > 0 && (
-                        <span className={`absolute -top-1 -right-1 flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white rounded-full ${notifications.some(n => n.type === 'overdue') ? 'bg-red-500 animate-pulse' : 'bg-amber-500'}`}>
-                          {pendingCount > 9 ? '9+' : pendingCount}
+                        <span className={`absolute -top-1 -right-1 flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white rounded-full ${notifications.some(n => n.type === 'overdue') ? 'bg-red-500 animate-pulse' : notifications.some(n => n.type === 'today') ? 'bg-amber-500' : notifications.some(n => n.type === 'upcoming') ? 'bg-blue-500 animate-pulse' : 'bg-amber-500'}`}>
+                          {pendingCount}
                         </span>
                       )}
                     </button>
 
+                    {/* Notification dropdown */}
                     {notificationMenuOpen && (
-                      <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-xl border border-slate-200 z-50 max-h-[480px] flex flex-col overflow-hidden dark:bg-gray-800 dark:border-gray-700">
-                        {/* Header */}
-                        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between dark:border-gray-700 dark:bg-gray-900/50">
-                          <div>
-                            <h3 className="font-bold text-slate-900 text-sm dark:text-gray-100">Followup Reminders</h3>
-                            <p className="text-xs text-slate-500 mt-0.5 dark:text-gray-400">{pendingCount} pending</p>
-                          </div>
-                          {/* Sound toggle */}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); toggleSound(); }}
-                            title={soundEnabled ? 'Mute alerts' : 'Enable alerts'}
-                            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${soundEnabled ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                          >
-                            {soundEnabled ? (
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M12 6v12m0 0L8 14m4 4l4-4M9.172 9.172a4 4 0 000 5.656" />
-                              </svg>
-                            ) : (
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                              </svg>
+                      <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-primary-100 z-50 dark:bg-gray-800 dark:border-gray-700">
+                        <div className="p-3 border-b border-primary-100 dark:border-gray-700 flex items-center justify-between">
+                          <h3 className="font-semibold text-slate-900 dark:text-gray-100">Followup Reminders</h3>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleSound(); }}
+                              title={soundEnabled ? 'Mute alerts' : 'Enable alerts'}
+                              className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${soundEnabled ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                            >
+                              {soundEnabled ? (
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M12 6v12m0 0L8 14m4 4l4-4M9.172 9.172a4 4 0 000 5.656" />
+                                </svg>
+                              ) : (
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                                </svg>
+                              )}
+                              {soundEnabled ? 'Sound On' : 'Muted'}
+                            </button>
+                            {notifications.length > 0 && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); markAllAsRead(); }}
+                                className="px-2 py-1 rounded-md text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                              >
+                                Clear All
+                              </button>
                             )}
-                            {soundEnabled ? 'Sound On' : 'Muted'}
-                          </button>
+                          </div>
                         </div>
                         {/* Notification list */}
-                        <div className="overflow-y-auto flex-1">
+                        <div className="overflow-y-auto max-h-96">
                           {notifications.length === 0 ? (
                             <div className="px-4 py-10 text-center">
                               <svg className="w-10 h-10 text-green-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -297,16 +305,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                                       ? 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500 dark:bg-red-900/20 dark:hover:bg-red-900/30'
                                       : notif.type === 'today'
                                       ? 'bg-amber-50 hover:bg-amber-100 border-l-4 border-amber-500 dark:bg-amber-900/20 dark:hover:bg-amber-900/30'
+                                      : notif.type === 'upcoming'
+                                      ? 'bg-blue-50 hover:bg-blue-100 border-l-4 border-blue-500 dark:bg-blue-900/20 dark:hover:bg-blue-900/30'
                                       : 'bg-green-50 hover:bg-green-100 border-l-4 border-green-500 dark:bg-green-900/20 dark:hover:bg-green-900/30'
                                   }`}
                                 >
                                   <div className="flex items-center gap-2">
                                     <span className="text-base">
-                                      {notif.type === 'overdue' ? '🔴' : notif.type === 'today' ? '⏰' : '📅'}
+                                      {notif.type === 'overdue' ? '🔴' : notif.type === 'today' ? '⏰' : notif.type === 'upcoming' ? '🔔' : '📅'}
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                      <div className={`text-xs font-bold uppercase tracking-wide ${notif.type === 'overdue' ? 'text-red-700' : notif.type === 'today' ? 'text-amber-700' : 'text-green-700'}`}>
-                                        {notif.type === 'overdue' ? 'Overdue' : notif.type === 'today' ? 'Due Today' : 'Due Tomorrow'}
+                                      <div className={`text-xs font-bold uppercase tracking-wide ${notif.type === 'overdue' ? 'text-red-700' : notif.type === 'today' ? 'text-amber-700' : notif.type === 'upcoming' ? 'text-blue-700' : 'text-green-700'}`}>
+                                        {notif.type === 'overdue' ? 'Overdue' : notif.type === 'today' ? 'Due Today' : notif.type === 'upcoming' ? 'Upcoming (10 min)' : 'Due Tomorrow'}
                                       </div>
                                       <div className="font-semibold text-slate-900 text-sm truncate dark:text-gray-100">
                                         {notif.followup?.lead?.name || 'Unknown Lead'}
