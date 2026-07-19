@@ -4,25 +4,33 @@ import { ExtractJwt, Strategy, StrategyOptionsWithRequest } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { TokenBlacklistService } from '../services/token-blacklist.service';
 
-// Simple TTL cache for session validation (reduces DB hits from every HTTP request)
-const sessionCache = new Map<string, { valid: boolean; expires: number }>();
-const SESSION_CACHE_TTL = 60_000; // 1 minute
+/**
+ * Access tokens are short-lived (15 min) and NOT stored in DB.
+ * We use an in-memory blacklist for explicit revocation (logout, password change).
+ * Tokens naturally expire via JWT `exp` claim.
+ */
+const accessTokenBlacklist = new Map<string, number>(); // token -> expiry timestamp
 const MAX_CACHE_SIZE = 1000;
 
-// Periodic cache eviction to prevent memory leak
+// Periodic cleanup to prevent memory leak
 setInterval(() => {
   const now = Date.now();
-  for (const [key, val] of sessionCache) {
-    if (val.expires < now) sessionCache.delete(key);
+  for (const [key, val] of accessTokenBlacklist) {
+    if (val < now) accessTokenBlacklist.delete(key);
   }
-  // Hard cap: if still too large, evict oldest half
-  if (sessionCache.size > MAX_CACHE_SIZE) {
-    const entries = Array.from(sessionCache.entries());
+  if (accessTokenBlacklist.size > MAX_CACHE_SIZE) {
+    const entries = Array.from(accessTokenBlacklist.entries());
     for (let i = 0; i < entries.length / 2; i++) {
-      sessionCache.delete(entries[i][0]);
+      accessTokenBlacklist.delete(entries[i][0]);
     }
   }
 }, 300_000); // every 5 minutes
+
+/** Exported for use by logout / password-change endpoints */
+export function revokeAccessToken(token: string): void {
+  // Store with 15 min TTL (matches max access token lifetime)
+  accessTokenBlacklist.set(token, Date.now() + 15 * 60 * 1000);
+}
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -50,21 +58,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       token = req.cookies.auth_token;
     }
 
-    // Check cache first to avoid DB hit on every request
     if (token) {
-      const cached = sessionCache.get(token);
-      if (cached) {
-        if (!cached.valid) {
+      // Check in-memory blacklist first (instant, for logout/password change)
+      const blacklisted = accessTokenBlacklist.get(token);
+      if (blacklisted) {
+        if (blacklisted > Date.now()) {
           throw new UnauthorizedException('Token has been revoked. Please log in again.');
         }
-        // Cache hit, valid session
-      } else {
-        // Cache miss, check DB
-        const isRevoked = await this.tokenBlacklist.isBlacklisted(token);
-        sessionCache.set(token, { valid: !isRevoked, expires: Date.now() + SESSION_CACHE_TTL });
-        if (isRevoked) {
-          throw new UnauthorizedException('Token has been revoked. Please log in again.');
-        }
+        accessTokenBlacklist.delete(token); // expired entry, clean up
       }
     }
 

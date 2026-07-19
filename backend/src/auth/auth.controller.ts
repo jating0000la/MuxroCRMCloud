@@ -9,6 +9,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
 import { ConfigService } from '@nestjs/config';
+import { ExtractJwt } from 'passport-jwt';
+import { revokeAccessToken } from './strategies/jwt.strategy';
 
 function parseExpirationToMs(expiration: string): number {
   const match = expiration.match(/^(\d+)([smhd])$/);
@@ -67,6 +69,12 @@ export class AuthController {
       return res.status(401).json({ message: 'No refresh token found. Please log in again.' });
     }
 
+    // Revoke old access token in in-memory blacklist
+    const oldAccessToken = req.cookies?.auth_token;
+    if (oldAccessToken) {
+      revokeAccessToken(oldAccessToken);
+    }
+
     const result = await this.authService.refreshAccessToken(refreshToken);
     const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
     const accessExpiration = this.configService.get<string>('ACCESS_TOKEN_EXPIRATION', '15m');
@@ -111,9 +119,15 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Logout and revoke current token' })
   async logout(@Request() req, @Response() res) {
+    // Revoke refresh token in DB
     const refreshToken = req.cookies?.refresh_token;
     if (refreshToken) {
       await this.tokenBlacklist.revoke(refreshToken);
+    }
+    // Revoke access token in in-memory blacklist (expires in 15 min automatically)
+    const accessToken = ExtractJwt.fromAuthHeaderAsBearerToken()(req) || req.cookies?.auth_token;
+    if (accessToken) {
+      revokeAccessToken(accessToken);
     }
     const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
     // Clear both cookies
@@ -145,6 +159,11 @@ export class AuthController {
     }
     if (body.newPassword.length < 6) {
       return { success: false, message: 'New password must be at least 6 characters' };
+    }
+    // Revoke current access token (all sessions invalidated on password change)
+    const accessToken = ExtractJwt.fromAuthHeaderAsBearerToken()(req) || req.cookies?.auth_token;
+    if (accessToken) {
+      revokeAccessToken(accessToken);
     }
     return this.authService.changePassword(req.user.id, body.currentPassword, body.newPassword);
   }
