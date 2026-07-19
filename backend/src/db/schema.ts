@@ -346,9 +346,63 @@ export const jobLogs = pgTable(
   ],
 );
 
+// ─── WhatsApp Messages (Chat history for WhatsApp integration) ────────────────
+
+export const whatsappMessages = pgTable(
+  'WhatsappMessage',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    phone: varchar('phone', { length: 50 }).notNull(),
+    name: varchar('name', { length: 255 }),
+    direction: varchar('direction', { length: 10 }).notNull(), // 'in' | 'out'
+    message: text('message'),
+    type: varchar('type', { length: 50 }).notNull().default('text'), // text, image, video, audio, file, location, contact, quick_reply, list, template
+    mediaUrl: varchar('mediaUrl', { length: 2000 }),
+    messageId: varchar('messageId', { length: 255 }), // Gupshup message ID
+    status: varchar('status', { length: 50 }), // submitted, delivered, read, failed
+    leadId: uuid('leadId').references(() => leads.id, { onDelete: 'set null' }),
+    campaignId: uuid('campaignId').references(() => campaigns.id, { onDelete: 'set null' }),
+    userId: uuid('userId').references(() => users.id, { onDelete: 'set null' }),
+    raw: json('raw'), // full Gupshup response payload
+    createdAt: timestamp('createdAt').notNull().defaultNow(),
+  },
+  (table) => [
+    index('WhatsappMessage_phone_idx').on(table.phone),
+    index('WhatsappMessage_direction_idx').on(table.direction),
+    index('WhatsappMessage_messageId_idx').on(table.messageId),
+    index('WhatsappMessage_leadId_idx').on(table.leadId),
+    index('WhatsappMessage_createdAt_idx').on(table.createdAt),
+  ],
+);
+
+// ─── WhatsApp Contacts (Unified contacts for WhatsApp chat) ───────────────────
+
+export const whatsappContacts = pgTable(
+  'WhatsappContact',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    phone: varchar('phone', { length: 50 }).notNull().unique(),
+    name: varchar('name', { length: 255 }),
+    leadId: uuid('leadId').references(() => leads.id, { onDelete: 'set null' }),
+    tags: varchar('tags', { length: 500 }),
+    optIn: boolean('optIn').notNull().default(true),
+    lastSeen: timestamp('lastSeen'),
+    createdAt: timestamp('createdAt').notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+  },
+  (table) => [
+    index('WhatsappContact_phone_idx').on(table.phone),
+    index('WhatsappContact_leadId_idx').on(table.leadId),
+  ],
+);
+
 export type RefreshSession = typeof refreshSessions.$inferSelect;
 export type NewRefreshSession = typeof refreshSessions.$inferInsert;
 export type OutboxEvent = typeof outboxEvents.$inferSelect;
 export type NewOutboxEvent = typeof outboxEvents.$inferInsert;
 export type JobLog = typeof jobLogs.$inferSelect;
 export type NewJobLog = typeof jobLogs.$inferInsert;
+export type WhatsappMessage = typeof whatsappMessages.$inferSelect;
+export type NewWhatsappMessage = typeof whatsappMessages.$inferInsert;
+export type WhatsappContact = typeof whatsappContacts.$inferSelect;
+export type NewWhatsappContact = typeof whatsappContacts.$inferInsert;

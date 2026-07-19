@@ -12,6 +12,7 @@ import { FollowupsModule } from './followups/followups.module';
 import { BulkImportModule } from './bulk-import/bulk-import.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { WhatsAppModule } from './whatsapp/whatsapp.module';
 import { SettingsModule } from './settings/settings.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { HealthController } from './health.controller';
@@ -47,6 +48,7 @@ import { StructuredLoggingMiddleware } from './common/logging/structured-logging
     BulkImportModule,
     DashboardModule,
     IntegrationsModule,
+    WhatsAppModule,
     SettingsModule,
     NotificationsModule,
     // New infrastructure
