@@ -4,8 +4,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { GupshupService } from './gupshup.service';
-import { SendGupshupMessageDto, SendGupshupTemplateDto, TestGupshupDto } from './dto/integration.dto';
+import { GupshupService, GupshupMediaType } from './gupshup.service';
+import { SendGupshupMessageDto, SendGupshupMediaDto, SendGupshupTemplateDto, TestGupshupDto } from './dto/integration.dto';
 import { SettingsService } from '../settings/settings.service';
 
 @ApiTags('Gupshup WhatsApp')
@@ -23,11 +23,11 @@ export class GupshupController {
   @Post('send-message')
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send a WhatsApp session message via Gupshup' })
+  @ApiOperation({ summary: 'Send a WhatsApp session text message via Gupshup' })
   @ApiResponse({ status: 200, description: 'Message sent successfully' })
   @ApiResponse({ status: 400, description: 'Invalid request' })
   async sendMessage(@Body() dto: SendGupshupMessageDto, @CurrentUser() user: { role?: string }) {
-    this.logger.log(`Sending WhatsApp message to ${dto.destination}`);
+    this.logger.log(`Sending WhatsApp text to ${dto.destination}`);
     const apiKey = await this.resolveConfigValue('gupshupApiKey', dto.apiKey, user);
     const source = await this.resolveConfigValue('gupshupSource', dto.source, user);
     const appName = await this.resolveConfigValue('gupshupAppName', dto.appName, user);
@@ -39,6 +39,30 @@ export class GupshupController {
       dto.destination,
       dto.message,
       dto.disablePreview,
+      dto.encode,
+    );
+  }
+
+  @Post('send-media')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send a WhatsApp session media message (image/video/document/audio) via Gupshup' })
+  @ApiResponse({ status: 200, description: 'Media message sent successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid request' })
+  async sendMedia(@Body() dto: SendGupshupMediaDto, @CurrentUser() user: { role?: string }) {
+    this.logger.log(`Sending WhatsApp ${dto.mediaType} to ${dto.destination}`);
+    const apiKey = await this.resolveConfigValue('gupshupApiKey', dto.apiKey, user);
+    const source = await this.resolveConfigValue('gupshupSource', dto.source, user);
+    const appName = await this.resolveConfigValue('gupshupAppName', dto.appName, user);
+
+    return this.gupshup.sendMediaSessionMessage(
+      apiKey,
+      source,
+      appName,
+      dto.destination,
+      dto.mediaType as GupshupMediaType,
+      dto.mediaUrl,
+      dto.caption,
     );
   }
 
@@ -76,12 +100,7 @@ export class GupshupController {
     const source = await this.resolveConfigValue('gupshupSource', dto.source, user);
     const appName = await this.resolveConfigValue('gupshupAppName', dto.appName, user);
 
-    return this.gupshup.testConnection(
-      apiKey,
-      source,
-      appName,
-      dto.testPhone,
-    );
+    return this.gupshup.testConnection(apiKey, source, appName, dto.testPhone);
   }
 
   @Post('sync-templates')
@@ -117,5 +136,4 @@ export class GupshupController {
       throw new BadRequestException(`Missing required setting: ${key}`);
     }
   }
-
 }

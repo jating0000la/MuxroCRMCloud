@@ -513,11 +513,43 @@ export class WhatsAppService {
 
   // ─── Delivery Status Update ───────────────────────────────────────────────
 
-  async updateMessageStatus(messageId: string, status: string) {
+  async updateMessageStatus(
+    messageId: string,
+    status: string,
+    metadata?: {
+      pricing?: { category: string; billable?: boolean; pricingType: string };
+      conversation?: { id: string; expirationTimestamp: number | null; originType: string };
+      errorCode?: string;
+      cause?: string;
+    },
+  ) {
     if (!messageId) return;
+
+    // Build update with pricing/conversation data stored in raw column
+    const updateData: any = { status };
+
+    if (metadata && (metadata.pricing || metadata.conversation || metadata.errorCode || metadata.cause)) {
+      // Merge with existing raw data if present
+      const [existing] = await this.database.db
+        .select({ raw: whatsappMessages.raw })
+        .from(whatsappMessages)
+        .where(eq(whatsappMessages.messageId, messageId))
+        .limit(1);
+
+      const existingRaw = (existing?.raw as any) || {};
+      updateData.raw = {
+        ...existingRaw,
+        ...(metadata.pricing ? { pricing: metadata.pricing } : {}),
+        ...(metadata.conversation ? { conversation: metadata.conversation } : {}),
+        ...(metadata.errorCode ? { errorCode: metadata.errorCode } : {}),
+        ...(metadata.cause ? { cause: metadata.cause } : {}),
+        lastStatusUpdate: new Date().toISOString(),
+      };
+    }
+
     await this.database.db
       .update(whatsappMessages)
-      .set({ status })
+      .set(updateData)
       .where(eq(whatsappMessages.messageId, messageId));
   }
 

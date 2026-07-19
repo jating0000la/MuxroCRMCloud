@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsArray } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsArray, IsIn } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SaveIntegrationSettingsDto {
@@ -133,6 +133,49 @@ export class SendGupshupMessageDto {
   @IsOptional()
   @IsBoolean()
   disablePreview?: boolean;
+
+  @ApiPropertyOptional({ description: 'URL-encode the message text (for special characters)' })
+  @IsOptional()
+  @IsBoolean()
+  encode?: boolean;
+}
+
+export class SendGupshupMediaDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  apiKey?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  source?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  appName?: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  destination: string;
+
+  @ApiProperty({ enum: ['image', 'video', 'document', 'audio', 'location'] })
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(['image', 'video', 'document', 'audio', 'location'])
+  mediaType: string;
+
+  @ApiProperty({ description: 'Public URL of the media file' })
+  @IsString()
+  @IsNotEmpty()
+  mediaUrl: string;
+
+  @ApiPropertyOptional({ description: 'Optional caption (text, image, video, document only)' })
+  @IsOptional()
+  @IsString()
+  caption?: string;
 }
 
 export class SendGupshupTemplateDto {

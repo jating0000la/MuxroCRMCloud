@@ -1,4 +1,4 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Logger, Req } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Logger, Req, UnauthorizedException } from '@nestjs/common';
 import { timingSafeEqual } from 'crypto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
@@ -49,21 +49,46 @@ export class WhatsAppWebhookController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Receive delivery status updates from Gupshup' })
-  async handleStatusWebhook(@Body() payload: any) {
+  async handleStatusWebhook(@Body() payload: any, @Req() request: Request) {
     this.logger.log('Received WhatsApp status webhook');
 
+    // Verify webhook secret (CRITICAL: was missing before audit fix)
+    await this.assertWebhookSecret(request.header('x-gupshup-webhook-secret') || undefined);
+
     try {
+      // Gupshup delivery event format per docs:
+      // { type: 'message-event', payload: { type: 'SENT'|'DELIVERED'|'READ'|'FAILED', id, srcAddr, destAddr, cause, errorCode, conversation, pricing } }
+      // Alternate format: top-level { externalId, eventType, srcAddr, destAddr, cause, errorCode, conversation, pricing }
       const eventType = payload.type || payload.event || '';
       const eventPayload = payload.payload || payload;
 
       if (eventType === 'message-event' || eventPayload.type) {
-        const gsId = eventPayload.id || eventPayload.gsId || eventPayload.messageId || '';
-        const status = eventPayload.type || eventPayload.status || '';
+        const gsId = eventPayload.id || eventPayload.gsId || eventPayload.messageId || eventPayload.externalId || '';
+        const rawStatus = eventPayload.type || eventPayload.status || eventPayload.eventType || '';
+        const mappedStatus = this.mapGupshupStatus(rawStatus);
+
+        // Extract pricing and conversation metadata per docs
+        const pricing = eventPayload.pricing || payload.pricing || null;
+        const conversation = eventPayload.conversation || payload.conversation || null;
+        const errorCode = eventPayload.errorCode || eventPayload.error_code || null;
+        const cause = eventPayload.cause || null;
 
         if (gsId) {
-          const mappedStatus = this.mapGupshupStatus(status);
-          await this.whatsapp.updateMessageStatus(gsId, mappedStatus);
-          this.logger.log(`Message ${gsId} status updated to ${mappedStatus}`);
+          await this.whatsapp.updateMessageStatus(gsId, mappedStatus, {
+            pricing: pricing ? {
+              category: pricing.category || pricing.model || '',
+              billable: pricing.billable,
+              pricingType: pricing.pricing_type || pricing.type || '',
+            } : undefined,
+            conversation: conversation ? {
+              id: conversation.id || '',
+              expirationTimestamp: conversation.expiration_timestamp || null,
+              originType: conversation.origin?.type || '',
+            } : undefined,
+            errorCode: errorCode || undefined,
+            cause: cause || undefined,
+          });
+          this.logger.log(`Message ${gsId} status updated to ${mappedStatus}${pricing ? ` (pricing: ${pricing.category})` : ''}`);
         }
       }
     } catch (err: any) {
@@ -106,11 +131,15 @@ export class WhatsAppWebhookController {
     const userId = lead.lead.doerId || lead.campaign?.managerId;
     if (!userId) return;
 
+    // Include sender name in remarks if available
+    const senderName = inbound.name || '';
+    const namePrefix = senderName ? `[${senderName}] ` : '';
+
     await this.database.db.insert(followups).values({
       leadId: lead.lead.id,
       userId,
       status: 'WhatsApp Received',
-      remarks: `[msg:${messageId}] Inbound WhatsApp: ${text.substring(0, 500)}`,
+      remarks: `[msg:${messageId}] ${namePrefix}Inbound WhatsApp: ${text.substring(0, 500)}`,
     });
 
     this.logger.log(`Created followup for lead ${lead.lead.id} from inbound WhatsApp`);
@@ -132,17 +161,23 @@ export class WhatsAppWebhookController {
       configuredSecret = (await this.settingsService.getSettingForUse('gupshupWebhookSecret')).trim();
     } catch {
       this.logger.warn('Webhook secret not configured — rejecting webhook');
-      throw new Error('Webhook secret not configured');
+      throw new UnauthorizedException('Webhook secret not configured');
     }
 
-    if (!configuredSecret || !headerToken) {
-      throw new Error('Missing webhook secret');
+    if (!configuredSecret) {
+      this.logger.warn('Webhook secret is empty — rejecting webhook');
+      throw new UnauthorizedException('Webhook secret not configured');
+    }
+
+    if (!headerToken) {
+      throw new UnauthorizedException('Missing webhook secret header');
     }
 
     const a = Buffer.from(configuredSecret);
-    const b = Buffer.from(headerToken);
+    const b = Buffer.from(headerToken.trim());
     if (a.length !== b.length || !timingSafeEqual(a, b)) {
-      throw new Error('Invalid webhook secret');
+      this.logger.warn('Rejected WhatsApp webhook with invalid secret');
+      throw new UnauthorizedException('Invalid webhook token');
     }
   }
 }
