@@ -18,10 +18,9 @@ export class AuthService {
     private refreshSessionService: RefreshSessionService,
   ) {}
 
-  private getExpirationMs(): number {
-    const expiration = this.configService.get<string>('JWT_EXPIRATION', '7d');
+  private parseExpirationToMs(expiration: string): number {
     const match = expiration.match(/^(\d+)([smhd])$/);
-    if (!match) return 7 * 24 * 60 * 60 * 1000; // default 7 days
+    if (!match) return 15 * 60 * 1000; // default 15 minutes
 
     const value = parseInt(match[1], 10);
     switch (match[2]) {
@@ -29,8 +28,20 @@ export class AuthService {
       case 'm': return value * 60 * 1000;
       case 'h': return value * 60 * 60 * 1000;
       case 'd': return value * 24 * 60 * 60 * 1000;
-      default: return 7 * 24 * 60 * 60 * 1000;
+      default: return 15 * 60 * 1000;
     }
+  }
+
+  private getAccessTokenExpiration(): string {
+    return this.configService.get<string>('ACCESS_TOKEN_EXPIRATION', '15m');
+  }
+
+  private getRefreshTokenExpiration(): string {
+    return this.configService.get<string>('REFRESH_TOKEN_EXPIRATION', '7d');
+  }
+
+  private getRefreshTokenExpirationMs(): number {
+    return this.parseExpirationToMs(this.getRefreshTokenExpiration());
   }
 
   async login(loginDto: LoginDto) {
@@ -50,19 +61,23 @@ export class AuthService {
     }
 
     const payload = { sub: user.id, username: user.username, role: user.role };
-    const token = this.jwtService.sign(payload);
+    const accessToken = this.jwtService.sign(payload);
+    const refreshToken = this.jwtService.sign(payload, {
+      expiresIn: this.getRefreshTokenExpiration() as any,
+    });
 
-    // Create a DB-backed session (if this fails, revoke the token)
+    // Create a DB-backed session for the refresh token
     try {
-      const expiresAt = new Date(Date.now() + this.getExpirationMs());
-      await this.refreshSessionService.createSession(user.id, token, expiresAt);
+      const expiresAt = new Date(Date.now() + this.getRefreshTokenExpirationMs());
+      await this.refreshSessionService.createSession(user.id, refreshToken, expiresAt);
     } catch (sessionError) {
-      await this.refreshSessionService.revokeSession(token);
+      await this.refreshSessionService.revokeSession(refreshToken);
       throw new UnauthorizedException('Login failed. Please try again.');
     }
 
     return {
-      access_token: token,
+      access_token: accessToken,
+      refresh_token: refreshToken,
       user: {
         id: user.id,
         username: user.username,
@@ -94,19 +109,23 @@ export class AuthService {
       .returning();
 
     const payload = { sub: user.id, username: user.username, role: user.role };
-    const token = this.jwtService.sign(payload);
+    const accessToken = this.jwtService.sign(payload);
+    const refreshToken = this.jwtService.sign(payload, {
+      expiresIn: this.getRefreshTokenExpiration() as any,
+    });
 
-    // Create a DB-backed session (if this fails, revoke the token)
+    // Create a DB-backed session for the refresh token
     try {
-      const expiresAt = new Date(Date.now() + this.getExpirationMs());
-      await this.refreshSessionService.createSession(user.id, token, expiresAt);
+      const expiresAt = new Date(Date.now() + this.getRefreshTokenExpirationMs());
+      await this.refreshSessionService.createSession(user.id, refreshToken, expiresAt);
     } catch (sessionError) {
-      await this.refreshSessionService.revokeSession(token);
+      await this.refreshSessionService.revokeSession(refreshToken);
       throw new ConflictException('Registration failed. Please try again.');
     }
 
     return {
-      access_token: token,
+      access_token: accessToken,
+      refresh_token: refreshToken,
       user: {
         id: user.id,
         username: user.username,
@@ -120,6 +139,49 @@ export class AuthService {
   async logout(token: string) {
     await this.refreshSessionService.revokeSession(token);
     return { message: 'Logged out successfully' };
+  }
+
+  /**
+   * Refresh access token using a valid refresh token.
+   */
+  async refreshAccessToken(refreshToken: string) {
+    // Verify the refresh token is still valid (not revoked / expired)
+    const isRevoked = await this.refreshSessionService.isRevoked(refreshToken);
+    if (isRevoked) {
+      throw new UnauthorizedException('Refresh token is invalid. Please log in again.');
+    }
+
+    // Decode the refresh token to get user info
+    let payload: any;
+    try {
+      payload = this.jwtService.verify(refreshToken);
+    } catch {
+      throw new UnauthorizedException('Refresh token is expired. Please log in again.');
+    }
+
+    // Revoke old refresh token (rotate)
+    await this.refreshSessionService.revokeSession(refreshToken);
+
+    // Issue new token pair
+    const userPayload = { sub: payload.sub, username: payload.username, role: payload.role };
+    const newAccessToken = this.jwtService.sign(userPayload);
+    const newRefreshToken = this.jwtService.sign(userPayload, {
+      expiresIn: this.getRefreshTokenExpiration() as any,
+    });
+
+    // Create new DB session
+    try {
+      const expiresAt = new Date(Date.now() + this.getRefreshTokenExpirationMs());
+      await this.refreshSessionService.createSession(payload.sub, newRefreshToken, expiresAt);
+    } catch (sessionError) {
+      await this.refreshSessionService.revokeSession(newRefreshToken);
+      throw new UnauthorizedException('Token refresh failed. Please log in again.');
+    }
+
+    return {
+      access_token: newAccessToken,
+      refresh_token: newRefreshToken,
+    };
   }
 
   async validateUser(userId: string) {

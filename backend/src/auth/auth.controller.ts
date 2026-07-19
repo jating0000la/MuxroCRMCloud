@@ -8,7 +8,7 @@ import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
-import { ExtractJwt } from 'passport-jwt';
+import { ConfigService } from '@nestjs/config';
 
 function parseExpirationToMs(expiration: string): number {
   const match = expiration.match(/^(\d+)([smhd])$/);
@@ -24,12 +24,21 @@ function parseExpirationToMs(expiration: string): number {
   }
 }
 
+const COOKIE_OPTIONS = (maxAgeMs: number, isProduction: boolean) => ({
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: 'lax' as const,
+  maxAge: maxAgeMs,
+  path: '/',
+});
+
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(
     private authService: AuthService,
     private tokenBlacklist: TokenBlacklistService,
+    private configService: ConfigService,
   ) {}
 
   @Post('login')
@@ -37,15 +46,38 @@ export class AuthController {
   @ApiOperation({ summary: 'Login with username and password' })
   async login(@Body() loginDto: LoginDto, @Response() res) {
     const result = await this.authService.login(loginDto);
-    const maxAge = parseExpirationToMs(process.env.JWT_EXPIRATION || '7d');
-    res.cookie('auth_token', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge,
-      path: '/',
-    });
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    const accessExpiration = this.configService.get<string>('ACCESS_TOKEN_EXPIRATION', '15m');
+    const refreshExpiration = this.configService.get<string>('REFRESH_TOKEN_EXPIRATION', '7d');
+    const accessMaxAge = parseExpirationToMs(accessExpiration);
+    const refreshMaxAge = parseExpirationToMs(refreshExpiration);
+
+    // Access token: short-lived HttpOnly cookie (15-30 min)
+    res.cookie('auth_token', result.access_token, COOKIE_OPTIONS(accessMaxAge, isProduction));
+    // Refresh token: long-lived HttpOnly cookie (7-30 days)
+    res.cookie('refresh_token', result.refresh_token, COOKIE_OPTIONS(refreshMaxAge, isProduction));
     return res.json({ user: result.user, message: 'Login successful' });
+  }
+
+  @Post('refresh')
+  @ApiOperation({ summary: 'Refresh access token using HttpOnly refresh token cookie' })
+  async refresh(@Request() req, @Response() res) {
+    const refreshToken = req.cookies?.refresh_token;
+    if (!refreshToken) {
+      return res.status(401).json({ message: 'No refresh token found. Please log in again.' });
+    }
+
+    const result = await this.authService.refreshAccessToken(refreshToken);
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    const accessExpiration = this.configService.get<string>('ACCESS_TOKEN_EXPIRATION', '15m');
+    const refreshExpiration = this.configService.get<string>('REFRESH_TOKEN_EXPIRATION', '7d');
+    const accessMaxAge = parseExpirationToMs(accessExpiration);
+    const refreshMaxAge = parseExpirationToMs(refreshExpiration);
+
+    // Rotate both cookies
+    res.cookie('auth_token', result.access_token, COOKIE_OPTIONS(accessMaxAge, isProduction));
+    res.cookie('refresh_token', result.refresh_token, COOKIE_OPTIONS(refreshMaxAge, isProduction));
+    return res.json({ message: 'Token refreshed successfully' });
   }
 
   @Post('register')
@@ -53,9 +85,17 @@ export class AuthController {
   @Roles('ADMIN')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Register new user (Admin only)' })
-  async register(@Body() registerDto: RegisterDto) {
+  async register(@Body() registerDto: RegisterDto, @Response() res) {
     const result = await this.authService.register(registerDto);
-    return { user: result.user, message: 'Registration successful' };
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    const accessExpiration = this.configService.get<string>('ACCESS_TOKEN_EXPIRATION', '15m');
+    const refreshExpiration = this.configService.get<string>('REFRESH_TOKEN_EXPIRATION', '7d');
+    const accessMaxAge = parseExpirationToMs(accessExpiration);
+    const refreshMaxAge = parseExpirationToMs(refreshExpiration);
+
+    res.cookie('auth_token', result.access_token, COOKIE_OPTIONS(accessMaxAge, isProduction));
+    res.cookie('refresh_token', result.refresh_token, COOKIE_OPTIONS(refreshMaxAge, isProduction));
+    return res.json({ user: result.user, message: 'Registration successful' });
   }
 
   @Get('profile')
@@ -71,13 +111,21 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Logout and revoke current token' })
   async logout(@Request() req, @Response() res) {
-    let token = ExtractJwt.fromAuthHeaderAsBearerToken()(req) || req.cookies?.auth_token;
-    if (token) {
-      await this.tokenBlacklist.revoke(token);
+    const refreshToken = req.cookies?.refresh_token;
+    if (refreshToken) {
+      await this.tokenBlacklist.revoke(refreshToken);
     }
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    // Clear both cookies
     res.clearCookie('auth_token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProduction,
+      sameSite: 'lax',
+      path: '/',
+    });
+    res.clearCookie('refresh_token', {
+      httpOnly: true,
+      secure: isProduction,
       sameSite: 'lax',
       path: '/',
     });
