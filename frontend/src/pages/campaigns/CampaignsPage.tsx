@@ -75,7 +75,21 @@ export default function CampaignsPage() {
   const canManage = user?.role === 'ADMIN';
 
   useEffect(() => {
-    loadCampaigns();
+    let cancelled = false;
+
+    const loadAll = async () => {
+      try {
+        const data = await campaignService.getAll();
+        if (!cancelled) setCampaigns(data);
+      } catch (error: any) {
+        if (!cancelled) toast.error(error.response?.data?.message || 'Failed to load campaigns');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadAll();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {

@@ -20,8 +20,8 @@ export default class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught:', error, errorInfo);
+  componentDidCatch(_error: Error, _errorInfo: ErrorInfo) {
+    // Intentionally empty — integrate an error reporting service (e.g. Sentry) here
   }
 
   render() {
@@ -51,8 +51,8 @@ export default class ErrorBoundary extends Component<Props, State> {
             {this.state.error && (
               <details className="mt-4 text-left">
                 <summary className="text-sm text-gray-400 cursor-pointer hover:text-gray-600">Error details</summary>
-                <pre className="mt-2 text-xs text-red-600 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg overflow-auto">
-                  {this.state.error.message}
+                <pre className="mt-2 text-xs text-red-600 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg overflow-auto max-h-40">
+                  {this.state.error.message?.slice(0, 500) || 'Unknown error'}
                 </pre>
               </details>
             )}

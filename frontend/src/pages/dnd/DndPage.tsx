@@ -28,7 +28,28 @@ export default function DndPage() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   useEffect(() => {
-    loadData();
+    let cancelled = false;
+
+    const loadAll = async () => {
+      setError(null);
+      try {
+        const [leadsData, campaignsData] = await Promise.all([
+          leadService.getDnd(),
+          campaignService.getAll(),
+        ]);
+        if (!cancelled) {
+          setLeads(leadsData);
+          setCampaigns(campaignsData);
+        }
+      } catch {
+        if (!cancelled) setError('Failed to load dashboard data. Please try again.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadAll();
+    return () => { cancelled = true; };
   }, []);
 
   const loadData = async () => {
@@ -40,8 +61,7 @@ export default function DndPage() {
       ]);
       setLeads(leadsData);
       setCampaigns(campaignsData);
-    } catch (error) {
-      console.error('Failed to load data', error);
+    } catch {
       setError('Failed to load dashboard data. Please try again.');
     } finally {
       setLoading(false);
@@ -52,8 +72,8 @@ export default function DndPage() {
     try {
       const statuses = await statusService.getByCampaign(campaignId);
       setCampaignStatuses(statuses);
-    } catch (error) {
-      console.error('Failed to load statuses');
+    } catch {
+      // Statuses load is non-critical
     }
   };
 

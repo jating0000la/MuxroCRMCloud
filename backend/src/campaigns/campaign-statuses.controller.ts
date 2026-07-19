@@ -28,21 +28,34 @@ export class CampaignStatusesController {
   @Post()
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Create a new status' })
-  create(
+  async create(
     @Param('campaignId') campaignId: string,
     @Body() body: { label: string; color?: string; whatsappMessage?: string },
   ) {
-    return this.statusesService.create(campaignId, body);
+    if (!body.label || typeof body.label !== 'string' || body.label.trim().length === 0) {
+      throw new (await import('@nestjs/common')).BadRequestException('label is required');
+    }
+    if (body.label.length > 50) {
+      throw new (await import('@nestjs/common')).BadRequestException('label must be 50 characters or less');
+    }
+    return this.statusesService.create(campaignId, { ...body, label: body.label.trim() });
   }
 
   @Put(':id')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Update a status' })
-  update(
+  async update(
     @Param('id') id: string,
     @Body() body: { label?: string; color?: string; order?: number; whatsappMessage?: string },
   ) {
-    return this.statusesService.update(id, body);
+    if (body.label !== undefined && (typeof body.label !== 'string' || body.label.trim().length === 0)) {
+      throw new (await import('@nestjs/common')).BadRequestException('label cannot be empty');
+    }
+    if (body.label && body.label.length > 50) {
+      throw new (await import('@nestjs/common')).BadRequestException('label must be 50 characters or less');
+    }
+    const sanitized = body.label ? { ...body, label: body.label.trim() } : body;
+    return this.statusesService.update(id, sanitized);
   }
 
   @Delete(':id')

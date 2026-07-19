@@ -4,6 +4,7 @@ import { DatabaseService } from '../db/database.service';
 import { leads, followups, campaignStatuses, campaignUsers, users, campaigns } from '../db/schema';
 import { PaginationDto } from '../common/pagination.dto';
 import { RoundRobinService } from '../common/services/round-robin.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
@@ -13,6 +14,7 @@ export class LeadsService {
   constructor(
     private database: DatabaseService,
     private roundRobinService: RoundRobinService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async findByCampaign(campaignId: string, userId?: string, role?: string, pagination?: PaginationDto) {
@@ -42,7 +44,7 @@ export class LeadsService {
       .offset(skip)
       .limit(take);
 
-    // Get latest followup for each lead
+    // Get latest followup for each lead using DISTINCT ON (PostgreSQL optimization)
     const leadIds = results.map((r) => r.lead.id);
     let latestFollowups: any[] = [];
     if (leadIds.length > 0) {
@@ -55,7 +57,7 @@ export class LeadsService {
         .from(followups)
         .innerJoin(users, eq(followups.userId, users.id))
         .where(inArray(followups.leadId, leadIds))
-        .orderBy(desc(followups.createdAt));
+        .orderBy(desc(followups.leadId), desc(followups.createdAt));
     }
 
     // Group followups by leadId and take the first one per lead
@@ -185,9 +187,21 @@ export class LeadsService {
     if (role === 'USER' && lead.doerId !== userId) {
       throw new ForbiddenException('You can only edit leads assigned to you');
     }
+    // Whitelist allowed fields — never allow changing campaignId or other ownership fields
+    const allowedFields: Record<string, any> = {};
+    if (dto.name !== undefined) allowedFields.name = dto.name;
+    if (dto.email !== undefined) allowedFields.email = dto.email;
+    if (dto.phone !== undefined) allowedFields.phone = dto.phone;
+    if (dto.statusId !== undefined) allowedFields.statusId = dto.statusId;
+    if (dto.customData !== undefined) allowedFields.customData = dto.customData;
+    if (dto.source !== undefined) allowedFields.source = dto.source;
+    if (role === 'ADMIN') {
+      if (dto.doerId !== undefined) allowedFields.doerId = dto.doerId;
+    }
+    allowedFields.updatedAt = new Date();
     const [updated] = await this.database.db
       .update(leads)
-      .set(dto)
+      .set(allowedFields)
       .where(eq(leads.id, id))
       .returning();
     return updated;
@@ -199,22 +213,30 @@ export class LeadsService {
       throw new ForbiddenException('You can only update status for leads assigned to you');
     }
 
-    const [followup] = await this.database.db
-      .insert(followups)
-      .values({
-        leadId: id,
-        userId,
-        status: dto.status,
-        remarks: dto.remarks,
-        nextCallDate: dto.nextCallDate ? new Date(dto.nextCallDate) : null,
-      })
-      .returning();
+    // Wrap followup insert + lead status update in a transaction for atomicity
+    const [followup] = await this.database.db.transaction(async (tx) => {
+      const [newFollowup] = await tx
+        .insert(followups)
+        .values({
+          leadId: id,
+          userId,
+          status: dto.status,
+          remarks: dto.remarks,
+          nextCallDate: dto.nextCallDate ? new Date(dto.nextCallDate) : null,
+        })
+        .returning();
 
-    const leadUpdate: any = {};
-    if (dto.statusId) leadUpdate.statusId = dto.statusId;
-    if (dto.dnd !== undefined) leadUpdate.dnd = dto.dnd;
+      const leadUpdate: any = {};
+      if (dto.statusId) leadUpdate.statusId = dto.statusId;
+      if (dto.dnd !== undefined) leadUpdate.dnd = dto.dnd;
 
-    await this.database.db.update(leads).set(leadUpdate).where(eq(leads.id, id));
+      await tx.update(leads).set(leadUpdate).where(eq(leads.id, id));
+
+      return [newFollowup] as const;
+    });
+
+    // Create notification after transaction commits (best-effort, non-critical)
+    await this.notificationsService.createNotificationForFollowup(userId, followup.id);
 
     return followup;
   }
@@ -281,7 +303,7 @@ export class LeadsService {
     const [{ total }] = await this.database.db
       .select({ total: sql<number>`count(*)::int` })
       .from(leads)
-      .where(eq(leads.campaignId, campaignId));
+      .where(and(eq(leads.campaignId, campaignId), eq(leads.isDeleted, false)));
 
     const byStatus = await this.database.db
       .select({

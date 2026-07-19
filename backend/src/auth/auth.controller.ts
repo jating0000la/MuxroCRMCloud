@@ -92,6 +92,12 @@ export class AuthController {
     @Request() req,
     @Body() body: { currentPassword: string; newPassword: string },
   ) {
+    if (!body.currentPassword || !body.newPassword) {
+      return { success: false, message: 'currentPassword and newPassword are required' };
+    }
+    if (body.newPassword.length < 6) {
+      return { success: false, message: 'New password must be at least 6 characters' };
+    }
     return this.authService.changePassword(req.user.id, body.currentPassword, body.newPassword);
   }
 }

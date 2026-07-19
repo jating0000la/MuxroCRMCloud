@@ -147,8 +147,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/login');
+    try {
+      await logout();
+    } catch {
+      // Logout API may fail but still clear local state
+    } finally {
+      navigate('/login');
+    }
   };
 
   const filteredNav = navItems.filter((item) => {
@@ -299,6 +304,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                                   onClick={() => {
                                     if (!notif.isRead) markAsRead(notif.id);
                                     setNotificationMenuOpen(false);
+                                    if (notif.followup?.lead?.id) {
+                                      navigate(`/followups`);
+                                    }
                                   }}
                                   className={`w-full text-left px-4 py-3 transition-colors ${
                                     notif.type === 'overdue'

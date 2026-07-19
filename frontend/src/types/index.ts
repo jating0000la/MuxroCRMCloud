@@ -6,6 +6,7 @@ export interface User {
   role: 'ADMIN' | 'USER';
   isActive: boolean;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Campaign {
@@ -19,6 +20,7 @@ export interface Campaign {
   statuses?: CampaignStatus[];
   _count?: { leads: number; forms: number };
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface CampaignUser {
@@ -45,7 +47,7 @@ export interface Lead {
   email?: string;
   phone?: string;
   source: string;
-  customData?: any;
+  customData?: Record<string, unknown>;
   dnd?: boolean;
   doerId?: string;
   doer?: User;
@@ -78,6 +80,7 @@ export interface Form {
   publicSlug: string;
   _count?: { submissions: number };
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface FormField {
@@ -95,7 +98,7 @@ export interface FormField {
 export interface Enquiry {
   id: string;
   formId: string;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   submittedAt: string;
 }
 

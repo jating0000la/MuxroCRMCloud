@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { eq, and, inArray, desc, asc, sql, ilike, count, lt, gte, between } from 'drizzle-orm';
+import { eq, and, or, inArray, desc, asc, sql, ilike, count, lt, gte, between, not } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
 import {
   campaigns,
@@ -450,6 +450,8 @@ export class DashboardService {
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
+    const now = new Date();
+    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
 
     const leadConditions: any[] = [eq(leads.isDeleted, false)];
     if (role === 'USER') leadConditions.push(eq(leads.doerId, userId));
@@ -467,7 +469,7 @@ export class DashboardService {
         leadConditions.push(sql`${leads.createdAt} <= ${end}`);
       }
     }
-
+    
     const whereClause = leadConditions.length > 0 ? and(...leadConditions) : undefined;
 
     const [{ totalLeads }] = await this.database.db
@@ -484,27 +486,78 @@ export class DashboardService {
       .from(leads)
       .where(and(...todayLeadConditions));
 
-    const followupConditions: any[] = [sql`${followups.nextCallDate} >= ${today}`, sql`${followups.nextCallDate} < ${tomorrow}`];
-    if (role === 'USER') followupConditions.push(eq(followups.userId, userId));
+    // Subquery: find the latest followup (max createdAt) per leadId
+    const latestFollowupSubquery = this.database.db
+      .select({
+        leadId: followups.leadId,
+        maxCreatedAt: sql<Date>`max(${followups.createdAt})`.as('maxCreatedAt'),
+      })
+      .from(followups)
+      .groupBy(followups.leadId)
+      .as('latest_followups');
+
+    // Find status IDs whose label contains 'completed' (to exclude them)
+    const completedStatuses = await this.database.db
+      .select({ id: campaignStatuses.id })
+      .from(campaignStatuses)
+      .where(ilike(campaignStatuses.label, '%completed%'));
+
+    // Due followups: latest followup per lead where nextCallDate passed but not more than 2 hours ago
+    const dueFollowupConditions: any[] = [
+      sql`${followups.nextCallDate} < ${now}`,
+      sql`${followups.nextCallDate} >= ${twoHoursAgo}`,
+      eq(leads.isDeleted, false),
+    ];
+    if (role === 'USER') dueFollowupConditions.push(eq(followups.userId, userId));
     if (campaignId) {
-      followupConditions.push(sql`${followups.leadId} IN (SELECT "id" FROM "Lead" WHERE "campaignId" = ${campaignId})`);
+      dueFollowupConditions.push(eq(leads.campaignId, campaignId));
+    }
+    // Exclude leads whose status label contains 'completed'
+    if (completedStatuses.length > 0) {
+      const completedIds = completedStatuses.map((s) => s.id);
+      dueFollowupConditions.push(or(sql`${leads.statusId} IS NULL`, not(inArray(leads.statusId, completedIds))));
     }
 
     const [{ dueFollowups }] = await this.database.db
       .select({ dueFollowups: sql<number>`count(*)::int` })
       .from(followups)
-      .where(and(...followupConditions));
+      .innerJoin(leads, eq(followups.leadId, leads.id))
+      .innerJoin(
+        latestFollowupSubquery,
+        and(
+          eq(followups.leadId, latestFollowupSubquery.leadId),
+          eq(followups.createdAt, latestFollowupSubquery.maxCreatedAt),
+        ),
+      )
+      .where(and(...dueFollowupConditions));
 
-    const missedConditions: any[] = [sql`${followups.nextCallDate} < ${today}`];
-    if (role === 'USER') missedConditions.push(eq(followups.userId, userId));
+    // Missed followups: latest followup per lead where nextCallDate passed more than 2 hours ago
+    const missedFollowupConditions: any[] = [
+      sql`${followups.nextCallDate} < ${twoHoursAgo}`,
+      eq(leads.isDeleted, false),
+    ];
+    if (role === 'USER') missedFollowupConditions.push(eq(followups.userId, userId));
     if (campaignId) {
-      missedConditions.push(sql`${followups.leadId} IN (SELECT "id" FROM "Lead" WHERE "campaignId" = ${campaignId})`);
+      missedFollowupConditions.push(eq(leads.campaignId, campaignId));
+    }
+    // Exclude leads whose status label contains 'completed'
+    if (completedStatuses.length > 0) {
+      const completedIds = completedStatuses.map((s) => s.id);
+      missedFollowupConditions.push(or(sql`${leads.statusId} IS NULL`, not(inArray(leads.statusId, completedIds))));
     }
 
     const [{ missedFollowups }] = await this.database.db
       .select({ missedFollowups: sql<number>`count(*)::int` })
       .from(followups)
-      .where(and(...missedConditions));
+      .innerJoin(leads, eq(followups.leadId, leads.id))
+      .innerJoin(
+        latestFollowupSubquery,
+        and(
+          eq(followups.leadId, latestFollowupSubquery.leadId),
+          eq(followups.createdAt, latestFollowupSubquery.maxCreatedAt),
+        ),
+      )
+      .where(and(...missedFollowupConditions));
 
     const wonStatuses = await this.database.db
       .select({ id: campaignStatuses.id })
@@ -652,37 +705,58 @@ export class DashboardService {
       .from(campaignStatuses)
       .where(ilike(campaignStatuses.label, '%won%'));
 
-    const results = await Promise.all(
-      campaignData.map(async (c) => {
-        let converted = 0;
-        let lost = 0;
+    const convertedIds = convertedStatuses.map((s) => s.id);
+    const campaignIds = campaignData.map((c) => c.campaignId);
 
-        if (convertedStatuses.length > 0) {
-          const [{ count }] = await this.database.db
-            .select({ count: sql<number>`count(*)::int` })
-            .from(leads)
-            .where(and(eq(leads.campaignId, c.campaignId), eq(leads.isDeleted, false), inArray(leads.statusId, convertedStatuses.map((s) => s.id))));
-          converted = count;
-        }
+    // Single query for converted lead counts per campaign (was N+1)
+    let convertedCounts: Record<string, number> = {};
+    if (convertedIds.length > 0 && campaignIds.length > 0) {
+      const ccRows = await this.database.db
+        .select({
+          campaignId: leads.campaignId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(leads)
+        .where(and(
+          inArray(leads.campaignId, campaignIds),
+          eq(leads.isDeleted, false),
+          inArray(leads.statusId, convertedIds),
+        ))
+        .groupBy(leads.campaignId);
+      ccRows.forEach((r) => { convertedCounts[r.campaignId!] = r.count; });
+    }
 
-        const allLeads = await this.database.db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(leads)
-          .where(and(eq(leads.campaignId, c.campaignId), eq(leads.isDeleted, false)));
-        const totalLeadsCount = allLeads[0]?.count || 0;
+    // Single query for total lead counts per campaign (was N+1)
+    let totalCounts: Record<string, number> = {};
+    if (campaignIds.length > 0) {
+      const tcRows = await this.database.db
+        .select({
+          campaignId: leads.campaignId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(leads)
+        .where(and(
+          inArray(leads.campaignId, campaignIds),
+          eq(leads.isDeleted, false),
+        ))
+        .groupBy(leads.campaignId);
+      tcRows.forEach((r) => { totalCounts[r.campaignId!] = r.count; });
+    }
 
-        lost = totalLeadsCount - converted;
+    const results = campaignData.map((c) => {
+      const totalLeadsCount = totalCounts[c.campaignId] || c.totalLeads;
+      const converted = convertedCounts[c.campaignId] || 0;
+      const lost = Math.max(0, totalLeadsCount - converted);
 
-        return {
-          campaignId: c.campaignId,
-          campaignName: c.campaignName,
-          totalLeads: totalLeadsCount,
-          converted,
-          lost: Math.max(0, lost),
-          conversionRate: totalLeadsCount > 0 ? Math.round((converted / totalLeadsCount) * 100) : 0,
-        };
-      }),
-    );
+      return {
+        campaignId: c.campaignId,
+        campaignName: c.campaignName,
+        totalLeads: totalLeadsCount,
+        converted,
+        lost,
+        conversionRate: totalLeadsCount > 0 ? Math.round((converted / totalLeadsCount) * 100) : 0,
+      };
+    });
 
     return results;
   }
@@ -718,68 +792,87 @@ export class DashboardService {
     const end = endDate ? new Date(endDate) : new Date();
     end.setHours(23, 59, 59, 999);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Fetch converted statuses ONCE (was re-fetched every day in the old loop)
+    const convertedStatuses = await this.database.db
+      .select({ id: campaignStatuses.id })
+      .from(campaignStatuses)
+      .where(ilike(campaignStatuses.label, '%convert%'));
 
+    const convertedStatusIds = convertedStatuses.map((s) => s.id);
+
+    // Query 1: New leads per day (single query with GROUP BY instead of N queries)
+    const leadConditions: any[] = [
+      eq(leads.isDeleted, false),
+      sql`${leads.createdAt} >= ${start}`,
+      sql`${leads.createdAt} <= ${end}`,
+    ];
+    if (role === 'USER') leadConditions.push(eq(leads.doerId, userId));
+    if (campaignId) leadConditions.push(eq(leads.campaignId, campaignId));
+
+    const newLeadsByDay = await this.database.db
+      .select({
+        date: sql<string>`to_char(${leads.createdAt}, 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(leads)
+      .where(and(...leadConditions))
+      .groupBy(sql`to_char(${leads.createdAt}, 'YYYY-MM-DD')`);
+
+    // Query 2: Converted leads per day (single query with GROUP BY)
+    const convertedLeadsByDay = new Map<string, number>();
+    if (convertedStatusIds.length > 0) {
+      const convConditions: any[] = [
+        eq(leads.isDeleted, false),
+        sql`${leads.updatedAt} >= ${start}`,
+        sql`${leads.updatedAt} <= ${end}`,
+        inArray(leads.statusId, convertedStatusIds),
+      ];
+      if (role === 'USER') convConditions.push(eq(leads.doerId, userId));
+      if (campaignId) convConditions.push(eq(leads.campaignId, campaignId));
+
+      const rows = await this.database.db
+        .select({
+          date: sql<string>`to_char(${leads.updatedAt}, 'YYYY-MM-DD')`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(leads)
+        .where(and(...convConditions))
+        .groupBy(sql`to_char(${leads.updatedAt}, 'YYYY-MM-DD')`);
+
+      for (const r of rows) convertedLeadsByDay.set(r.date, r.count);
+    }
+
+    // Query 3: Missed followups per day (single query with GROUP BY)
+    const followupConditions: any[] = [
+      sql`${followups.nextCallDate} >= ${start}`,
+      sql`${followups.nextCallDate} <= ${end}`,
+    ];
+    if (role === 'USER') followupConditions.push(eq(followups.userId, userId));
+
+    const missedByDay = await this.database.db
+      .select({
+        date: sql<string>`to_char(${followups.nextCallDate}, 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(followups)
+      .where(and(...followupConditions))
+      .groupBy(sql`to_char(${followups.nextCallDate}, 'YYYY-MM-DD')`);
+
+    // Build lookup maps for O(1) merge
+    const newLeadsMap = new Map(newLeadsByDay.map((r) => [r.date, r.count]));
+    const missedMap = new Map(missedByDay.map((r) => [r.date, r.count]));
+
+    // Generate all days in range and merge results
     const days: Array<{ date: string; newLeads: number; convertedLeads: number; missedFollowups: number }> = [];
     const current = new Date(start);
-
     while (current <= end) {
-      const dayStart = new Date(current);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(current);
-      dayEnd.setHours(23, 59, 59, 999);
       const dateStr = current.toISOString().split('T')[0];
-
-      const leadConditions: any[] = [
-        eq(leads.isDeleted, false),
-        sql`${leads.createdAt} >= ${dayStart}`,
-        sql`${leads.createdAt} <= ${dayEnd}`,
-      ];
-      if (role === 'USER') leadConditions.push(eq(leads.doerId, userId));
-      if (campaignId) leadConditions.push(eq(leads.campaignId, campaignId));
-
-      const [{ newLeads }] = await this.database.db
-        .select({ newLeads: sql<number>`count(*)::int` })
-        .from(leads)
-        .where(and(...leadConditions));
-
-      const convertedStatuses = await this.database.db
-        .select({ id: campaignStatuses.id })
-        .from(campaignStatuses)
-        .where(ilike(campaignStatuses.label, '%convert%'));
-
-      let convertedLeads = 0;
-      if (convertedStatuses.length > 0) {
-        const convConditions: any[] = [
-          eq(leads.isDeleted, false),
-          sql`${leads.updatedAt} >= ${dayStart}`,
-          sql`${leads.updatedAt} <= ${dayEnd}`,
-          inArray(leads.statusId, convertedStatuses.map((s) => s.id)),
-        ];
-        if (role === 'USER') convConditions.push(eq(leads.doerId, userId));
-        if (campaignId) convConditions.push(eq(leads.campaignId, campaignId));
-
-        const [{ count }] = await this.database.db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(leads)
-          .where(and(...convConditions));
-        convertedLeads = count;
-      }
-
-      const followupConditions: any[] = [
-        sql`${followups.nextCallDate} >= ${dayStart}`,
-        sql`${followups.nextCallDate} <= ${dayEnd}`,
-      ];
-      if (role === 'USER') followupConditions.push(eq(followups.userId, userId));
-
-      const [{ missedFollowups }] = await this.database.db
-        .select({ missedFollowups: sql<number>`count(*)::int` })
-        .from(followups)
-        .where(and(...followupConditions));
-
-      days.push({ date: dateStr, newLeads, convertedLeads, missedFollowups });
-
+      days.push({
+        date: dateStr,
+        newLeads: newLeadsMap.get(dateStr) ?? 0,
+        convertedLeads: convertedLeadsByDay.get(dateStr) ?? 0,
+        missedFollowups: missedMap.get(dateStr) ?? 0,
+      });
       current.setDate(current.getDate() + 1);
     }
 

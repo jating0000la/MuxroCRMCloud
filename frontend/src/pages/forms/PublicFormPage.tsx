@@ -57,8 +57,8 @@ export default function PublicFormPage() {
 
   const pageStyle = {
     fontFamily: FONT_FAMILY_MAP[pageConfig.fontFamily] || FONT_FAMILY_MAP.system,
-    ...(pageConfig.backgroundImage
-      ? { backgroundImage: `url(${pageConfig.backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' as const }
+    ...(pageConfig.backgroundImage && /^https?:\/\//.test(pageConfig.backgroundImage)
+      ? { backgroundImage: `url('${pageConfig.backgroundImage}')`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' as const }
       : { backgroundColor: pageConfig.backgroundColor }),
   };
 

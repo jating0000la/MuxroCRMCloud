@@ -9,8 +9,8 @@ import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../../db/database.service';
 import { jobLogs } from '../../db/schema';
 
-// Filenames are generated exclusively by createBackup() as crm_db_<timestamp>.sql.gz
-const SAFE_BACKUP_FILENAME = /^[A-Za-z0-9._-]+\.sql\.gz$/;
+// Filenames are generated exclusively by createBackup() as crm_db_<timestamp>.dump
+const SAFE_BACKUP_FILENAME = /^[A-Za-z0-9._-]+\.dump$/;
 
 const execFileAsync = promisify(execFile);
 
@@ -52,7 +52,7 @@ export class BackupService {
 
     const db = this.parseDatabaseUrl(dbUrl);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `crm_db_${timestamp}.sql.gz`;
+    const filename = `crm_db_${timestamp}.dump`;
     const filepath = path.join(this.backupDir, filename);
 
     this.logger.log(`Starting backup: ${filename}`);
@@ -74,10 +74,8 @@ export class BackupService {
         env: { ...process.env, PGPASSWORD: db.password },
       }) as unknown as { stdout: Buffer };
 
-      // Gzip the dump so the .sql.gz filename is accurate and the file is
-      // restorable the same way as scripts/backup.sh's cron-generated backups.
-      const gzipped = zlib.gzipSync(stdout);
-      fs.writeFileSync(filepath, gzipped);
+      // pg_dump --format=custom already compresses at level 6; no double-gzip needed
+      fs.writeFileSync(filepath, stdout);
 
       const stats = fs.statSync(filepath);
       const duration = Date.now() - startTime;
@@ -117,7 +115,7 @@ export class BackupService {
     if (!fs.existsSync(this.backupDir)) return [];
 
     return fs.readdirSync(this.backupDir)
-      .filter(f => f.endsWith('.sql.gz'))
+      .filter(f => f.endsWith('.dump'))
       .map(f => {
         const filepath = path.join(this.backupDir, f);
         const stats = fs.statSync(filepath);
@@ -219,8 +217,8 @@ export class BackupService {
     this.logger.warn(`Starting restore from ${filename} — this will overwrite existing data in database "${db.database}"`);
 
     try {
-      const gzipped = fs.readFileSync(filepath);
-      const dump = zlib.gunzipSync(gzipped);
+      // pg_dump --format=custom output is already compressed; pass directly to pg_restore
+      const dump = fs.readFileSync(filepath);
       fs.writeFileSync(tmpDumpPath, dump);
 
       let stderr = '';

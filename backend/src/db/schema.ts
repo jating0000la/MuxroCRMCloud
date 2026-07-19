@@ -154,6 +154,8 @@ export const leads = pgTable(
     index('Lead_source_idx').on(table.source),
     index('Lead_dnd_idx').on(table.dnd),
     index('Lead_name_idx').on(table.name),
+    index('Lead_phone_idx').on(table.phone),
+    index('Lead_email_idx').on(table.email),
     index('Lead_createdAt_idx').on(table.createdAt),
     index('Lead_updatedAt_idx').on(table.updatedAt),
     index('Lead_campaignId_doerId_idx').on(table.campaignId, table.doerId),
@@ -222,7 +224,6 @@ export const settings = pgTable(
     updatedAt: timestamp('updatedAt').notNull().defaultNow(),
   },
   (table) => [
-    index('Setting_key_idx').on(table.key),
     index('Setting_updatedAt_idx').on(table.updatedAt),
   ],
 );

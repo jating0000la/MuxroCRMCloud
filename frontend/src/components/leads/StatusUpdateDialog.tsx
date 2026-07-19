@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Lead, CampaignStatus, Followup } from '../../types';
 import { leadService } from '../../services/leads';
 import { followupService } from '../../services/followups';
@@ -31,19 +31,31 @@ export default function StatusUpdateDialog({ lead, statuses, onClose, onUpdate }
   const [activeTab, setActiveTab] = useState<'update' | 'history'>('update');
 
   useEffect(() => {
+    let cancelled = false;
+
+    const loadHistory = async () => {
+      try {
+        const data = await followupService.getByLead(lead.id);
+        if (!cancelled) setHistory(data);
+      } catch {
+        // History loading is non-critical
+      } finally {
+        if (!cancelled) setLoadingHistory(false);
+      }
+    };
+
     loadHistory();
+    return () => { cancelled = true; };
   }, [lead.id]);
 
-  const loadHistory = async () => {
-    try {
-      const data = await followupService.getByLead(lead.id);
-      setHistory(data);
-    } catch (error) {
-      console.error('Failed to load history');
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
+  // Escape key handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const selectedStatus = statuses.find((s) => s.id === statusId);
 
@@ -67,7 +79,7 @@ export default function StatusUpdateDialog({ lead, statuses, onClose, onUpdate }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-label="Update lead status">
       <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Lead Info Header */}
         <div className="p-5 border-b dark:border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">

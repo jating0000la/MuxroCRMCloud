@@ -34,8 +34,12 @@ export default function LoginPage() {
     } catch (error: any) {
       setShake(true);
       setTimeout(() => setShake(false), 500);
-      setFormError(error.response?.data?.message || 'Invalid credentials');
-      toast.error(error.response?.data?.message || 'Invalid credentials');
+      const msg = error.response?.data?.message || 'Invalid credentials';
+      setFormError(msg);
+      // Show toast only for non-validation errors (inline formError handles those)
+      if (msg !== 'Enter username and password' && !msg.includes('required')) {
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }

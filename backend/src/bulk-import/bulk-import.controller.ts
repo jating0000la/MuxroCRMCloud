@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Param, Body, UseGuards, UploadedFile, UseInterceptors,
+  Controller, Post, Param, Body, UseGuards, UploadedFile, UseInterceptors, BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
@@ -7,6 +7,8 @@ import { BulkImportService } from './bulk-import.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+
+const MAX_IMPORT_ROWS = 5000;
 
 @ApiTags('Bulk Import')
 @ApiBearerAuth()
@@ -35,7 +37,7 @@ export class BulkImportController {
     @Body('allocateRoundRobin') allocateRoundRobin?: string,
   ) {
     if (!file) {
-      throw new Error('No file uploaded');
+      throw new BadRequestException('No file uploaded');
     }
     const shouldAllocate = allocateRoundRobin !== 'false';
     return this.bulkImportService.importFromCSV(campaignId, file.buffer, shouldAllocate);
@@ -48,6 +50,12 @@ export class BulkImportController {
     @Param('campaignId') campaignId: string,
     @Body() body: { data: any[]; allocateRoundRobin?: boolean },
   ) {
+    if (!Array.isArray(body.data)) {
+      throw new BadRequestException('data must be an array');
+    }
+    if (body.data.length > MAX_IMPORT_ROWS) {
+      throw new BadRequestException(`Maximum ${MAX_IMPORT_ROWS} rows allowed per import. Received ${body.data.length}.`);
+    }
     return this.bulkImportService.importFromJSON(
       campaignId,
       body.data,

@@ -87,6 +87,10 @@ export class JobProcessors {
         await this.notificationsService.syncNotificationsForUser(data.userId);
         return { success: true };
       }},
+      { type: JOB_TYPES.NOTIFICATION_CLEANUP, handler: async (data: any) => {
+        await this.notificationsService.cleanupOldNotifications(data.userId);
+        return { success: true };
+      }},
       { type: JOB_TYPES.OUTBOX_PUBLISH, handler: async (data: any) => {
         const count = await this.outboxService.processPendingEvents(data.batchSize || 50);
         return { processed: count };

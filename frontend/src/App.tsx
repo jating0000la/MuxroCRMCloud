@@ -1,29 +1,40 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import ErrorBoundary from './components/common/ErrorBoundary';
-import LoginPage from './pages/auth/LoginPage';
-import DashboardPage from './pages/dashboard/DashboardPage';
-import CampaignsPage from './pages/campaigns/CampaignsPage';
-import CampaignDetailPage from './pages/campaigns/CampaignDetailPage';
-import FollowupDashboardPage from './pages/dashboard/FollowupDashboardPage';
-import DndPage from './pages/dnd/DndPage';
-import AdminUsersPage from './pages/admin/AdminUsersPage';
-import BackupsPage from './pages/admin/BackupsPage';
-import PublicFormPage from './pages/forms/PublicFormPage';
-import SettingsPage from './pages/settings/SettingsPage';
+
+// Route-level code splitting
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
+const CampaignsPage = lazy(() => import('./pages/campaigns/CampaignsPage'));
+const CampaignDetailPage = lazy(() => import('./pages/campaigns/CampaignDetailPage'));
+const FollowupDashboardPage = lazy(() => import('./pages/dashboard/FollowupDashboardPage'));
+const DndPage = lazy(() => import('./pages/dnd/DndPage'));
+const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
+const BackupsPage = lazy(() => import('./pages/admin/BackupsPage'));
+const PublicFormPage = lazy(() => import('./pages/forms/PublicFormPage'));
+const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'));
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+    </div>
+  );
+}
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
-  if (isLoading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  if (isLoading) return <PageLoader />;
   return user ? <>{children}</> : <Navigate to="/login" />;
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <PageLoader />;
   if (user?.role === 'ADMIN') {
     return <>{children}</>;
   }
@@ -56,19 +67,21 @@ export default function App() {
           <NotificationProvider>
             <BrowserRouter>
               <ThemedToaster />
-              <Routes>
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/form/:slug" element={<PublicFormPage />} />
-                <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
-                <Route path="/campaigns" element={<PrivateRoute><AdminRoute><CampaignsPage /></AdminRoute></PrivateRoute>} />
-                <Route path="/campaigns/:id" element={<PrivateRoute><AdminRoute><CampaignDetailPage /></AdminRoute></PrivateRoute>} />
-                <Route path="/followups" element={<PrivateRoute><FollowupDashboardPage /></PrivateRoute>} />
-                <Route path="/dnd" element={<PrivateRoute><DndPage /></PrivateRoute>} />
-                <Route path="/admin/users" element={<PrivateRoute><AdminRoute><AdminUsersPage /></AdminRoute></PrivateRoute>} />
-                <Route path="/admin/backups" element={<PrivateRoute><AdminRoute><BackupsPage /></AdminRoute></PrivateRoute>} />
-                <Route path="/settings" element={<PrivateRoute><AdminRoute><SettingsPage /></AdminRoute></PrivateRoute>} />
-                <Route path="*" element={<Navigate to="/dashboard" />} />
-              </Routes>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/form/:slug" element={<PublicFormPage />} />
+                  <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+                  <Route path="/campaigns" element={<PrivateRoute><AdminRoute><CampaignsPage /></AdminRoute></PrivateRoute>} />
+                  <Route path="/campaigns/:id" element={<PrivateRoute><AdminRoute><CampaignDetailPage /></AdminRoute></PrivateRoute>} />
+                  <Route path="/followups" element={<PrivateRoute><FollowupDashboardPage /></PrivateRoute>} />
+                  <Route path="/dnd" element={<PrivateRoute><DndPage /></PrivateRoute>} />
+                  <Route path="/admin/users" element={<PrivateRoute><AdminRoute><AdminUsersPage /></AdminRoute></PrivateRoute>} />
+                  <Route path="/admin/backups" element={<PrivateRoute><AdminRoute><BackupsPage /></AdminRoute></PrivateRoute>} />
+                  <Route path="/settings" element={<PrivateRoute><AdminRoute><SettingsPage /></AdminRoute></PrivateRoute>} />
+                  <Route path="*" element={<Navigate to="/dashboard" />} />
+                </Routes>
+              </Suspense>
             </BrowserRouter>
           </NotificationProvider>
         </AuthProvider>

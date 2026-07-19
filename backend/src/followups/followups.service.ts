@@ -39,7 +39,8 @@ export class FollowupsService {
       .from(followups)
       .innerJoin(users, eq(followups.userId, users.id))
       .where(eq(followups.leadId, leadId))
-      .orderBy(desc(followups.createdAt));
+      .orderBy(desc(followups.createdAt))
+      .limit(100); // Safety cap
 
     return results.map((r) => ({
       ...r.followup,
@@ -48,6 +49,14 @@ export class FollowupsService {
   }
 
   async create(dto: CreateFollowupDto, userId: string) {
+    // Validate leadId exists
+    const [leadExists] = await this.database.db
+      .select({ id: leads.id })
+      .from(leads)
+      .where(eq(leads.id, dto.leadId))
+      .limit(1);
+    if (!leadExists) throw new NotFoundException('Lead not found');
+
     const [followup] = await this.database.db
       .insert(followups)
       .values({

@@ -23,12 +23,17 @@ export interface Notification {
 export const notificationService = {
   getPendingNotifications: async (): Promise<Notification[]> => {
     const { data } = await api.get('/notifications/pending');
-    return data;
+    return data.notifications ?? data;
   },
 
   getPendingCount: async (): Promise<number> => {
     const { data } = await api.get('/notifications/pending-count');
     return data.count;
+  },
+
+  getPendingWithCount: async (): Promise<{ notifications: Notification[]; count: number }> => {
+    const { data } = await api.get('/notifications/pending');
+    return { notifications: data.notifications ?? data, count: data.count ?? 0 };
   },
 
   getNotifications: async (limit = 20): Promise<Notification[]> => {

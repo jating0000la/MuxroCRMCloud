@@ -77,12 +77,11 @@ export class UsersService {
         .limit(1);
       if (existing && existing.id !== id) throw new ConflictException('Username already exists');
     }
-    if (dto.password) {
-      dto.password = await bcrypt.hash(dto.password, 10);
-    }
+    // Never allow password changes through generic update — use resetPassword instead
+    const { password: _pwd, ...safeDto } = dto as any;
     const [updated] = await this.database.db
       .update(users)
-      .set(dto)
+      .set(safeDto)
       .where(eq(users.id, id))
       .returning({
         id: users.id,
@@ -101,6 +100,7 @@ export class UsersService {
       .update(users)
       .set({ isActive: false })
       .where(eq(users.id, id));
+    // Note: Session revocation should be handled by the controller via TokenBlacklistService
     return { message: 'User deactivated successfully' };
   }
 
@@ -115,14 +115,28 @@ export class UsersService {
   }
 
   async permanentDelete(id: string) {
-    await this.findOne(id);
+    const user = await this.findOne(id);
+    // Soft-delete leads assigned to this user before deleting the user
+    const { leads: leadsTable } = await import('../db/schema');
+    await this.database.db
+      .update(leadsTable)
+      .set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() })
+      .where(eq(leadsTable.doerId, id));
     await this.database.db.delete(users).where(eq(users.id, id));
     return { message: 'User permanently deleted' };
   }
 
   async findByUsername(username: string) {
     const [user] = await this.database.db
-      .select()
+      .select({
+        id: users.id,
+        username: users.username,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        isActive: users.isActive,
+        password: users.password,
+      })
       .from(users)
       .where(eq(users.username, username))
       .limit(1);

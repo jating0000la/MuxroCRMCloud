@@ -7,6 +7,22 @@ import { TokenBlacklistService } from '../services/token-blacklist.service';
 // Simple TTL cache for session validation (reduces DB hits from every HTTP request)
 const sessionCache = new Map<string, { valid: boolean; expires: number }>();
 const SESSION_CACHE_TTL = 60_000; // 1 minute
+const MAX_CACHE_SIZE = 1000;
+
+// Periodic cache eviction to prevent memory leak
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of sessionCache) {
+    if (val.expires < now) sessionCache.delete(key);
+  }
+  // Hard cap: if still too large, evict oldest half
+  if (sessionCache.size > MAX_CACHE_SIZE) {
+    const entries = Array.from(sessionCache.entries());
+    for (let i = 0; i < entries.length / 2; i++) {
+      sessionCache.delete(entries[i][0]);
+    }
+  }
+}, 300_000); // every 5 minutes
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Lead, CampaignStatus, Followup } from '../../types';
 import { leadService } from '../../services/leads';
 import { followupService } from '../../services/followups';
@@ -34,15 +34,7 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
   const [crossCampaignFollowups, setCrossCampaignFollowups] = useState<any[]>([]);
   const [loadingCross, setLoadingCross] = useState(false);
 
-  useEffect(() => {
-    loadLead();
-  }, [leadId]);
-
-  useEffect(() => {
-    setSendWhatsapp(canSendWhatsapp);
-  }, [canSendWhatsapp]);
-
-  const loadLead = async () => {
+  const loadLead = useCallback(async () => {
     try {
       const [leadData, followupsData] = await Promise.all([
         leadService.getOne(leadId),
@@ -63,7 +55,9 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
             excludeLeadId: leadId,
           });
           setCrossCampaignFollowups(cross || []);
-        } catch {}
+        } catch {
+          // Cross-campaign history is optional
+        }
         setLoadingCross(false);
       }
     } catch (error) {
@@ -71,7 +65,17 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
     } finally {
       setLoading(false);
     }
-  };
+  }, [leadId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadLead();
+    return () => { cancelled = true; };
+  }, [loadLead]);
+
+  useEffect(() => {
+    setSendWhatsapp(canSendWhatsapp);
+  }, [canSendWhatsapp]);
 
   const handleStatusUpdate = async () => {
     if (!statusId) {
@@ -140,6 +144,15 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
     }
   };
 
+  // Escape key and focus trap
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -166,7 +179,7 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
   const enquiryData = lead.customData || (lead as any).enquiry?.data || {};
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-label="Lead details">
       <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-5 border-b dark:border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">

@@ -61,7 +61,97 @@ export default function DashboardPage() {
   const [upcomingFollowups, setUpcomingFollowups] = useState<Followup[]>([]);
   const [recentLeads, setRecentLeads] = useState<Lead[]>([]);
 
-  const loadData = useCallback(async () => {
+  const loadKpi = async () => {
+    try {
+      const data = await dashboardService.getKpi(selectedCampaign || undefined, startDate, endDate);
+      setKpi(data);
+    } catch {
+      // KPI load failure is non-critical
+    }
+  };
+
+  const loadAlerts = async () => {
+    try {
+      const data = await dashboardService.getAlerts();
+      setAlerts(data);
+    } catch {
+      // Alerts load failure is non-critical
+    }
+  };
+
+  const loadSalesFunnel = async () => {
+    try {
+      const data = await dashboardService.getSalesFunnel(selectedCampaign || undefined);
+      setSalesFunnel(data);
+    } catch {
+      // Sales funnel load failure is non-critical
+    }
+  };
+
+  const loadUpcomingFollowups = async () => {
+    try {
+      const data = await dashboardService.getFollowupDashboard(selectedCampaign || undefined);
+      setUpcomingFollowups(data.slice(0, 5));
+    } catch {
+      // Followups load failure is non-critical
+    }
+  };
+
+  const loadRecentLeads = async () => {
+    try {
+      const data = await dashboardService.getAllLeadsDashboard(selectedCampaign || undefined);
+      setRecentLeads(data.slice(0, 5));
+    } catch {
+      // Recent leads load failure is non-critical
+    }
+  };
+
+  const loadUserConversion = async () => {
+    try {
+      const data = await dashboardService.getUserConversion(selectedCampaign || undefined, startDate, endDate);
+      setUserConversion(data);
+    } catch {
+      // User conversion load failure is non-critical
+    }
+  };
+
+  const loadCampaignReport = async () => {
+    try {
+      const data = await dashboardService.getCampaignReport(startDate, endDate);
+      setCampaignReport(data);
+    } catch {
+      // Campaign report load failure is non-critical
+    }
+  };
+
+  const loadStatusReport = async () => {
+    try {
+      const data = await dashboardService.getStatusReport(selectedCampaign || undefined);
+      setStatusReport(data);
+    } catch {
+      // Status report load failure is non-critical
+    }
+  };
+
+  const loadDailyTrend = async () => {
+    try {
+      const data = await dashboardService.getDailyTrend(selectedCampaign || undefined, startDate, endDate);
+      setDailyTrend(data);
+    } catch {
+      // Daily trend load failure is non-critical
+    }
+  };
+
+  const loadMissedByUser = async () => {
+    try {
+      const data = await dashboardService.getMissedByUser(selectedCampaign || undefined);
+      setMissedByUser(data);
+    } catch {
+      // Missed by user load failure is non-critical
+    }
+  };
+
+  const loadAll = useCallback(async () => {
     setRefreshing(true);
     try {
       const campaignList = await campaignService.getAll();
@@ -80,106 +170,18 @@ export default function DashboardPage() {
         loadRecentLeads(),
       ]);
     } catch (err) {
-      console.error('Dashboard load failed', err);
+      // Dashboard load errors are handled per-section
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [selectedCampaign, startDate, endDate]);
 
-  const loadKpi = async () => {
-    try {
-      const data = await dashboardService.getKpi(selectedCampaign || undefined, startDate, endDate);
-      setKpi(data);
-    } catch (err) {
-      console.error('KPI load failed', err);
-    }
-  };
-
-  const loadAlerts = async () => {
-    try {
-      const data = await dashboardService.getAlerts();
-      setAlerts(data);
-    } catch (err) {
-      console.error('Alerts load failed', err);
-    }
-  };
-
-  const loadSalesFunnel = async () => {
-    try {
-      const data = await dashboardService.getSalesFunnel(selectedCampaign || undefined);
-      setSalesFunnel(data);
-    } catch (err) {
-      console.error('Sales funnel load failed', err);
-    }
-  };
-
-  const loadUpcomingFollowups = async () => {
-    try {
-      const data = await dashboardService.getFollowupDashboard(selectedCampaign || undefined);
-      setUpcomingFollowups(data.slice(0, 5));
-    } catch (err) {
-      console.error('Upcoming followups load failed', err);
-    }
-  };
-
-  const loadRecentLeads = async () => {
-    try {
-      const data = await dashboardService.getAllLeadsDashboard(selectedCampaign || undefined);
-      setRecentLeads(data.slice(0, 5));
-    } catch (err) {
-      console.error('Recent leads load failed', err);
-    }
-  };
-
-  const loadUserConversion = async () => {
-    try {
-      const data = await dashboardService.getUserConversion(selectedCampaign || undefined, startDate, endDate);
-      setUserConversion(data);
-    } catch (err) {
-      console.error('User conversion load failed', err);
-    }
-  };
-
-  const loadCampaignReport = async () => {
-    try {
-      const data = await dashboardService.getCampaignReport(startDate, endDate);
-      setCampaignReport(data);
-    } catch (err) {
-      console.error('Campaign report load failed', err);
-    }
-  };
-
-  const loadStatusReport = async () => {
-    try {
-      const data = await dashboardService.getStatusReport(selectedCampaign || undefined);
-      setStatusReport(data);
-    } catch (err) {
-      console.error('Status report load failed', err);
-    }
-  };
-
-  const loadDailyTrend = async () => {
-    try {
-      const data = await dashboardService.getDailyTrend(selectedCampaign || undefined, startDate, endDate);
-      setDailyTrend(data);
-    } catch (err) {
-      console.error('Daily trend load failed', err);
-    }
-  };
-
-  const loadMissedByUser = async () => {
-    try {
-      const data = await dashboardService.getMissedByUser(selectedCampaign || undefined);
-      setMissedByUser(data);
-    } catch (err) {
-      console.error('Missed by user load failed', err);
-    }
-  };
-
   useEffect(() => {
-    loadData();
-  }, [selectedCampaign, startDate, endDate]);
+    let cancelled = false;
+    loadAll();
+    return () => { cancelled = true; };
+  }, [loadAll]);
 
   const dedupedStatusReport = useMemo(() => {
     const map = new Map<string, StatusReportData>();
@@ -319,7 +321,7 @@ export default function DashboardPage() {
                 </select>
                 <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-primary-500" />
                 <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-primary-500" />
-                <button onClick={loadData} disabled={refreshing} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50">
+                <button onClick={loadAll} disabled={refreshing} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50">
                   <svg className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                   Refresh
                 </button>

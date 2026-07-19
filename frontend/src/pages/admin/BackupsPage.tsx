@@ -22,7 +22,22 @@ export default function BackupsPage() {
   const [restoringFile, setRestoringFile] = useState<string | null>(null);
 
   useEffect(() => {
-    loadBackups();
+    let cancelled = false;
+
+    const loadAll = async () => {
+      try {
+        setLoading(true);
+        const data = await adminService.getBackups();
+        if (!cancelled) setBackups(data);
+      } catch (error: any) {
+        if (!cancelled) toast.error(error.response?.data?.message || 'Failed to load backups');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadAll();
+    return () => { cancelled = true; };
   }, []);
 
   const loadBackups = async () => {
@@ -50,8 +65,20 @@ export default function BackupsPage() {
     }
   };
 
-  const handleDownload = (filename: string) => {
-    window.open(adminService.getBackupDownloadUrl(filename), '_blank');
+  const handleDownload = async (filename: string) => {
+    try {
+      const blob = await adminService.downloadBackup(filename);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Download failed');
+    }
   };
 
   const handleDelete = async () => {

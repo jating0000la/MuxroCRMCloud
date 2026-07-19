@@ -69,8 +69,58 @@ export default function SettingsPage() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
   useEffect(() => {
-    loadSettings();
-    loadCampaigns();
+    let cancelled = false;
+
+    const loadAll = async () => {
+      try {
+        setLoading(true);
+        const allSettings = await settingsService.getAllSettings(true);
+        if (cancelled) return;
+        allSettings.forEach((setting) => {
+          switch (setting.key) {
+            case 'companyName': setCompanyName(setting.value); break;
+            case 'appLogoUrl': setAppLogoUrl(setting.value); break;
+            case 'websiteLink': setWebsiteLink(setting.value); break;
+            case 'companyEmail': setCompanyEmail(setting.value); break;
+            case 'companyPhone': setCompanyPhone(setting.value); break;
+            case 'companyAddress': setCompanyAddress(setting.value); break;
+            case 'indiamartApiKey': setIndiamartApiKey(setting.value); break;
+            case 'indiamartCampaignId': setIndiamartCampaignId(setting.value); break;
+            case 'indiamartAutoFetch': setIndiamartAutoFetch(setting.value === 'true'); break;
+            case 'processSutraApiKey': setProcessSutraApiKey(setting.value); break;
+            case 'processSutraSystemName': setProcessSutraSystemName(setting.value); break;
+            case 'webhookUrl': setWebhookUrl(setting.value); break;
+            case 'gupshupApiKey': setGupshupApiKey(setting.value); break;
+            case 'gupshupSource': setGupshupSource(setting.value); break;
+            case 'gupshupAppName': setGupshupAppName(setting.value); break;
+            case 'gupshupAppId': setGupshupAppId(setting.value); break;
+            case 'gupshupTestPhone': setGupshupTestPhone(setting.value); break;
+            case 'gupshupWebhookUrl': setGupshupWebhookUrl(setting.value); break;
+          }
+        });
+        try {
+          const { lastFetchTime } = await integrationService.getLastFetchTime();
+          if (!cancelled) setIndiamartLastFetch(lastFetchTime);
+        } catch {}
+      } catch (error: any) {
+        // Settings not yet configured
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    const loadCampaignsList = async () => {
+      try {
+        const data = await campaignService.getAll();
+        if (!cancelled) setCampaigns(data.filter((c: any) => c.isActive).map((c: any) => ({ id: c.id, name: c.name, isActive: c.isActive })));
+      } catch {
+        // Campaigns list is optional
+      }
+    };
+
+    loadAll();
+    loadCampaignsList();
+    return () => { cancelled = true; };
   }, []);
 
   const normalizeUrl = (value: string): string => {
@@ -85,71 +135,22 @@ export default function SettingsPage() {
     try { new URL(normalizeUrl(value)); return true; } catch { return false; }
   };
 
-  const loadCampaigns = async () => {
-    try {
-      const data = await campaignService.getAll();
-      setCampaigns(data.filter((c: any) => c.isActive).map((c: any) => ({ id: c.id, name: c.name, isActive: c.isActive })));
-    } catch (error: any) {
-      console.log('Failed to load campaigns:', error.message);
-    }
-  };
-
-  const loadSettings = async () => {
-    try {
-      setLoading(true);
-      const allSettings = await settingsService.getAllSettings(true);
-      allSettings.forEach((setting) => {
-        switch (setting.key) {
-          case 'companyName': setCompanyName(setting.value); break;
-          case 'appLogoUrl': setAppLogoUrl(setting.value); break;
-          case 'websiteLink': setWebsiteLink(setting.value); break;
-          case 'companyEmail': setCompanyEmail(setting.value); break;
-          case 'companyPhone': setCompanyPhone(setting.value); break;
-          case 'companyAddress': setCompanyAddress(setting.value); break;
-          case 'indiamartApiKey': setIndiamartApiKey(setting.value); break;
-          case 'indiamartCampaignId': setIndiamartCampaignId(setting.value); break;
-          case 'indiamartAutoFetch': setIndiamartAutoFetch(setting.value === 'true'); break;
-          case 'processSutraApiKey': setProcessSutraApiKey(setting.value); break;
-          case 'processSutraSystemName': setProcessSutraSystemName(setting.value); break;
-          case 'webhookUrl': setWebhookUrl(setting.value); break;
-          case 'gupshupApiKey': setGupshupApiKey(setting.value); break;
-          case 'gupshupSource': setGupshupSource(setting.value); break;
-          case 'gupshupAppName': setGupshupAppName(setting.value); break;
-          case 'gupshupAppId': setGupshupAppId(setting.value); break;
-          case 'gupshupTestPhone': setGupshupTestPhone(setting.value); break;
-          case 'gupshupWebhookUrl': setGupshupWebhookUrl(setting.value); break;
-
-        }
-      });
-      try {
-        const { lastFetchTime } = await integrationService.getLastFetchTime();
-        setIndiamartLastFetch(lastFetchTime);
-      } catch {}
-    } catch (error: any) {
-      console.log('Settings not yet configured:', error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const saveSettings = async (settings: { key: string; value: string; reason?: string }[]) => {
     for (const setting of settings) {
-      if (setting.value || setting.key.includes('Enabled') || setting.key.includes('AutoFetch')) {
-        try {
-          await settingsService.updateSetting(setting.key, {
+      try {
+        await settingsService.updateSetting(setting.key, {
+          value: setting.value,
+          reason: setting.reason || 'Updated via Settings',
+        });
+      } catch (error: any) {
+        if (error.response?.status === 404) {
+          await settingsService.createSetting({
+            key: setting.key,
             value: setting.value,
             reason: setting.reason || 'Updated via Settings',
           });
-        } catch (error: any) {
-          if (error.response?.status === 404) {
-            await settingsService.createSetting({
-              key: setting.key,
-              value: setting.value,
-              reason: setting.reason || 'Updated via Settings',
-            });
-          } else {
-            throw error;
-          }
+        } else {
+          throw error;
         }
       }
     }
@@ -184,14 +185,20 @@ export default function SettingsPage() {
   const handleSaveApiWebhook = async () => {
     setSaving(true);
     try {
-      await saveSettings([
-        { key: 'indiamartApiKey', value: isMasked(indiamartApiKey) ? '' : indiamartApiKey },
+      const settingsPayload = [
         { key: 'indiamartCampaignId', value: indiamartCampaignId },
         { key: 'indiamartAutoFetch', value: String(indiamartAutoFetch) },
-        { key: 'processSutraApiKey', value: isMasked(processSutraApiKey) ? '' : processSutraApiKey },
         { key: 'processSutraSystemName', value: processSutraSystemName },
         { key: 'webhookUrl', value: webhookUrl },
-      ]);
+      ];
+      // Only include API keys if user actually changed them (not masked)
+      if (!isMasked(indiamartApiKey)) {
+        settingsPayload.unshift({ key: 'indiamartApiKey', value: indiamartApiKey });
+      }
+      if (!isMasked(processSutraApiKey)) {
+        settingsPayload.unshift({ key: 'processSutraApiKey', value: processSutraApiKey });
+      }
+      await saveSettings(settingsPayload);
       toast.success('API & Webhook settings saved');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to save');
@@ -203,14 +210,17 @@ export default function SettingsPage() {
   const handleSaveCommunication = async () => {
     setSaving(true);
     try {
-      await saveSettings([
-        { key: 'gupshupApiKey', value: isMasked(gupshupApiKey) ? '' : gupshupApiKey },
+      const settingsPayload = [
         { key: 'gupshupSource', value: gupshupSource },
         { key: 'gupshupAppName', value: gupshupAppName },
         { key: 'gupshupAppId', value: gupshupAppId },
         { key: 'gupshupTestPhone', value: gupshupTestPhone },
         { key: 'gupshupWebhookUrl', value: gupshupWebhookUrl },
-      ]);
+      ];
+      if (!isMasked(gupshupApiKey)) {
+        settingsPayload.unshift({ key: 'gupshupApiKey', value: gupshupApiKey });
+      }
+      await saveSettings(settingsPayload);
       toast.success('Communication settings saved');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to save');

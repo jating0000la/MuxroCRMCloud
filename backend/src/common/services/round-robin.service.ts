@@ -66,16 +66,14 @@ export class RoundRobinService {
       }
     }
 
-    const client = await this.database.getPool().connect();
-    try {
-      await client.query('BEGIN');
-      // Advisory lock on campaign (hash campaignId to bigint)
-      await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [campaignId]);
+    return await this.database.db.transaction(async (tx) => {
+      // Advisory lock on campaign (hash campaignId to bigint) — prevents concurrent allocations
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${campaignId}))`);
 
       const allocations: any[] = [];
       for (let i = 0; i < leadIds.length; i++) {
         const userIndex = (startIndex + i) % eligibleUsers.length;
-        const [updated] = await this.database.db
+        const [updated] = await tx
           .update(leads)
           .set({ doerId: eligibleUsers[userIndex].userId })
           .where(eq(leads.id, leadIds[i]))
@@ -83,13 +81,7 @@ export class RoundRobinService {
         allocations.push(updated);
       }
 
-      await client.query('COMMIT');
       return allocations;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 }

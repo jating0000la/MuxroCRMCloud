@@ -138,6 +138,14 @@ export class NotificationsService {
     }));
   }
 
+  async getPendingWithCount(userId: string): Promise<{ notifications: any[]; count: number }> {
+    const [notifs, count] = await Promise.all([
+      this.getPendingNotifications(userId),
+      this.getPendingCount(userId),
+    ]);
+    return { notifications: notifs, count };
+  }
+
   async getNotifications(userId: string, limit = 20) {
     const results = await this.database.db
       .select({
@@ -185,10 +193,10 @@ export class NotificationsService {
   }
 
   async getPendingCount(userId: string): Promise<number> {
-    // Count unique leads with pending notifications (deduplicated)
-    const results = await this.database.db
+    // Use SQL COUNT(DISTINCT leadId) for efficient deduplication
+    const [result] = await this.database.db
       .select({
-        leadId: leads.id,
+        count: sql<number>`count(distinct ${leads.id})::int`,
       })
       .from(notifications)
       .innerJoin(followups, eq(notifications.followupId, followups.id))
@@ -196,14 +204,12 @@ export class NotificationsService {
       .where(
         and(
           eq(notifications.userId, userId),
-          inArray(notifications.type, ['overdue', 'today', 'upcoming']),
+          inArray(notifications.type, ['overdue', 'today', 'tomorrow', 'upcoming']),
           eq(notifications.isRead, false),
         ),
       );
 
-    // Deduplicate by leadId
-    const uniqueLeads = new Set(results.map(r => r.leadId));
-    return uniqueLeads.size;
+    return result?.count ?? 0;
   }
 
   async syncNotificationsForUser(userId: string): Promise<void> {
@@ -256,18 +262,20 @@ export class NotificationsService {
       await this.database.db.insert(notifications).values(toInsert);
     }
     if (toUpdate.length > 0) {
-      for (const update of toUpdate) {
-        await this.database.db
-          .update(notifications)
-          .set({ type: update.type })
-          .where(eq(notifications.id, update.id));
-      }
+      await Promise.all(
+        toUpdate.map((update) =>
+          this.database.db
+            .update(notifications)
+            .set({ type: update.type })
+            .where(eq(notifications.id, update.id)),
+        ),
+      );
     }
 
     await this.cleanupOldNotifications(userId);
   }
 
-  private async cleanupOldNotifications(userId: string): Promise<void> {
+  async cleanupOldNotifications(userId: string): Promise<void> {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
@@ -132,18 +132,24 @@ export default function CampaignDetailPage() {
     setBulkProcessing(true);
     try {
       if (bulkAction === 'status' && bulkStatusId) {
-        await Promise.all(
-          selectedLeadIds.map((leadId) =>
-            leadService.updateStatus(leadId, { status: bulkStatusId, statusId: bulkStatusId })
-          )
-        );
+        const BATCH = 25;
+        for (let i = 0; i < selectedLeadIds.length; i += BATCH) {
+          await Promise.all(
+            selectedLeadIds.slice(i, i + BATCH).map((leadId) =>
+              leadService.updateStatus(leadId, { status: bulkStatusId, statusId: bulkStatusId })
+            )
+          );
+        }
         toast.success(`Updated ${selectedLeadIds.length} lead(s)`);
       } else if (bulkAction === 'assign' && bulkDoerId) {
-        await Promise.all(
-          selectedLeadIds.map((leadId) =>
-            leadService.update(leadId, { doerId: bulkDoerId } as any)
-          )
-        );
+        const BATCH = 25;
+        for (let i = 0; i < selectedLeadIds.length; i += BATCH) {
+          await Promise.all(
+            selectedLeadIds.slice(i, i + BATCH).map((leadId) =>
+              leadService.update(leadId, { doerId: bulkDoerId } as any)
+            )
+          );
+        }
         toast.success(`Assigned ${selectedLeadIds.length} lead(s)`);
       }
       setSelectedLeadIds([]);
@@ -158,10 +164,6 @@ export default function CampaignDetailPage() {
     }
   };
 
-  useEffect(() => {
-    if (id) loadData();
-  }, [id]);
-
   const loadData = async () => {
     try {
       const [campaignData, leadsData, formsData, assignedUsers] = await Promise.all([
@@ -173,7 +175,7 @@ export default function CampaignDetailPage() {
       setCampaign(campaignData);
       setLeads(leadsData);
       setForms(formsData);
-      setUsers(assignedUsers.map((au) => au.user!).filter(Boolean));
+      setUsers(assignedUsers.map((au: any) => au.user!).filter(Boolean));
 
       if (canManage) {
         const allUsersData = await userService.getAll();
@@ -190,6 +192,14 @@ export default function CampaignDetailPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+
+    loadData();
+    return () => { cancelled = true; };
+  }, [id, canManage]);
 
   const handleSaveCampaign = async () => {
     if (!editName.trim()) {
@@ -310,7 +320,7 @@ export default function CampaignDetailPage() {
     }
   };
 
-  const filteredLeads = leads.filter((lead) => {
+  const filteredLeads = useMemo(() => leads.filter((lead) => {
     const matchSearch =
       !leadSearch ||
       lead.name.toLowerCase().includes(leadSearch.toLowerCase()) ||
@@ -318,7 +328,7 @@ export default function CampaignDetailPage() {
       lead.phone?.includes(leadSearch);
     const matchStatus = !leadStatusFilter || lead.statusId === leadStatusFilter;
     return matchSearch && matchStatus;
-  });
+  }), [leads, leadSearch, leadStatusFilter]);
 
   const totalLeadPages = Math.max(1, Math.ceil(filteredLeads.length / leadPageSize));
   const currentLeadPage = Math.min(leadPage, totalLeadPages);

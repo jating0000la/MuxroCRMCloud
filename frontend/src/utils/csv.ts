@@ -3,7 +3,10 @@ type CsvCell = string | number | boolean | null | undefined | Date;
 const escapeCsvCell = (value: CsvCell) => {
   const text = value instanceof Date ? value.toISOString() : value == null ? '' : String(value);
   const needsQuotes = /[",\r\n]/.test(text);
-  const escaped = text.replace(/"/g, '""');
+  // Prevent CSV injection by prefixing dangerous formula characters
+  const DANGEROUS_PREFIXES = /^[=+\-@\t\r\n]/;
+  const sanitized = DANGEROUS_PREFIXES.test(text) ? `'${text}` : text;
+  const escaped = sanitized.replace(/"/g, '""');
   return needsQuotes ? `"${escaped}"` : escaped;
 };
 

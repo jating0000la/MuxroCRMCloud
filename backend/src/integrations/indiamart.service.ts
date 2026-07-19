@@ -212,13 +212,13 @@ export class IndiamartService {
   async getLastFetchTime(): Promise<string | null> {
     try {
       const [setting] = await this.database.db
-        .select()
+        .select({ key: settings.key, encryptedValue: settings.encryptedValue, isEncrypted: settings.isEncrypted })
         .from(settings)
         .where(eq(settings.key, 'indiamartLastFetchTime'))
         .limit(1);
       if (!setting) return null;
 
-      let value = setting.encryptedValue;
+      // If encrypted, try to decrypt; if already plaintext date, return as-is
       if (setting.isEncrypted) {
         try {
           if (setting.encryptedValue.match(/^\d{4}-\d{2}-\d{2}/)) {
@@ -226,7 +226,7 @@ export class IndiamartService {
           }
         } catch {}
       }
-      return value;
+      return setting.encryptedValue;
     } catch {
       return null;
     }

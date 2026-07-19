@@ -20,7 +20,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     const databaseUrl = this.configService.get<string>('DATABASE_URL');
     this.pool = new Pool({
       connectionString: databaseUrl,
-      max: 5,                         // Safe for 512MB VPS; raise only with Redis-backed sessions
+      max: this.configService.get<number>('DB_POOL_MAX', 5),
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
       options: '-c statement_timeout=30000', // Apply 30s timeout to ALL pool connections

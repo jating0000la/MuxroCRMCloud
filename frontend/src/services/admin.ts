@@ -54,6 +54,14 @@ export const adminService = {
     return `/api/v1/admin/backups/${encodeURIComponent(filename)}/download`;
   },
 
+  downloadBackup: async (filename: string): Promise<Blob> => {
+    const { data } = await api.get(
+      `/admin/backups/${encodeURIComponent(filename)}/download`,
+      { responseType: 'blob', timeout: 300000 },
+    );
+    return data;
+  },
+
   getSystemHealth: async (): Promise<any> => {
     const { data } = await api.get('/admin/health');
     return data;

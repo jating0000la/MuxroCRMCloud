@@ -34,6 +34,7 @@ export default function AdminUsersPage() {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [saving, setSaving] = useState(false);
+  const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({ username: '', password: '', name: '', email: '', role: 'USER' });
   const [newPassword, setNewPassword] = useState('');
@@ -101,13 +102,13 @@ export default function AdminUsersPage() {
   };
 
   const handleToggleActive = async (u: User) => {
-    if (saving) return; setSaving(true);
+    if (togglingUserId) return; setTogglingUserId(u.id);
     try {
       if (u.isActive) { await userService.remove(u.id); toast.success(`${u.name} deactivated`); }
       else { await userService.update(u.id, { isActive: true }); toast.success(`${u.name} activated`); }
       loadUsers();
     } catch { toast.error('Failed to update user'); }
-    finally { setSaving(false); }
+    finally { setTogglingUserId(null); }
   };
 
   const handlePermanentDelete = async () => {

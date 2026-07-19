@@ -19,9 +19,9 @@ export class NotificationsController {
   constructor(private notificationsService: NotificationsService) {}
 
   @Get('pending')
-  @ApiOperation({ summary: 'Get pending notifications (overdue + today)' })
+  @ApiOperation({ summary: 'Get pending notifications with count' })
   async getPendingNotifications(@Request() req) {
-    return this.notificationsService.getPendingNotifications(req.user.id);
+    return this.notificationsService.getPendingWithCount(req.user.id);
   }
 
   @Get('pending-count')
@@ -34,7 +34,8 @@ export class NotificationsController {
   @Get()
   @ApiOperation({ summary: 'Get all notifications for user' })
   async getNotifications(@Request() req, @Query('limit') limit?: string) {
-    return this.notificationsService.getNotifications(req.user.id, limit ? parseInt(limit, 10) : 20);
+    const parsed = limit ? Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100) : 20;
+    return this.notificationsService.getNotifications(req.user.id, parsed);
   }
 
   @Patch(':id/read')

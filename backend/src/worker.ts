@@ -54,10 +54,10 @@ async function bootstrap() {
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 
-  // Prevent silent worker death
+  // Prevent silent worker death — exit to let process manager restart
   process.on('uncaughtException', (err) => {
     logger.error(`Uncaught Exception: ${err.message}`, err.stack);
-    // Don't exit - let worker continue processing other jobs
+    process.exit(1);
   });
   process.on('unhandledRejection', (reason: any) => {
     logger.error(`Unhandled Rejection: ${reason?.message || reason}`);

@@ -1,29 +1,10 @@
 import api from './api';
 import { Lead } from '../types';
-
-// Backend caps page size at 500 (see PaginationDto). These endpoints return a
-// plain array with no total count, so to avoid silently truncating results at
-// the backend's default limit of 50, we fetch full pages until a short page is
-// returned. The safety cap prevents runaway loops for pathological data sets.
-const MAX_PAGE_LIMIT = 500;
-const MAX_PAGES_SAFETY = 20; // up to 10,000 records
-
-async function fetchAllLeadPages(url: string): Promise<Lead[]> {
-  const all: Lead[] = [];
-  let page = 1;
-  while (page <= MAX_PAGES_SAFETY) {
-    const { data } = await api.get(url, { params: { page, limit: MAX_PAGE_LIMIT } });
-    const batch: Lead[] = Array.isArray(data) ? data : data?.data || [];
-    all.push(...batch);
-    if (batch.length < MAX_PAGE_LIMIT) break;
-    page++;
-  }
-  return all;
-}
+import { fetchAllPages } from './pagination';
 
 export const leadService = {
   getByCampaign: async (campaignId: string): Promise<Lead[]> => {
-    return fetchAllLeadPages(`/leads/campaign/${campaignId}`);
+    return fetchAllPages<Lead>(`/leads/campaign/${campaignId}`, {}, { maxPageLimit: 500, maxPages: 20 });
   },
 
   getOne: async (id: string): Promise<Lead> => {
@@ -32,7 +13,7 @@ export const leadService = {
   },
 
   getDnd: async (): Promise<Lead[]> => {
-    return fetchAllLeadPages('/leads/dnd');
+    return fetchAllPages<Lead>('/leads/dnd', {}, { maxPageLimit: 500, maxPages: 20 });
   },
 
   create: async (leadData: Partial<Lead>): Promise<Lead> => {

@@ -86,14 +86,34 @@ export default function FollowupDashboardPage() {
     }
   }, [selectedCampaign]);
 
-  // Always live — refresh silently every 10s, no visual indicator
-  useEffect(() => { loadData(); }, [loadData]);
-
+  // Auto-refresh every 10s only when page is visible
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (!selectedLead) loadData();
-    }, 10000);
-    return () => clearInterval(interval);
+    loadData();
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const startInterval = () => {
+      if (intervalId) return;
+      intervalId = setInterval(() => {
+        if (!selectedLead && !document.hidden) loadData();
+      }, 10000);
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (intervalId) { clearInterval(intervalId); intervalId = null; }
+      } else {
+        loadData();
+        startInterval();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    startInterval();
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [selectedLead, loadData]);
 
   // Load statuses for filter dropdown
@@ -241,24 +261,25 @@ export default function FollowupDashboardPage() {
   // ── Computed ──────────────────────────────────────────────────
   const uniqueSources = useMemo(() => [...new Set(leads.map((l) => l.source))], [leads]);
 
-  const now = new Date();
-  const twoHoursAgo = subHours(now, 2);
-
   const overdueCount = useMemo(() => {
+    const now = new Date();
+    const twoHrsAgo = subHours(now, 2);
     return leads.filter((l) => {
       const next = l.followups?.[0]?.nextCallDate;
       if (!next) return false;
       const nextDate = new Date(next);
-      return isPast(nextDate) && isAfter(nextDate, twoHoursAgo) && !isToday(nextDate) && !(l.status?.label || '').toLowerCase().includes('completed');
+      return isPast(nextDate) && isAfter(nextDate, twoHrsAgo) && !isToday(nextDate) && !(l.status?.label || '').toLowerCase().includes('completed');
     }).length;
   }, [leads]);
 
   const missedCount = useMemo(() => {
+    const now = new Date();
+    const twoHrsAgo = subHours(now, 2);
     return leads.filter((l) => {
       const next = l.followups?.[0]?.nextCallDate;
       if (!next) return false;
       const nextDate = new Date(next);
-      return isPast(nextDate) && isBefore(nextDate, twoHoursAgo) && !(l.status?.label || '').toLowerCase().includes('completed');
+      return isPast(nextDate) && isBefore(nextDate, twoHrsAgo) && !(l.status?.label || '').toLowerCase().includes('completed');
     }).length;
   }, [leads]);
 
@@ -279,6 +300,7 @@ export default function FollowupDashboardPage() {
   }, [leads]);
 
   const upcomingCount = useMemo(() => {
+    const now = new Date();
     const tenMinutesFromNow = addMinutes(now, 10);
     return leads.filter((l) => {
       const next = l.followups?.[0]?.nextCallDate;

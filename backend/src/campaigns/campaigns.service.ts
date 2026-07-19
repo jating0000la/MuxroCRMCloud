@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { eq, and, ne, inArray, sql, desc, asc } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
-import { campaigns, campaignUsers, campaignStatuses, users } from '../db/schema';
+import { campaigns, campaignUsers, campaignStatuses, users, leads, forms } from '../db/schema';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { AssignUsersDto } from './dto/assign-users.dto';
@@ -38,6 +38,9 @@ export class CampaignsService {
   }
 
   async findAll(userId: string, role: string) {
+    const leadCount = sql<number>`(SELECT count(*)::int FROM "Lead" WHERE "Lead"."campaignId" = ${campaigns.id} AND "Lead"."isDeleted" = false)`;
+    const formCount = sql<number>`(SELECT count(*)::int FROM "Form" WHERE "Form"."campaignId" = ${campaigns.id})`;
+
     if (role === 'ADMIN') {
       const result = await this.database.db
         .select({
@@ -47,6 +50,8 @@ export class CampaignsService {
             name: users.name,
             username: users.username,
           },
+          leadCount,
+          formCount,
         })
         .from(campaigns)
         .leftJoin(users, eq(campaigns.managerId, users.id))
@@ -55,6 +60,7 @@ export class CampaignsService {
       return result.map((r) => ({
         ...r.campaign,
         manager: r.manager,
+        _count: { leads: r.leadCount, forms: r.formCount },
       }));
     }
 
@@ -72,6 +78,8 @@ export class CampaignsService {
           name: users.name,
           username: users.username,
         },
+        leadCount,
+        formCount,
       })
       .from(campaigns)
       .leftJoin(users, eq(campaigns.managerId, users.id))
@@ -81,6 +89,7 @@ export class CampaignsService {
     return result.map((r) => ({
       ...r.campaign,
       manager: r.manager,
+      _count: { leads: r.leadCount, forms: r.formCount },
     }));
   }
 
@@ -190,47 +199,40 @@ export class CampaignsService {
       }
     }
 
-    // Deactivate users not in the new list
-    const deactivateConditions: any[] = [
-      eq(campaignUsers.campaignId, campaignId),
-      eq(campaignUsers.isActive, true),
-    ];
-    if (uniqueUserIds.length > 0) {
-      deactivateConditions.push(ne(campaignUsers.userId, uniqueUserIds[0]));
-      // For multiple IDs, we need a different approach
-    }
+    // Wrap entire assignment in a transaction for atomicity
+    return this.database.db.transaction(async (tx) => {
+      // Deactivate all current assignments
+      await tx
+        .update(campaignUsers)
+        .set({ isActive: false })
+        .where(and(eq(campaignUsers.campaignId, campaignId), eq(campaignUsers.isActive, true)));
 
-    // Simple approach: deactivate all, then reactivate the ones we want
-    await this.database.db
-      .update(campaignUsers)
-      .set({ isActive: false })
-      .where(and(eq(campaignUsers.campaignId, campaignId), eq(campaignUsers.isActive, true)));
+      const results: any[] = [];
+      for (const uid of uniqueUserIds) {
+        const [existing] = await tx
+          .select()
+          .from(campaignUsers)
+          .where(and(eq(campaignUsers.campaignId, campaignId), eq(campaignUsers.userId, uid)))
+          .limit(1);
 
-    const results: any[] = [];
-    for (const uid of uniqueUserIds) {
-      const [existing] = await this.database.db
-        .select()
-        .from(campaignUsers)
-        .where(and(eq(campaignUsers.campaignId, campaignId), eq(campaignUsers.userId, uid)))
-        .limit(1);
-
-      if (existing) {
-        const [updated] = await this.database.db
-          .update(campaignUsers)
-          .set({ isActive: true })
-          .where(eq(campaignUsers.id, existing.id))
-          .returning();
-        results.push(updated);
-      } else {
-        const [created] = await this.database.db
-          .insert(campaignUsers)
-          .values({ campaignId, userId: uid })
-          .returning();
-        results.push(created);
+        if (existing) {
+          const [updated] = await tx
+            .update(campaignUsers)
+            .set({ isActive: true })
+            .where(eq(campaignUsers.id, existing.id))
+            .returning();
+          results.push(updated);
+        } else {
+          const [created] = await tx
+            .insert(campaignUsers)
+            .values({ campaignId, userId: uid })
+            .returning();
+          results.push(created);
+        }
       }
-    }
 
-    return results;
+      return results;
+    });
   }
 
   async removeUser(campaignId: string, userId: string, requestUserId?: string, role?: string) {
