@@ -143,14 +143,26 @@ export default function SettingsPage() {
           reason: setting.reason || 'Updated via Settings',
         });
       } catch (error: any) {
-        if (error.response?.status === 404) {
-          await settingsService.createSetting({
-            key: setting.key,
-            value: setting.value,
-            reason: setting.reason || 'Updated via Settings',
-          });
+        const status = error.response?.status;
+        if (status === 404 || status === 409) {
+          // 404 = setting doesn't exist, create it
+          // 409 = race condition duplicate, retry update
+          try {
+            await settingsService.createSetting({
+              key: setting.key,
+              value: setting.value,
+              reason: setting.reason || 'Updated via Settings',
+            });
+          } catch {
+            // If create also fails (e.g. race condition), retry update
+            await settingsService.updateSetting(setting.key, {
+              value: setting.value,
+              reason: setting.reason || 'Updated via Settings',
+            }).catch(() => {}); // best-effort
+          }
         } else {
-          throw error;
+          console.error(`Failed to save setting ${setting.key}:`, error);
+          // Don't throw — continue saving remaining settings
         }
       }
     }

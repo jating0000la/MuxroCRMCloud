@@ -16,7 +16,6 @@ export class CreateSettingDto {
 
 export class UpdateSettingDto {
   @IsString()
-  @IsNotEmpty()
   value: string;
 
   @IsOptional()

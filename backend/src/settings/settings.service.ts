@@ -85,7 +85,8 @@ export class SettingsService {
       .limit(1);
 
     if (existing) {
-      throw new Error(`Setting with key "${dto.key}" already exists`);
+      // Setting already exists — perform update instead of throwing
+      return this.updateSetting(dto.key, { value: dto.value, reason: dto.reason }, userId);
     }
 
     const encryptedValue = this.encryption.encrypt(dto.value);
