@@ -19,7 +19,7 @@ const DEFAULT_PAGE_SIZE = 50;
 
 type SortField = 'name' | 'campaign' | 'status' | 'doer' | 'dueDate' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
-type DueFilter = 'all' | 'overdue' | 'missed' | 'due' | 'upcoming' | 'today' | 'next3' | 'completed';
+type DueFilter = 'all' | 'missed' | 'due' | 'upcoming' | 'today' | 'completed';
 
 export default function FollowupDashboardPage() {
   const { user } = useAuth();
@@ -76,7 +76,11 @@ export default function FollowupDashboardPage() {
         campaignService.getAll(),
       ]);
       const leadsData = Array.isArray(leadsRaw) ? leadsRaw : (leadsRaw as any).data;
-      setLeads(leadsData);
+      // Deduplicate by lead ID as a safety net against backend returning duplicates
+      const deduped = leadsData.filter((lead: any, idx: number, arr: any[]) =>
+        arr.findIndex((l: any) => l.id === lead.id) === idx,
+      );
+      setLeads(deduped);
       setCampaigns(campaignsData);
       setLoaded(true);
     } catch (err) {
@@ -140,11 +144,8 @@ export default function FollowupDashboardPage() {
 
   // Document title
   useEffect(() => {
-    const overdue = notifications.filter((n) => n.type === 'overdue').length;
-    const today = notifications.filter((n) => n.type === 'today').length;
     const upcoming = notifications.filter((n) => n.type === 'upcoming').length;
-    const total = overdue + today + upcoming;
-    document.title = total > 0 ? `(${total}) Follow-ups` : 'Follow-ups';
+    document.title = upcoming > 0 ? `(${upcoming}) Follow-ups` : 'Follow-ups';
     return () => { document.title = 'CRM'; };
   }, [notifications]);
 
@@ -261,34 +262,26 @@ export default function FollowupDashboardPage() {
   // ── Computed ──────────────────────────────────────────────────
   const uniqueSources = useMemo(() => [...new Set(leads.map((l) => l.source))], [leads]);
 
-  const overdueCount = useMemo(() => {
-    const now = new Date();
-    const twoHrsAgo = subHours(now, 2);
-    return leads.filter((l) => {
-      const next = l.followups?.[0]?.nextCallDate;
-      if (!next) return false;
-      const nextDate = new Date(next);
-      return isPast(nextDate) && isAfter(nextDate, twoHrsAgo) && !isToday(nextDate) && !(l.status?.label || '').toLowerCase().includes('completed');
-    }).length;
-  }, [leads]);
+  const twoHoursAgo = subHours(new Date(), 2);
 
+  // Missed: nextCallDate < twoHoursAgo
   const missedCount = useMemo(() => {
-    const now = new Date();
-    const twoHrsAgo = subHours(now, 2);
     return leads.filter((l) => {
       const next = l.followups?.[0]?.nextCallDate;
       if (!next) return false;
       const nextDate = new Date(next);
-      return isPast(nextDate) && isBefore(nextDate, twoHrsAgo) && !(l.status?.label || '').toLowerCase().includes('completed');
+      return isBefore(nextDate, twoHoursAgo) && !(l.status?.label || '').toLowerCase().includes('completed');
     }).length;
   }, [leads]);
 
+  // Pending: nextCallDate > twoHoursAgo AND nextCallDate < now
   const dueCount = useMemo(() => {
+    const now = new Date();
     return leads.filter((l) => {
       const next = l.followups?.[0]?.nextCallDate;
       if (!next) return false;
       const nextDate = new Date(next);
-      return isPast(nextDate) && !(l.status?.label || '').toLowerCase().includes('completed');
+      return isAfter(nextDate, twoHoursAgo) && isBefore(nextDate, now) && !(l.status?.label || '').toLowerCase().includes('completed');
     }).length;
   }, [leads]);
 
@@ -312,19 +305,14 @@ export default function FollowupDashboardPage() {
 
   const getUrgencyScore = useCallback((lead: Lead) => {
     const notif = notifications.find((n) => n.followupId === lead.followups?.[0]?.id);
-    if (notif?.type === 'overdue') return 0;
     if (notif?.type === 'upcoming') return 1;
-    if (notif?.type === 'today') return 2;
     return 3;
   }, [notifications]);
 
   const getRowHighlight = useCallback((lead: Lead): string => {
     const notif = notifications.find((n) => n.followupId === lead.followups?.[0]?.id);
     if (!notif) return '';
-    if (notif.type === 'overdue') return 'bg-red-50/80 dark:bg-red-950/30 border-l-[3px] border-l-red-500';
     if (notif.type === 'upcoming') return 'bg-blue-50/80 dark:bg-blue-950/30 border-l-[3px] border-l-blue-500';
-    if (notif.type === 'today') return 'bg-amber-50/80 dark:bg-amber-950/30 border-l-[3px] border-l-amber-500';
-    if (notif.type === 'tomorrow') return 'bg-emerald-50/60 dark:bg-emerald-950/20 border-l-[3px] border-l-emerald-500';
     return '';
   }, [notifications]);
 
@@ -352,13 +340,10 @@ export default function FollowupDashboardPage() {
         const nextCall = lead.followups?.[0]?.nextCallDate ? new Date(lead.followups[0].nextCallDate) : null;
         const isCompleted = (lead.status?.label || '').toLowerCase().includes('completed');
 
-        if (dueFilter === 'overdue' && (!nextCall || !isPast(nextCall) || isBefore(nextCall, twoHoursAgo) || isCompleted)) return false;
-        if (dueFilter === 'missed' && (!nextCall || !isPast(nextCall) || isAfter(nextCall, twoHoursAgo) || isCompleted)) return false;
-        if (dueFilter === 'due' && (!nextCall || !isPast(nextCall) || isCompleted)) return false;
+        if (dueFilter === 'missed' && (!nextCall || !isBefore(nextCall, twoHoursAgo) || isCompleted)) return false;
+        if (dueFilter === 'due' && (!nextCall || !isAfter(nextCall, twoHoursAgo) || !isBefore(nextCall, now) || isCompleted)) return false;
         if (dueFilter === 'upcoming' && (!nextCall || !isAfter(nextCall, now) || !isBefore(nextCall, tenMinutesFromNow) || isCompleted)) return false;
         if (dueFilter === 'today' && (!nextCall || !isToday(nextCall) || isCompleted)) return false;
-        if (dueFilter === 'next3' && (!nextCall || nextCall <= endToday || nextCall > after3 || isCompleted)) return false;
-        if (dueFilter === 'completed' && !isCompleted) return false;
         if (statusFilter && lead.status?.label !== statusFilter) return false;
 
         return true;
@@ -532,7 +517,7 @@ export default function FollowupDashboardPage() {
                     {notifications.length} Pending Follow-up{notifications.length > 1 ? 's' : ''}
                   </p>
                   <div className="flex items-center gap-3 mt-0.5">
-                    {overdueCount > 0 && <span className="text-xs text-red-600 dark:text-red-400 font-medium">{overdueCount} overdue</span>}
+
                     {todayCount > 0 && <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">{todayCount} due today</span>}
                   </div>
                 </div>
@@ -613,13 +598,10 @@ export default function FollowupDashboardPage() {
               <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                 {([
                   { key: 'all' as DueFilter, label: 'All', count: leads.length },
-                  { key: 'overdue' as DueFilter, label: 'Overdue (≤2h)', count: overdueCount },
                   { key: 'missed' as DueFilter, label: 'Missed (>2h)', count: missedCount },
-                  { key: 'due' as DueFilter, label: 'Due (All Past)', count: dueCount },
+                  { key: 'due' as DueFilter, label: 'Pending (<2h)', count: dueCount },
                   { key: 'upcoming' as DueFilter, label: 'Upcoming (10 min)', count: upcomingCount },
-                  { key: 'today' as DueFilter, label: 'Today', count: todayCount },
-                  { key: 'next3' as DueFilter, label: 'Next 3 Days', count: 0 },
-                  { key: 'completed' as DueFilter, label: 'Completed', count: 0 },
+                  { key: 'today' as DueFilter, label: 'Today', count: todayCount }
                 ]).map((chip) => (
                   <button
                     key={chip.key}
@@ -631,9 +613,6 @@ export default function FollowupDashboardPage() {
                     }`}
                   >
                     {chip.label}
-                    {chip.key === 'overdue' && overdueCount > 0 && (
-                      <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-red-100 text-red-600 rounded-full dark:bg-red-900/30 dark:text-red-400">{overdueCount}</span>
-                    )}
                     {chip.key === 'missed' && missedCount > 0 && (
                       <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-red-200 text-red-700 rounded-full dark:bg-red-900/50 dark:text-red-300">{missedCount}</span>
                     )}

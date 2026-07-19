@@ -80,13 +80,13 @@ export const dashboardService = {
   getFollowupDashboard: async (campaignId?: string): Promise<Followup[]> => {
     const params: Record<string, string> = {};
     if (campaignId) params.campaignId = campaignId;
-    return fetchAllPages<Followup>('/dashboard/followups', params);
+    return fetchAllPages<Followup>('/dashboard/followups', params, { deduplicateKey: 'leadId' });
   },
 
   getAllLeadsDashboard: async (campaignId?: string): Promise<Lead[]> => {
     const params: Record<string, string> = {};
     if (campaignId) params.campaignId = campaignId;
-    return fetchAllPages<Lead>('/dashboard/leads', params);
+    return fetchAllPages<Lead>('/dashboard/leads', params, { deduplicateKey: 'id' });
   },
 
   getCampaignStats: async (campaignId: string) => {

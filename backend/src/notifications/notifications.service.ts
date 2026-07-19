@@ -12,34 +12,11 @@ export class NotificationsService {
     if (!nextCallDate) return 'warning';
 
     const now = new Date();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-
-    // Check if the followup is within 10 minutes (upcoming)
     const tenMinutesFromNow = addMinutes(now, 10);
+
+    // Only notify when followup is coming up within the next 10 minutes
     if (isAfter(nextCallDate, now) && isBefore(nextCallDate, tenMinutesFromNow)) {
       return 'upcoming';
-    }
-
-    if (isBefore(nextCallDate, today)) {
-      return 'overdue';
-    }
-
-    if (
-      isAfter(nextCallDate, startOfDay(today)) &&
-      isBefore(nextCallDate, endOfDay(today))
-    ) {
-      return 'today';
-    }
-
-    if (
-      isAfter(nextCallDate, startOfDay(tomorrow)) &&
-      isBefore(nextCallDate, endOfDay(tomorrow))
-    ) {
-      return 'tomorrow';
     }
 
     return 'warning';
@@ -112,7 +89,7 @@ export class NotificationsService {
       .where(
         and(
           eq(notifications.userId, userId),
-          inArray(notifications.type, ['overdue', 'today', 'tomorrow', 'upcoming']),
+          inArray(notifications.type, ['upcoming']),
           eq(notifications.isRead, false),
         ),
       )
@@ -204,7 +181,7 @@ export class NotificationsService {
       .where(
         and(
           eq(notifications.userId, userId),
-          inArray(notifications.type, ['overdue', 'today', 'tomorrow', 'upcoming']),
+          inArray(notifications.type, ['upcoming']),
           eq(notifications.isRead, false),
         ),
       );

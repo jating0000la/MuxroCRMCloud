@@ -15,6 +15,7 @@ const FollowupDashboardPage = lazy(() => import('./pages/dashboard/FollowupDashb
 const DndPage = lazy(() => import('./pages/dnd/DndPage'));
 const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
 const BackupsPage = lazy(() => import('./pages/admin/BackupsPage'));
+const DataManagementPage = lazy(() => import('./pages/admin/DataManagementPage'));
 const PublicFormPage = lazy(() => import('./pages/forms/PublicFormPage'));
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'));
 
@@ -78,6 +79,7 @@ export default function App() {
                   <Route path="/dnd" element={<PrivateRoute><DndPage /></PrivateRoute>} />
                   <Route path="/admin/users" element={<PrivateRoute><AdminRoute><AdminUsersPage /></AdminRoute></PrivateRoute>} />
                   <Route path="/admin/backups" element={<PrivateRoute><AdminRoute><BackupsPage /></AdminRoute></PrivateRoute>} />
+                  <Route path="/admin/data-management" element={<PrivateRoute><AdminRoute><DataManagementPage /></AdminRoute></PrivateRoute>} />
                   <Route path="/settings" element={<PrivateRoute><AdminRoute><SettingsPage /></AdminRoute></PrivateRoute>} />
                   <Route path="*" element={<Navigate to="/dashboard" />} />
                 </Routes>

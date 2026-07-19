@@ -22,6 +22,7 @@ import { JobModule } from './jobs/job.module';
 import { AuthorizationModule } from './common/authorization/authorization.module';
 import { OutboxModule } from './common/outbox/outbox.module';
 import { BackupModule } from './common/backup/backup.module';
+import { DataExportModule } from './data-export/data-export.module';
 
 // Middleware
 import { StructuredLoggingMiddleware } from './common/logging/structured-logging.middleware';
@@ -53,6 +54,7 @@ import { StructuredLoggingMiddleware } from './common/logging/structured-logging
     AuthorizationModule,
     OutboxModule,
     BackupModule,
+    DataExportModule,
   ],
   controllers: [HealthController, AdminDashboardController],
   providers: [

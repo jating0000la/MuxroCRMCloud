@@ -103,94 +103,94 @@ export class DashboardService {
   }
 
   async getFollowupDashboard(userId: string, role: string, campaignId?: string, page: number = 1, limit: number = 50) {
-    const conditions: any[] = [eq(leads.isDeleted, false)];
+    // Query leads first (deduplicated), then fetch latest followup per lead
+    // This avoids N duplicate rows when a lead has N followups
+    const leadConditions: any[] = [eq(leads.isDeleted, false)];
     if (role === 'USER') {
-      conditions.push(eq(followups.userId, userId));
+      leadConditions.push(eq(leads.doerId, userId));
     }
+    if (campaignId) leadConditions.push(eq(leads.campaignId, campaignId));
 
+    const whereClause = leadConditions.length > 0 ? and(...leadConditions) : undefined;
+
+    // Count only distinct leads that have at least one followup
+    const [{ total }] = await this.database.db
+      .select({ total: sql<number>`count(distinct ${leads.id})::int` })
+      .from(leads)
+      .innerJoin(followups, eq(leads.id, followups.leadId))
+      .where(whereClause);
+
+    // Fetch distinct leads with their latest followup
+    // Use a subquery approach: get leads, then separately get latest followup per lead
     const offset = (page - 1) * limit;
 
-    const countConditions: any[] = [...conditions];
-    if (campaignId) countConditions.push(eq(leads.campaignId, campaignId));
-
-    const [{ total }] = await this.database.db
-      .select({ total: sql<number>`count(*)::int` })
-      .from(followups)
-      .innerJoin(leads, eq(followups.leadId, leads.id))
-      .where(countConditions.length > 0 ? and(...countConditions) : undefined);
-
-    let results;
-    if (campaignId) {
-      results = await this.database.db
-        .select({
-          followup: followups,
-          lead: {
-            ...leads,
-            campaign: {
-              id: campaigns.id,
-              name: campaigns.name,
-            },
-            status: campaignStatuses,
-            doer: {
-              id: users.id,
-              name: users.name,
-              username: users.username,
-            },
+    const leadResults = await this.database.db
+      .select({
+        lead: {
+          ...leads,
+          campaign: {
+            id: campaigns.id,
+            name: campaigns.name,
           },
-          user: {
+          status: campaignStatuses,
+          doer: {
             id: users.id,
             name: users.name,
             username: users.username,
           },
-        })
+        },
+      })
+      .from(leads)
+      .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
+      .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
+      .leftJoin(users, eq(leads.doerId, users.id))
+      .innerJoin(followups, eq(leads.id, followups.leadId))
+      .where(whereClause)
+      .groupBy(leads.id, campaigns.id, campaigns.name, campaignStatuses.id, users.id, users.name, users.username)
+      .orderBy(desc(sql`max(${followups.createdAt})`))
+      .offset(offset)
+      .limit(limit);
+
+    // Fetch the latest followup for each lead in the result
+    const leadIds = leadResults.map((r) => r.lead.id);
+    let latestFollowups: any[] = [];
+    if (leadIds.length > 0) {
+      latestFollowups = await this.database.db
+        .select()
         .from(followups)
-        .innerJoin(leads, eq(followups.leadId, leads.id))
-        .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
-        .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
-        .leftJoin(users, eq(followups.userId, users.id))
-        .where(and(eq(leads.campaignId, campaignId), ...(conditions.length > 0 ? conditions : [])))
-        .orderBy(desc(followups.createdAt))
-        .offset(offset)
-        .limit(limit);
-    } else {
-      results = await this.database.db
-        .select({
-          followup: followups,
-          lead: {
-            ...leads,
-            campaign: {
-              id: campaigns.id,
-              name: campaigns.name,
-            },
-            status: campaignStatuses,
-            doer: {
-              id: users.id,
-              name: users.name,
-              username: users.username,
-            },
-          },
-          user: {
-            id: users.id,
-            name: users.name,
-            username: users.username,
-          },
-        })
-        .from(followups)
-        .innerJoin(leads, eq(followups.leadId, leads.id))
-        .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
-        .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
-        .leftJoin(users, eq(followups.userId, users.id))
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(desc(followups.createdAt))
-        .offset(offset)
-        .limit(limit);
+        .where(inArray(followups.leadId, leadIds))
+        .orderBy(desc(followups.createdAt));
+    }
+
+    const followupMap = new Map<string, any>();
+    for (const f of latestFollowups) {
+      if (!followupMap.has(f.leadId)) {
+        followupMap.set(f.leadId, f);
+      }
+    }
+
+    // Also fetch the followup user info for the latest followup
+    const followupUserIds = latestFollowups
+      .filter((f) => followupMap.get(f.leadId)?.id === f.id)
+      .map((f) => f.userId)
+      .filter(Boolean);
+    const uniqueUserIds = [...new Set(followupUserIds)];
+    let userMap = new Map<string, any>();
+    if (uniqueUserIds.length > 0) {
+      const followupUsers = await this.database.db
+        .select({ id: users.id, name: users.name, username: users.username })
+        .from(users)
+        .where(inArray(users.id, uniqueUserIds));
+      userMap = new Map(followupUsers.map((u) => [u.id, u]));
     }
 
     return {
-      data: results.map((r) => ({
-        ...r.followup,
+      data: leadResults.map((r) => ({
+        ...(followupMap.get(r.lead.id) || {}),
         lead: r.lead,
-        user: r.user,
+        user: followupMap.get(r.lead.id)
+          ? userMap.get(followupMap.get(r.lead.id).userId) || null
+          : null,
       })),
       total,
       page,
@@ -450,8 +450,9 @@ export class DashboardService {
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const now = new Date();
-    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const date = new Date();
+    const twoHoursAgo = new Date(date.setHours(date.getHours()-2))
+    const now = new Date()
 
     const leadConditions: any[] = [eq(leads.isDeleted, false)];
     if (role === 'USER') leadConditions.push(eq(leads.doerId, userId));
@@ -486,78 +487,63 @@ export class DashboardService {
       .from(leads)
       .where(and(...todayLeadConditions));
 
-    // Subquery: find the latest followup (max createdAt) per leadId
-    const latestFollowupSubquery = this.database.db
-      .select({
-        leadId: followups.leadId,
-        maxCreatedAt: sql<Date>`max(${followups.createdAt})`.as('maxCreatedAt'),
-      })
-      .from(followups)
-      .groupBy(followups.leadId)
-      .as('latest_followups');
-
     // Find status IDs whose label contains 'completed' (to exclude them)
     const completedStatuses = await this.database.db
       .select({ id: campaignStatuses.id })
       .from(campaignStatuses)
       .where(ilike(campaignStatuses.label, '%completed%'));
+    const completedIds = completedStatuses.map((s) => s.id);
 
-    // Due followups: latest followup per lead where nextCallDate passed but not more than 2 hours ago
-    const dueFollowupConditions: any[] = [
-      sql`${followups.nextCallDate} < ${now}`,
-      sql`${followups.nextCallDate} >= ${twoHoursAgo}`,
-      eq(leads.isDeleted, false),
-    ];
-    if (role === 'USER') dueFollowupConditions.push(eq(followups.userId, userId));
-    if (campaignId) {
-      dueFollowupConditions.push(eq(leads.campaignId, campaignId));
-    }
+    // Query leads first (deduplicated), then fetch latest followup per lead — same approach as getFollowupDashboard
+    const followupLeadConditions: any[] = [eq(leads.isDeleted, false)];
+    if (role === 'USER') followupLeadConditions.push(eq(leads.doerId, userId));
+    if (campaignId) followupLeadConditions.push(eq(leads.campaignId, campaignId));
     // Exclude leads whose status label contains 'completed'
-    if (completedStatuses.length > 0) {
-      const completedIds = completedStatuses.map((s) => s.id);
-      dueFollowupConditions.push(or(sql`${leads.statusId} IS NULL`, not(inArray(leads.statusId, completedIds))));
+    if (completedIds.length > 0) {
+      followupLeadConditions.push(or(sql`${leads.statusId} IS NULL`, not(inArray(leads.statusId, completedIds))));
     }
 
-    const [{ dueFollowups }] = await this.database.db
-      .select({ dueFollowups: sql<number>`count(*)::int` })
+    const followupLeadWhere = and(...followupLeadConditions);
+
+    // Get distinct lead IDs that have followups
+    const leadsWithFollowups = await this.database.db
+      .select({ leadId: followups.leadId })
       .from(followups)
       .innerJoin(leads, eq(followups.leadId, leads.id))
-      .innerJoin(
-        latestFollowupSubquery,
-        and(
-          eq(followups.leadId, latestFollowupSubquery.leadId),
-          eq(followups.createdAt, latestFollowupSubquery.maxCreatedAt),
-        ),
-      )
-      .where(and(...dueFollowupConditions));
+      .where(followupLeadWhere)
+      .groupBy(followups.leadId);
 
-    // Missed followups: latest followup per lead where nextCallDate passed more than 2 hours ago
-    const missedFollowupConditions: any[] = [
-      sql`${followups.nextCallDate} < ${twoHoursAgo}`,
-      eq(leads.isDeleted, false),
-    ];
-    if (role === 'USER') missedFollowupConditions.push(eq(followups.userId, userId));
-    if (campaignId) {
-      missedFollowupConditions.push(eq(leads.campaignId, campaignId));
-    }
-    // Exclude leads whose status label contains 'completed'
-    if (completedStatuses.length > 0) {
-      const completedIds = completedStatuses.map((s) => s.id);
-      missedFollowupConditions.push(or(sql`${leads.statusId} IS NULL`, not(inArray(leads.statusId, completedIds))));
+    // Fetch latest followup for each lead
+    const fLeadIds = leadsWithFollowups.map((r) => r.leadId);
+    let latestFollowups: any[] = [];
+    if (fLeadIds.length > 0) {
+      latestFollowups = await this.database.db
+        .select()
+        .from(followups)
+        .where(inArray(followups.leadId, fLeadIds))
+        .orderBy(desc(followups.createdAt));
     }
 
-    const [{ missedFollowups }] = await this.database.db
-      .select({ missedFollowups: sql<number>`count(*)::int` })
-      .from(followups)
-      .innerJoin(leads, eq(followups.leadId, leads.id))
-      .innerJoin(
-        latestFollowupSubquery,
-        and(
-          eq(followups.leadId, latestFollowupSubquery.leadId),
-          eq(followups.createdAt, latestFollowupSubquery.maxCreatedAt),
-        ),
-      )
-      .where(and(...missedFollowupConditions));
+    // Build map of latest followup per lead
+    const followupMap = new Map<string, any>();
+    for (const f of latestFollowups) {
+      if (!followupMap.has(f.leadId)) {
+        followupMap.set(f.leadId, f);
+      }
+    }
+
+    // Count pending and missed in TypeScript (same logic as FollowupDashboardPage)
+    let dueFollowups = 0;
+    let missedFollowups = 0;
+    for (const [, followup] of followupMap) {
+      if (!followup.nextCallDate) continue;
+      const nextDate = new Date(followup.nextCallDate);
+      if (nextDate < twoHoursAgo) {
+        missedFollowups++;
+      } else if (nextDate >= twoHoursAgo && nextDate < now) {
+        dueFollowups++;
+      }
+    }
 
     const wonStatuses = await this.database.db
       .select({ id: campaignStatuses.id })
@@ -609,19 +595,56 @@ export class DashboardService {
   }
 
   async getBusinessAlerts(userId: string, role: string) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const now = new Date();
 
     const alerts: string[] = [];
 
-    const [{ missedCount }] = await this.database.db
-      .select({ missedCount: sql<number>`count(*)::int` })
-      .from(followups)
-      .where(sql`${followups.nextCallDate} < ${today}`);
+    // Query leads first (deduplicated), then fetch latest followup per lead — same reliable pattern
+    const alertLeadConditions: any[] = [eq(leads.isDeleted, false)];
+    if (role === 'USER') alertLeadConditions.push(eq(leads.doerId, userId));
 
-    if (missedCount > 0) {
-      alerts.push(`${missedCount} follow-up(s) missed today`);
+    const alertLeadWhere = and(...alertLeadConditions);
+
+    const alertLeadsWithFollowups = await this.database.db
+      .select({ leadId: followups.leadId })
+      .from(followups)
+      .innerJoin(leads, eq(followups.leadId, leads.id))
+      .where(alertLeadWhere)
+      .groupBy(followups.leadId);
+
+    const alertLeadIds = alertLeadsWithFollowups.map((r) => r.leadId);
+    let alertLatestFollowups: any[] = [];
+    if (alertLeadIds.length > 0) {
+      alertLatestFollowups = await this.database.db
+        .select()
+        .from(followups)
+        .where(inArray(followups.leadId, alertLeadIds))
+        .orderBy(desc(followups.createdAt));
     }
+
+    const alertFollowupMap = new Map<string, any>();
+    for (const f of alertLatestFollowups) {
+      if (!alertFollowupMap.has(f.leadId)) {
+        alertFollowupMap.set(f.leadId, f);
+      }
+    }
+
+    // Upcoming followups: nextCallDate is within the next 10 minutes
+    const tenMinutesFromNow = new Date(now.getTime() + 10 * 60 * 1000);
+    let upcomingCount = 0;
+    for (const [, followup] of alertFollowupMap) {
+      if (!followup.nextCallDate) continue;
+      const nextDate = new Date(followup.nextCallDate);
+      if (nextDate > now && nextDate < tenMinutesFromNow) {
+        upcomingCount++;
+      }
+    }
+
+    if (upcomingCount > 0) {
+      alerts.push(`${upcomingCount} follow-up(s) coming up in the next 10 minutes`);
+    }
+
 
     const userConversion = await this.getUserConversion(userId, role);
     if (userConversion.length > 0) {
@@ -651,6 +674,7 @@ export class DashboardService {
       alerts.push(`Top campaign: ${campaignStats[0].campaignName} with ${campaignStats[0].count} leads`);
     }
 
+    const today = new Date();
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 

@@ -48,12 +48,12 @@ function getAudioContext(): AudioContext | null {
 }
 
 /** Play an alert beep using Web Audio API — no external file needed */
-function playAlertSound(type: 'overdue' | 'today' | 'other' = 'other') {
+function playAlertSound(type: 'upcoming' | 'other' = 'other') {
   const ctx = getAudioContext();
   if (!ctx) return;
   try {
-    const frequencies = type === 'overdue' ? [880, 660, 880, 1100] : type === 'today' ? [660, 880] : [550];
-    const durations = type === 'overdue' ? [0.2, 0.2, 0.2, 0.3] : [0.3, 0.3];
+    const frequencies = type === 'upcoming' ? [880, 660, 880, 1100] : [550];
+    const durations = type === 'upcoming' ? [0.2, 0.2, 0.2, 0.3] : [0.3, 0.3];
     let time = ctx.currentTime;
     frequencies.forEach((freq, i) => {
       const osc = ctx.createOscillator();
@@ -62,7 +62,7 @@ function playAlertSound(type: 'overdue' | 'today' | 'other' = 'other') {
       gain.connect(ctx.destination);
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, time);
-      gain.gain.setValueAtTime(type === 'overdue' ? 0.5 : 0.4, time);
+      gain.gain.setValueAtTime(type === 'upcoming' ? 0.5 : 0.4, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + durations[i]);
       osc.start(time);
       osc.stop(time + durations[i]);
@@ -109,18 +109,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         knownIdsRef.current = new Set(idsArray.slice(idsArray.length - MAX_KNOWN_IDS));
       }
 
-      const overdueCount = newOnes.filter((n) => n.type === 'overdue').length;
-      const todayCount = newOnes.filter((n) => n.type === 'today').length;
       const upcomingCount = newOnes.filter((n) => n.type === 'upcoming').length;
 
-      if (soundEnabledRef.current && (overdueCount > 0 || todayCount > 0 || upcomingCount > 0)) {
-        if (overdueCount > 0) {
-          playAlertSound('overdue');
-        } else if (todayCount > 0) {
-          playAlertSound('today');
-        } else {
-          playAlertSound('other');
-        }
+      if (soundEnabledRef.current && upcomingCount > 0) {
+        playAlertSound('upcoming');
       }
     }
   }, []);
