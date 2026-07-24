@@ -1,5 +1,5 @@
 {
-    email {$ACME_EMAIL:admin@muxrocrm.com}
+    email {$ACME_EMAIL:admin@muxrocrm.cloud}
 }
 
 # ──────────────────────────────────────────────────────────────
@@ -8,9 +8,9 @@
 # Frontend: PM2 on localhost:8080 (npx serve)
 # ──────────────────────────────────────────────────────────────
 
-{$DOMAIN:muxrocrm.com}, www.{$DOMAIN:muxrocrm.com} {
-    @www host www.{$DOMAIN:muxrocrm.com}
-    redir @www https://{$DOMAIN:muxrocrm.com}{uri} 308
+{$DOMAIN:muxrocrm.cloud}, www.{$DOMAIN:muxrocrm.cloud} {
+    @www host www.{$DOMAIN:muxrocrm.cloud}
+    redir @www https://{$DOMAIN:muxrocrm.cloud}{uri} 308
 
     encode zstd gzip
 
