@@ -1,8 +1,18 @@
+# ──────────────────────────────────────────────────────────────
+# MuxroCRM Cloud — Docker Compose (Database Only)
+# Backend & Frontend run via PM2 on the VPS
+# Caddy runs on the VPS (not in Docker)
+# ──────────────────────────────────────────────────────────────
+
 services:
+  # ── PostgreSQL Database ─────────────────────────────────
+  # Port 5433 to avoid conflict with ProcessSutra (5432)
   postgres:
     image: postgres:15-alpine
     container_name: crm-postgres
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:5433:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -26,168 +36,8 @@ services:
     networks:
       - crm-network
 
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: crm-backend
-    restart: unless-stopped
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-crm_db}?schema=public
-      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
-      ACCESS_TOKEN_EXPIRATION: ${ACCESS_TOKEN_EXPIRATION:-15m}
-      REFRESH_TOKEN_EXPIRATION: ${REFRESH_TOKEN_EXPIRATION:-7d}
-      PORT: 3000
-      NODE_ENV: production
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
-      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
-      PUBLIC_FORMS_ENABLED: ${PUBLIC_FORMS_ENABLED:-true}
-      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?Set APP_ENCRYPTION_KEY in .env}
-      ENCRYPTION_SALT: ${ENCRYPTION_SALT:?Set ENCRYPTION_SALT in .env}
-      BACKUP_DIR: /backups
-      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 60s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-    volumes:
-      - backup_data:/backups
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - crm-network
-
-  worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: crm-worker
-    restart: unless-stopped
-    command: ["node", "dist/worker"]
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-crm_db}?schema=public
-      JWT_SECRET: ${JWT_SECRET}
-      ACCESS_TOKEN_EXPIRATION: ${ACCESS_TOKEN_EXPIRATION:-15m}
-      REFRESH_TOKEN_EXPIRATION: ${REFRESH_TOKEN_EXPIRATION:-7d}
-      NODE_ENV: production
-      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
-      ENCRYPTION_SALT: ${ENCRYPTION_SALT}
-      BACKUP_DIR: /backups
-      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          memory: 384M
-    volumes:
-      - backup_data:/backups
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - crm-network
-
-  backup-cron:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: crm-backup-cron
-    restart: unless-stopped
-    command: >
-      sh -c "echo '0 2 * * * /app/scripts/backup.sh >> /var/log/backup.log 2>&1' > /etc/crontabs/root && crond -f -l 2"
-    environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-crm_db}
-      BACKUP_DIR: /backups
-      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - backup_data:/backups
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-    networks:
-      - crm-network
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: crm-frontend
-    restart: unless-stopped
-    expose:
-      - "80"
-    depends_on:
-      backend:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - crm-network
-
-  caddy:
-    image: caddy:alpine
-    container_name: crm-caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      - DOMAIN=${DOMAIN:-localhost}
-      - ACME_EMAIL=${ACME_EMAIL:-admin@muxrocrm.com}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - frontend
-      - backend
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - crm-network
-
 volumes:
   postgres_data:
-  caddy_data:
-  caddy_config:
-  backup_data:
 
 networks:
   crm-network:

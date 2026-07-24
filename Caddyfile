@@ -2,36 +2,62 @@
     email {$ACME_EMAIL:admin@muxrocrm.com}
 }
 
+# ──────────────────────────────────────────────────────────────
+# MuxroCRM Cloud — Caddyfile for VPS (PM2 managed)
+# Backend:  PM2 on localhost:3000
+# Frontend: PM2 on localhost:8080 (npx serve)
+# ──────────────────────────────────────────────────────────────
+
 {$DOMAIN:muxrocrm.com}, www.{$DOMAIN:muxrocrm.com} {
     @www host www.{$DOMAIN:muxrocrm.com}
     redir @www https://{$DOMAIN:muxrocrm.com}{uri} 308
 
     encode zstd gzip
 
-    # API proxy
+    # ── Security Headers ──────────────────────────────────
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        -Server
+    }
+
+    # ── API Proxy → PM2 Backend (port 3000) ───────────────
     handle /api/* {
-        reverse_proxy backend:3000 {
+        reverse_proxy localhost:3000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+
+            # Health check
+            health_uri /api/health
+            health_interval 30s
+            health_timeout 10s
+
+            transport http {
+                keepalive 30s
+                dial_timeout 10s
+                response_header_timeout 60s
+            }
+        }
+    }
+
+    # ── Frontend → PM2 Serve (port 8080) ──────────────────
+    handle {
+        reverse_proxy localhost:8080 {
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
         }
     }
 
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "SAMEORIGIN"
-        Referrer-Policy "strict-origin-when-cross-origin"
-    }
-
-    # Frontend (static files)
-    handle {
-        reverse_proxy frontend:80
-    }
-
-    # Logging
+    # ── Logging ───────────────────────────────────────────
     log {
-        output stdout
-        format json
+        output file /var/log/caddy/muxrocrm-access.log {
+            roll_size 50MB
+            roll_keep 3
+        }
     }
 }
