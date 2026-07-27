@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { readBranding } from '../../utils/branding';
 import { usePublicForm } from './public-form/hooks/usePublicForm';
@@ -38,6 +39,18 @@ export default function PublicFormPage() {
   } = usePublicForm(slug);
 
   useSeoAndTheme(form, branding);
+
+  // Allow body scroll on the public form page
+  useEffect(() => {
+    const prevHtml = document.documentElement.style.overflow;
+    const prevBody = document.body.style.overflow;
+    document.documentElement.style.overflow = 'auto';
+    document.body.style.overflow = 'auto';
+    return () => {
+      document.documentElement.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+    };
+  }, []);
 
   if (loading) return <LoadingScreen />;
   if (loadError) return <ErrorScreen message={loadError} />;
