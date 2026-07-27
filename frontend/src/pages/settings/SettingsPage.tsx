@@ -128,8 +128,15 @@ export default function SettingsPage() {
   const normalizeUrl = (value: string): string => {
     const trimmed = value.trim();
     if (!trimmed) return '';
-    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('/')) return trimmed;
     return `https://${trimmed}`;
+  };
+
+  const normalizeLogoUrl = (value: string): string => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('/')) return trimmed;
+    return trimmed;
   };
 
   const isValidUrl = (value: string): boolean => {
@@ -201,13 +208,13 @@ export default function SettingsPage() {
     try {
       await saveSettings([
         { key: 'companyName', value: companyName },
-        { key: 'appLogoUrl', value: normalizeUrl(appLogoUrl) },
+        { key: 'appLogoUrl', value: normalizeLogoUrl(appLogoUrl) },
         { key: 'websiteLink', value: normalizeUrl(websiteLink) },
         { key: 'companyEmail', value: companyEmail },
         { key: 'companyPhone', value: companyPhone },
         { key: 'companyAddress', value: companyAddress },
       ]);
-      saveBranding({ appName: companyName || 'Muxro CRM', appLogoUrl: normalizeUrl(appLogoUrl) || '' });
+      saveBranding({ appName: companyName || 'Muxro CRM', appLogoUrl: normalizeLogoUrl(appLogoUrl) || '' });
       toast.success('Profile saved successfully');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to save profile');
