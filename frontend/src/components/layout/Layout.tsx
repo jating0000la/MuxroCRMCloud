@@ -103,7 +103,7 @@ function BottomBar({ filteredNav, currentPath }: { filteredNav: typeof navItems;
   );
 }
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function Layout({ children, fullHeight = false }: { children: React.ReactNode; fullHeight?: boolean }) {
   const { user, logout } = useAuth();
   const { pendingCount, notifications, markAsRead, markAllAsRead, soundEnabled, toggleSound } = useNotifications();
   const { theme, toggleTheme } = useTheme();
@@ -173,9 +173,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   });
 
   return (
-    <div className="min-h-screen bg-transparent flex dark:text-gray-200">
+    <div className="flex h-screen flex-col overflow-hidden bg-transparent dark:text-gray-200">
       {/* Main Content */}
-      <div className="flex-1 flex flex-col transition-all duration-300">
+      <div className="flex min-h-0 flex-1 flex-col transition-all duration-300">
         {/* Header */}
         <header className="sticky top-0 z-20 border-b border-primary-100/90 bg-white/90 backdrop-blur-xl dark:border-gray-700/90 dark:bg-gray-900/90">
           <div className="h-0.5 w-full bg-gradient-to-r from-primary-600 via-primary-400 to-primary-700" />
@@ -436,10 +436,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden animate-fade-up pb-16 [scrollbar-gutter:stable]">{children}</main>
-        <footer className="px-4 pb-16 text-center text-[10px] text-slate-500 dark:text-gray-500">
-          Copyright by Muxro Technologies 2026
-        </footer>
+        <main className={`flex-1 min-h-0 ${fullHeight ? 'flex flex-col overflow-hidden' : 'overflow-y-auto overflow-x-hidden animate-fade-up pb-16 [scrollbar-gutter:stable]'}`}>
+          {children}
+        </main>
+        {!fullHeight && (
+          <footer className="px-4 pb-16 text-center text-[10px] text-slate-500 dark:text-gray-500">
+            Copyright by Muxro Technologies 2026
+          </footer>
+        )}
       </div>
 
       {/* Global Bottom Bar */}

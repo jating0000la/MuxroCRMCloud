@@ -47,7 +47,7 @@ export default function MessageList({ messages, loading }: MessageListProps) {
   }, [messages]);
 
   return (
-    <div className="relative flex-1 min-h-0">
+    <div className="relative flex-1 min-h-0 overflow-hidden">
       <div
         ref={containerRef}
         onScroll={handleScroll}

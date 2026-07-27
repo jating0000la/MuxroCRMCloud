@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { dashboardService } from '../../services/dashboard';
@@ -49,12 +49,8 @@ export default function FollowupDashboardPage() {
   // Dialogs
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [campaignStatuses, setCampaignStatuses] = useState<CampaignStatus[]>([]);
-  const [quickReschedule, setQuickReschedule] = useState<{ leadId: string; followupId: string; value: string } | null>(null);
-  const [savingReschedule, setSavingReschedule] = useState(false);
-  const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null);
   const [startingFlow, setStartingFlow] = useState<string | null>(null);
   const [showNotifBanner, setShowNotifBanner] = useState(true);
-  const rescheduleRef = useRef<HTMLInputElement>(null);
 
   const canManage = user?.role === 'ADMIN';
   const hasProcessSutra = useMemo(() => {
@@ -149,52 +145,10 @@ export default function FollowupDashboardPage() {
     return () => { document.title = 'CRM'; };
   }, [notifications]);
 
-  // Focus reschedule input
-  useEffect(() => {
-    if (quickReschedule && rescheduleRef.current) rescheduleRef.current.focus();
-  }, [quickReschedule]);
-
   // Reset page on filter change
   useEffect(() => { setPage(1); }, [selectedCampaign, search, sourceFilter, dndFilter, dueFilter, statusFilter, pageSize]);
 
   // ── Handlers ──────────────────────────────────────────────────
-  const handleQuickReschedule = async () => {
-    if (!quickReschedule?.value) return;
-    setSavingReschedule(true);
-    try {
-      await followupService.update(quickReschedule.followupId, {
-        nextCallDate: new Date(quickReschedule.value).toISOString(),
-      });
-      toast.success('Rescheduled');
-      setQuickReschedule(null);
-      await loadData();
-      syncWithDelay(300);
-    } catch {
-      toast.error('Failed to reschedule');
-    } finally {
-      setSavingReschedule(false);
-    }
-  };
-
-  const handleInlineStatusUpdate = async (leadId: string, statusId: string) => {
-    setUpdatingLeadId(leadId);
-    try {
-      await leadService.updateStatus(leadId, { status: statusId, statusId });
-      setLeads((prev) =>
-        prev.map((l) =>
-          l.id === leadId
-            ? { ...l, statusId, status: availableStatuses.find((s) => s.id === statusId) || l.status }
-            : l
-        )
-      );
-      toast.success('Status updated');
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to update status');
-    } finally {
-      setUpdatingLeadId(null);
-    }
-  };
-
   const handleStartFlow = async (lead: Lead) => {
     if (!confirm(`Start Process Sutra flow for "${lead.name}"?`)) return;
     try {
@@ -403,49 +357,9 @@ export default function FollowupDashboardPage() {
 
   // ── Due Date Cell ─────────────────────────────────────────────
   const DueDateCell = ({ lead }: { lead: Lead }) => {
-    const followup = lead.followups?.[0];
-    const nextCall = followup?.nextCallDate;
-
-    if (quickReschedule?.leadId === lead.id) {
-      return (
-        <div className="flex items-center gap-1">
-          <input
-            ref={rescheduleRef}
-            type="datetime-local"
-            value={quickReschedule.value}
-            onChange={(e) => setQuickReschedule((q) => (q ? { ...q, value: e.target.value } : null))}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleQuickReschedule();
-              if (e.key === 'Escape') setQuickReschedule(null);
-            }}
-            className="text-xs border border-primary-400 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500 w-40 dark:border-primary-600 dark:bg-gray-700 dark:text-gray-100"
-          />
-          <button
-            onClick={handleQuickReschedule}
-            disabled={savingReschedule}
-            className="p-1 bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200 disabled:opacity-50 dark:bg-emerald-900/30 dark:text-emerald-400"
-            title="Save"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-          </button>
-          <button onClick={() => setQuickReschedule(null)} className="p-1 bg-gray-100 text-gray-500 rounded hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400" title="Cancel">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
-      );
-    }
+    const nextCall = lead.followups?.[0]?.nextCallDate;
 
     if (!nextCall) {
-      if (followup) {
-        return (
-          <button
-            onClick={() => setQuickReschedule({ leadId: lead.id, followupId: followup.id, value: format(new Date(), "yyyy-MM-dd'T'HH:mm") })}
-            className="text-xs text-blue-500 hover:text-blue-700 hover:underline font-medium"
-          >
-            + Schedule
-          </button>
-        );
-      }
       return <span className="text-xs text-gray-400 dark:text-gray-600">-</span>;
     }
 
@@ -455,11 +369,7 @@ export default function FollowupDashboardPage() {
     const isDueTomorrow = isTomorrow(date);
 
     return (
-      <button
-        onClick={() => followup && setQuickReschedule({ leadId: lead.id, followupId: followup.id, value: format(date, "yyyy-MM-dd'T'HH:mm") })}
-        className="text-left group"
-        title="Click to reschedule"
-      >
+      <div className="text-left">
         <span className={`text-xs font-medium ${
           isOverdue ? 'text-red-600 dark:text-red-400' :
           isDueToday ? 'text-amber-600 dark:text-amber-400' :
@@ -468,10 +378,10 @@ export default function FollowupDashboardPage() {
         }`}>
           {format(date, 'MMM d, h:mm a')}
         </span>
-        <span className="block text-[10px] text-gray-400 dark:text-gray-600 group-hover:text-primary-500">
-          {isOverdue ? 'overdue' : isDueToday ? 'today' : isDueTomorrow ? 'tomorrow' : 'reschedule'}
+        <span className="block text-[10px] text-gray-400 dark:text-gray-600">
+          {isOverdue ? 'overdue' : isDueToday ? 'today' : isDueTomorrow ? 'tomorrow' : 'scheduled'}
         </span>
-      </button>
+      </div>
     );
   };
 
@@ -689,21 +599,19 @@ export default function FollowupDashboardPage() {
                             </td>
                             <td className="px-3 py-2 text-[11px] text-gray-400 dark:text-gray-600">{format(new Date(lead.updatedAt), 'MMM d')}</td>
                             <td className="px-3 py-2">
-                              {updatingLeadId === lead.id ? (
-                                <span className="text-[10px] text-gray-400 animate-pulse">Saving...</span>
-                              ) : (
-                                <select
-                                  value={lead.statusId || ''}
-                                  onChange={(e) => e.target.value && handleInlineStatusUpdate(lead.id, e.target.value)}
-                                  className="text-[11px] px-1.5 py-0.5 rounded-full border-0 focus:ring-2 focus:ring-primary-500 cursor-pointer font-medium max-w-[120px] truncate dark:bg-gray-700"
+                              {lead.status ? (
+                                <span
+                                  className="inline-flex max-w-[120px] truncate rounded-full px-1.5 py-0.5 text-[11px] font-medium"
                                   style={{
-                                    backgroundColor: (lead.status?.color || '#9CA3AF') + '18',
-                                    color: lead.status?.color || '#9CA3AF',
+                                    backgroundColor: (lead.status.color || '#9CA3AF') + '18',
+                                    color: lead.status.color || '#9CA3AF',
                                   }}
+                                  title={lead.status.label}
                                 >
-                                  <option value="">No status</option>
-                                  {availableStatuses.map((s) => (<option key={s.id} value={s.id}>{s.label}</option>))}
-                                </select>
+                                  {lead.status.label}
+                                </span>
+                              ) : (
+                                <span className="text-[11px] text-gray-400 dark:text-gray-600">No status</span>
                               )}
                             </td>
                             <td className="px-3 py-2">

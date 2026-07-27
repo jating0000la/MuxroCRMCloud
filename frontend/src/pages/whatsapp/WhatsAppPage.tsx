@@ -140,10 +140,10 @@ export default function WhatsAppPage() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <Layout>
-      <div className="flex h-[calc(100vh-0rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+    <Layout fullHeight>
+      <div className="flex h-full min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
         {/* ─── Left Sidebar: Chat List ──────────────────────────────────── */}
-        <div className="w-80 flex-shrink-0">
+        <div className="w-80 min-h-0 flex-shrink-0">
           <ChatSidebar
             chats={chats}
             stats={stats}
@@ -155,7 +155,7 @@ export default function WhatsAppPage() {
         </div>
 
         {/* ─── Center: Chat View ────────────────────────────────────────── */}
-        <div className="flex flex-1 flex-col min-w-0">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden min-w-0">
           {!activePhone ? (
             <EmptyState />
           ) : (

@@ -44,7 +44,7 @@ export default function ChatSidebar({
   }, [chats, search]);
 
   return (
-    <div className="flex h-full w-full flex-col border-r border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+    <div className="flex h-full min-h-0 w-full flex-col border-r border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900">
       {/* Header */}
       <div className="border-b border-slate-100 px-4 py-3 dark:border-gray-800">
         <div className="flex items-center justify-between">
@@ -87,7 +87,7 @@ export default function ChatSidebar({
     
 
       {/* Chat list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {loading ? (
           <div className="flex flex-col gap-3 p-4">
             {[...Array(5)].map((_, i) => (

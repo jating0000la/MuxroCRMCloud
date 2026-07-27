@@ -34,13 +34,14 @@ body,
 }
 
 html {
-  overflow-y: scroll;
-  overflow-x: hidden;
+  height: 100%;
+  overflow: hidden;
   scrollbar-gutter: stable;
 }
 
 body {
-  overflow-x: hidden;
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
