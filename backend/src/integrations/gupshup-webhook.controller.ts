@@ -1,11 +1,8 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Logger, Req, UnauthorizedException } from '@nestjs/common';
-import { timingSafeEqual } from 'crypto';
+import { Controller, Post, Body, HttpCode, HttpStatus, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { Request } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import { DatabaseService } from '../db/database.service';
-import { SettingsService } from '../settings/settings.service';
 import { followups, leads, campaigns } from '../db/schema';
 import { eq, and, desc, like } from 'drizzle-orm';
 
@@ -17,16 +14,14 @@ export class GupshupWebhookController {
   constructor(
     private whatsapp: WhatsAppService,
     private database: DatabaseService,
-    private settingsService: SettingsService,
   ) {}
 
   @Post('webhook')
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Receive inbound WhatsApp messages from Gupshup' })
-  async handleWebhook(@Body() payload: any, @Req() request: Request) {
+  async handleWebhook(@Body() payload: any) {
     this.logger.log('Received Gupshup webhook');
-    await this.assertWebhookSecret(request.header('x-gupshup-webhook-secret') || undefined);
 
     const result = await this.whatsapp.processInbound(payload);
     if (result.status === 'ok' && result.messageId) {
@@ -44,9 +39,8 @@ export class GupshupWebhookController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Receive delivery status updates from Gupshup' })
-  async handleStatusWebhook(@Body() payload: any, @Req() request: Request) {
+  async handleStatusWebhook(@Body() payload: any) {
     this.logger.log('Received Gupshup status webhook');
-    await this.assertWebhookSecret(request.header('x-gupshup-webhook-secret') || undefined);
 
     try {
       const eventType = payload.type || payload.event || '';
@@ -141,29 +135,4 @@ export class GupshupWebhookController {
     return s;
   }
 
-  private async assertWebhookSecret(headerToken: string | undefined): Promise<void> {
-    let configuredSecret = '';
-    try {
-      configuredSecret = (await this.settingsService.getSettingForUse('gupshupWebhookSecret')).trim();
-    } catch {
-      this.logger.warn('Webhook secret not configured — rejecting webhook');
-      throw new UnauthorizedException('Webhook secret not configured');
-    }
-
-    if (!configuredSecret) {
-      this.logger.warn('Webhook secret is empty — rejecting webhook');
-      throw new UnauthorizedException('Webhook secret not configured');
-    }
-
-    if (!headerToken) {
-      throw new UnauthorizedException('Missing webhook secret header');
-    }
-
-    const a = Buffer.from(configuredSecret);
-    const b = Buffer.from(headerToken.trim());
-    if (a.length !== b.length || !timingSafeEqual(a, b)) {
-      this.logger.warn('Rejected Gupshup webhook with invalid secret');
-      throw new UnauthorizedException('Invalid webhook token');
-    }
-  }
 }
