@@ -9,12 +9,29 @@ interface MessageBubbleProps {
 }
 
 function MessageStatusIcon({ status }: { status: string | null }) {
-  if (!status || status === 'sending') return <Clock className="h-3 w-3 text-slate-400 animate-pulse" />;
-  if (status === 'sent') return <Check className="h-3 w-3 text-slate-400" />;
-  if (status === 'delivered') return <CheckCheck className="h-3 w-3 text-slate-400" />;
-  if (status === 'read') return <CheckCheck className="h-3 w-3 text-blue-500" />;
-  if (status === 'failed') return <XCircle className="h-3 w-3 text-red-500" />;
-  return <Clock className="h-3 w-3 text-slate-400" />;
+  const normalizedStatus = status?.trim().toLowerCase();
+
+  if (!normalizedStatus || normalizedStatus === 'sending') {
+    return <Clock className="h-3 w-3 text-slate-400 animate-pulse" />;
+  }
+
+  if (['sent', 'submitted', 'queued', 'accepted'].includes(normalizedStatus)) {
+    return <Check className="h-3 w-3 text-slate-400" />;
+  }
+
+  if (['delivered', 'received'].includes(normalizedStatus)) {
+    return <CheckCheck className="h-3 w-3 text-slate-400" />;
+  }
+
+  if (['read', 'seen'].includes(normalizedStatus)) {
+    return <CheckCheck className="h-3 w-3 text-blue-500" />;
+  }
+
+  if (['failed', 'undelivered', 'error'].includes(normalizedStatus)) {
+    return <XCircle className="h-3 w-3 text-red-500" />;
+  }
+
+  return null;
 }
 
 export default function MessageBubble({ msg }: MessageBubbleProps) {
