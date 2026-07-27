@@ -23,7 +23,6 @@ export interface PageConfig {
   backgroundImage: string;
   fontFamily: string;
   borderRadius: BorderRadiusKey;
-  companyLogo: string;
   bannerImage: string;
   showAbout: boolean;
   aboutTitle: string;
@@ -91,7 +90,6 @@ export const DEFAULT_PAGE_CONFIG: PageConfig = {
   backgroundImage: '',
   fontFamily: 'system',
   borderRadius: 'md',
-  companyLogo: '',
   bannerImage: '',
   showAbout: false,
   aboutTitle: 'About Us',

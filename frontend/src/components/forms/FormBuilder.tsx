@@ -107,7 +107,6 @@ interface PageConfig {
   backgroundImage: string;
   fontFamily: string;
   borderRadius: 'none' | 'sm' | 'md' | 'lg' | 'full';
-  companyLogo: string;
   bannerImage: string;
   showAbout: boolean;
   aboutTitle: string;
@@ -153,7 +152,6 @@ const DEFAULT_PAGE_CONFIG: PageConfig = {
   backgroundImage: '',
   fontFamily: 'system',
   borderRadius: 'md',
-  companyLogo: '',
   bannerImage: '',
   showAbout: false,
   aboutTitle: 'About Us',
@@ -1184,9 +1182,9 @@ export default function FormBuilder({ initialForm, onSubmit, onCancel }: FormBui
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">Header & Banner</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Add company branding at the top of the page.</p>
             <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Company Logo URL</label>
-                <input type="url" value={pageConfig.companyLogo} onChange={(e) => updatePageConfig({ companyLogo: e.target.value })} placeholder="https://your-logo.png" className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
+              <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-3 dark:border-gray-700 dark:bg-gray-900/50">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Shared Logo</p>
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">This public page will automatically use the saved app/logo branding from the main UI.</p>
               </div>
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Banner Image URL <span className="text-gray-400 normal-case font-normal">(optional — replaces color header)</span></label>

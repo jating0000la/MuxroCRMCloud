@@ -42,7 +42,7 @@ export default function PublicFormPage() {
   if (loading) return <LoadingScreen />;
   if (loadError) return <ErrorScreen message={loadError} />;
 
-  const displayLogo = pageConfig.companyLogo || branding.appLogoUrl;
+  const displayLogo = branding.appLogoUrl;
   const displayCompanyName = pageConfig.companyName || branding.appName;
   const primaryColor = pageConfig.primaryColor !== '#0ea5e9' ? pageConfig.primaryColor : design.customColor || pageConfig.primaryColor;
   const cardRadius = BORDER_RADIUS_MAP[pageConfig.borderRadius] || '12px';
