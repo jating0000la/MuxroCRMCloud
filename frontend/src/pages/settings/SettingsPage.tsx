@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import Layout from '../../components/layout/Layout';
 import integrationService from '../../services/integrations';
@@ -58,6 +58,7 @@ export default function SettingsPage() {
   // UI state
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [testingIndiamart, setTestingIndiamart] = useState(false);
   const [testingProcessSutra, setTestingProcessSutra] = useState(false);
   const [testingGupshup, setTestingGupshup] = useState(false);
@@ -67,6 +68,7 @@ export default function SettingsPage() {
   const [showGupshupApiKey, setShowGupshupApiKey] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -170,9 +172,29 @@ export default function SettingsPage() {
 
   const isMasked = (v: string) => v.includes('•');
 
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadingLogo(true);
+    try {
+      const { url } = await settingsService.uploadLogo(file);
+      setAppLogoUrl(url);
+      saveBranding({ appName: companyName || 'Muxro CRM', appLogoUrl: url });
+      toast.success('Logo uploaded successfully');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to upload logo');
+    } finally {
+      setUploadingLogo(false);
+      if (logoInputRef.current) {
+        logoInputRef.current.value = '';
+      }
+    }
+  };
+
   const handleSaveProfile = async () => {
-    if (!isValidUrl(appLogoUrl) || !isValidUrl(websiteLink)) {
-      toast.error('Please enter valid URL values');
+    if (!isValidUrl(websiteLink)) {
+      toast.error('Please enter a valid website URL');
       return;
     }
     setSaving(true);
@@ -378,8 +400,25 @@ export default function SettingsPage() {
                     <input type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} className={inputCls} placeholder="Muxro CRM" />
                   </div>
                   <div>
-                    <label className={labelCls}>Logo URL</label>
-                    <input type="text" inputMode="url" value={appLogoUrl} onChange={(e) => setAppLogoUrl(e.target.value)} onBlur={() => setAppLogoUrl((v) => normalizeUrl(v))} className={inputCls} placeholder="https://your-domain.com/logo.png" />
+                    <label className={labelCls}>Logo</label>
+                    <div className="space-y-3">
+                      <input
+                        ref={logoInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => logoInputRef.current?.click()}
+                        disabled={uploadingLogo}
+                        className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                      >
+                        {uploadingLogo ? 'Uploading...' : 'Upload logo'}
+                      </button>
+                      <p className={hintCls}>PNG, JPG, WebP, or SVG files will be stored inside the repository and used as your branding logo.</p>
+                    </div>
                   </div>
                   <div>
                     <label className={labelCls}>Website</label>

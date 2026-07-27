@@ -8,6 +8,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
+import { getTransferUpdatePayload } from './transfer.utils';
 
 @Injectable()
 export class LeadsService {
@@ -187,7 +188,7 @@ export class LeadsService {
     if (role === 'USER' && lead.doerId !== userId) {
       throw new ForbiddenException('You can only edit leads assigned to you');
     }
-    // Whitelist allowed fields — never allow changing campaignId or other ownership fields
+    // Whitelist allowed fields while allowing controlled campaign transfers.
     const allowedFields: Record<string, any> = {};
     if (dto.name !== undefined) allowedFields.name = dto.name;
     if (dto.email !== undefined) allowedFields.email = dto.email;
@@ -196,7 +197,34 @@ export class LeadsService {
     if (dto.customData !== undefined) allowedFields.customData = dto.customData;
     if (dto.source !== undefined) allowedFields.source = dto.source;
     if (role === 'ADMIN') {
-      if (dto.doerId !== undefined) allowedFields.doerId = dto.doerId;
+      let transferPayload: any = { campaignId: dto.campaignId, doerId: dto.doerId };
+      if (dto.campaignId && dto.campaignId !== lead.campaignId) {
+        const targetStatuses = await this.database.db
+          .select({ id: campaignStatuses.id, campaignId: campaignStatuses.campaignId })
+          .from(campaignStatuses)
+          .where(eq(campaignStatuses.campaignId, dto.campaignId));
+
+        transferPayload = getTransferUpdatePayload(
+          transferPayload,
+          lead.campaignId,
+          lead.statusId || undefined,
+          targetStatuses,
+        );
+      }
+
+      if (transferPayload.campaignId !== undefined) {
+        const [targetCampaign] = await this.database.db
+          .select({ id: campaigns.id })
+          .from(campaigns)
+          .where(eq(campaigns.id, transferPayload.campaignId))
+          .limit(1);
+        if (!targetCampaign) {
+          throw new NotFoundException('Campaign not found');
+        }
+        allowedFields.campaignId = transferPayload.campaignId;
+      }
+      if (transferPayload.doerId !== undefined) allowedFields.doerId = transferPayload.doerId;
+      if (transferPayload.statusId !== undefined) allowedFields.statusId = transferPayload.statusId;
     }
     allowedFields.updatedAt = new Date();
     const [updated] = await this.database.db

@@ -57,6 +57,15 @@ const settingsService = {
     }
   },
 
+  async uploadLogo(file: File): Promise<{ fileName: string; url: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await axiosInstance.post('/settings/logo/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
   async testSetting(key: string): Promise<{ success: boolean; message: string; lastTestedAt: string }> {
     const response = await axiosInstance.post(`/settings/${key}/test`);
     return response.data;

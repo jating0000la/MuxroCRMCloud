@@ -28,6 +28,7 @@ export default function CampaignDetailPage() {
   const { user } = useAuth();
   const { syncWithDelay } = useNotifications();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [forms, setForms] = useState<Form[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -37,6 +38,11 @@ export default function CampaignDetailPage() {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [showFormBuilder, setShowFormBuilder] = useState(false);
   const [showAssignUsers, setShowAssignUsers] = useState(false);
+  const [showTransferLead, setShowTransferLead] = useState(false);
+  const [transferLead, setTransferLead] = useState<Lead | null>(null);
+  const [transferCampaignId, setTransferCampaignId] = useState('');
+  const [transferDoerId, setTransferDoerId] = useState('');
+  const [transferringLead, setTransferringLead] = useState(false);
   const [assignUserIds, setAssignUserIds] = useState<string[]>([]);
   const [assigningUsers, setAssigningUsers] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -56,9 +62,6 @@ export default function CampaignDetailPage() {
   const [bulkStatusId, setBulkStatusId] = useState('');
   const [bulkDoerId, setBulkDoerId] = useState('');
   const [bulkProcessing, setBulkProcessing] = useState(false);
-
-  // Inline status update
-  const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null);
 
   // Status management
   const [newStatusLabel, setNewStatusLabel] = useState('');
@@ -91,26 +94,6 @@ export default function CampaignDetailPage() {
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [showFormBuilder, showBulkImport, showAssignUsers, editingCampaign, selectedLead]);
-
-  // Inline status update
-  const handleInlineStatusUpdate = async (leadId: string, statusId: string) => {
-    setUpdatingLeadId(leadId);
-    try {
-      await leadService.updateStatus(leadId, { status: statusId, statusId });
-      setLeads((prev) =>
-        prev.map((l) =>
-          l.id === leadId
-            ? { ...l, statusId, status: campaign?.statuses?.find((s) => s.id === statusId) || l.status }
-            : l
-        )
-      );
-      toast.success('Status updated');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to update status');
-    } finally {
-      setUpdatingLeadId(null);
-    }
-  };
 
   // Bulk actions
   const toggleLeadSelection = (leadId: string) => {
@@ -166,13 +149,15 @@ export default function CampaignDetailPage() {
 
   const loadData = async () => {
     try {
-      const [campaignData, leadsData, formsData, assignedUsers] = await Promise.all([
+      const [campaignData, leadsData, formsData, assignedUsers, allCampaigns] = await Promise.all([
         campaignService.getOne(id!),
         leadService.getByCampaign(id!),
         formService.getByCampaign(id!),
         campaignService.getAssignedUsers(id!),
+        campaignService.getAll(),
       ]);
       setCampaign(campaignData);
+      setCampaigns(allCampaigns);
       setLeads(leadsData);
       setForms(formsData);
       setUsers(assignedUsers.map((au: any) => au.user!).filter(Boolean));
@@ -284,12 +269,37 @@ export default function CampaignDetailPage() {
     }
   };
 
-    const openAssignUsers = () => {
-      setAssignUserIds(users.map((assignedUser) => assignedUser.id));
-      setShowAssignUsers(true);
-    };
+  const openAssignUsers = () => {
+    setAssignUserIds(users.map((assignedUser) => assignedUser.id));
+    setShowAssignUsers(true);
+  };
 
-    const toggleAssignUser = (userId: string) => {
+  const openTransferLead = (lead: Lead) => {
+    setTransferLead(lead);
+    setTransferCampaignId('');
+    setTransferDoerId('');
+    setShowTransferLead(true);
+  };
+
+  const handleTransferLead = async () => {
+    if (!transferLead || !transferCampaignId || !transferDoerId) return;
+    setTransferringLead(true);
+    try {
+      await leadService.update(transferLead.id, { campaignId: transferCampaignId, doerId: transferDoerId } as any);
+      toast.success(`Lead transferred to ${campaign?.name || 'selected campaign'}`);
+      setShowTransferLead(false);
+      setTransferLead(null);
+      setTransferCampaignId('');
+      setTransferDoerId('');
+      loadData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to transfer lead');
+    } finally {
+      setTransferringLead(false);
+    }
+  };
+
+  const toggleAssignUser = (userId: string) => {
       setAssignUserIds((prev) =>
         prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
       );
@@ -647,23 +657,19 @@ export default function CampaignDetailPage() {
                           {lead.doer?.name || <span className="text-gray-400 italic">Unassigned</span>}
                         </td>
                         <td className="px-3 py-2.5">
-                          {updatingLeadId === lead.id ? (
-                            <span className="text-xs text-gray-400">Saving...</span>
-                          ) : (
-                            <select
-                              value={lead.statusId || ''}
-                              onChange={(e) => e.target.value && handleInlineStatusUpdate(lead.id, e.target.value)}
-                              className="text-xs px-2 py-1 rounded-full border-0 focus:ring-2 focus:ring-primary-500 cursor-pointer"
+                          {lead.status ? (
+                            <span
+                              className="inline-flex max-w-[120px] truncate rounded-full px-2 py-1 text-xs font-medium"
                               style={{
-                                backgroundColor: (lead.status?.color || '#9CA3AF') + '20',
-                                color: lead.status?.color || '#9CA3AF',
+                                backgroundColor: (lead.status.color || '#9CA3AF') + '20',
+                                color: lead.status.color || '#9CA3AF',
                               }}
+                              title={lead.status.label}
                             >
-                              <option value="">No status</option>
-                              {campaign.statuses?.map((s) => (
-                                <option key={s.id} value={s.id}>{s.label}</option>
-                              ))}
-                            </select>
+                              {lead.status.label}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400 dark:text-gray-500">No status</span>
                           )}
                         </td>
                         <td className="px-3 py-2.5">
@@ -677,12 +683,39 @@ export default function CampaignDetailPage() {
                           </span>
                         </td>
                         <td className="px-3 py-2.5">
-                          <button
-                            onClick={() => setSelectedLead(lead)}
-                            className="text-primary-600 hover:text-primary-700 text-sm font-medium"
-                          >
-                            View Details
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setSelectedLead(lead)}
+                              className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                            >
+                              View Details
+                            </button>
+                            {canManage && (
+                              <>
+                                <button
+                                  onClick={() => openTransferLead(lead)}
+                                  className="text-sm font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                                >
+                                  Transfer
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm(`Delete lead "${lead.name}"?`)) return;
+                                    try {
+                                      await leadService.remove(lead.id);
+                                      toast.success('Lead deleted');
+                                      loadData();
+                                    } catch (error: any) {
+                                      toast.error(error.response?.data?.message || 'Failed to delete lead');
+                                    }
+                                  }}
+                                  className="text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                                >
+                                  Delete
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1229,6 +1262,77 @@ export default function CampaignDetailPage() {
                 onSubmit={editingForm ? handleUpdateForm : handleCreateForm}
                 onCancel={() => { setShowFormBuilder(false); setEditingForm(null); }}
               />
+            </div>
+          </div>
+        )}
+
+        {/* Transfer Lead Modal */}
+        {showTransferLead && transferLead && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl dark:bg-gray-800">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Transfer Lead</h2>
+                  <button onClick={() => { setShowTransferLead(false); setTransferLead(null); setTransferCampaignId(''); setTransferDoerId(''); }} aria-label="Close" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Lead</label>
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-300">
+                      {transferLead.name}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Destination Campaign</label>
+                    <select
+                      value={transferCampaignId}
+                      onChange={(e) => setTransferCampaignId(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                    >
+                      <option value="">Select campaign</option>
+                      {campaigns.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Assigned User</label>
+                    <select
+                      value={transferDoerId}
+                      onChange={(e) => setTransferDoerId(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                    >
+                      <option value="">Select user</option>
+                      {allUsers.map((u) => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => { setShowTransferLead(false); setTransferLead(null); setTransferCampaignId(''); setTransferDoerId(''); }}
+                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleTransferLead}
+                    disabled={transferringLead || !transferCampaignId || !transferDoerId}
+                    className="px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {transferringLead ? 'Transferring...' : 'Transfer Lead'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

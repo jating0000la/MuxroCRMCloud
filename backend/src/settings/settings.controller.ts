@@ -11,8 +11,18 @@ import {
   HttpStatus,
   Query,
   MethodNotAllowedException,
+  BadRequestException,
+  Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
+import { mkdir, writeFile } from 'fs/promises';
+import { existsSync } from 'fs';
+import { extname, join, basename } from 'path';
+import { randomUUID } from 'crypto';
 import { SettingsService } from './settings.service';
 import { CreateSettingDto, UpdateSettingDto, SettingResponseDto } from './dto/setting.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -75,6 +85,50 @@ export class SettingsController {
   @ApiOperation({ summary: 'Get audit log for setting (Admin only)' })
   async getAuditLog(@Param('key') key: string): Promise<any[]> {
     return this.settingsService.getAuditLog(key);
+  }
+
+  @Post('logo/upload')
+  @UseInterceptors(FileInterceptor('file', {
+    fileFilter: (_req, file, cb) => {
+      const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
+      if (allowed.includes(file.mimetype)) {
+        cb(null, true);
+        return;
+      }
+      cb(new BadRequestException('Only PNG, JPG, JPEG, WebP, and SVG files are allowed'), false);
+    },
+  }))
+  @ApiOperation({ summary: 'Upload a company logo to the repository' })
+  async uploadLogo(@UploadedFile() file: Express.Multer.File) {
+    if (!file?.buffer) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const uploadDir = join(process.cwd(), 'uploads', 'logos');
+    await mkdir(uploadDir, { recursive: true });
+
+    const extension = extname(file.originalname) || '.png';
+    const fileName = `${Date.now()}-${randomUUID()}${extension}`;
+    const filePath = join(uploadDir, fileName);
+    await writeFile(filePath, file.buffer);
+
+    return {
+      fileName,
+      url: `/api/v1/settings/logo/${fileName}`,
+    };
+  }
+
+  @Get('logo/:filename')
+  @ApiOperation({ summary: 'Serve a company logo from the repository' })
+  async getLogo(@Param('filename') filename: string, @Res() res: Response) {
+    const safeName = basename(filename);
+    const filePath = join(process.cwd(), 'uploads', 'logos', safeName);
+
+    if (!existsSync(filePath)) {
+      throw new BadRequestException('Logo not found');
+    }
+
+    res.sendFile(filePath);
   }
 
   @Post('/:key/test')
