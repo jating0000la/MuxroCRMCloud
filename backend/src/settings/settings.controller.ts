@@ -28,6 +28,7 @@ import { CreateSettingDto, UpdateSettingDto, SettingResponseDto } from './dto/se
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('Settings')
 @ApiBearerAuth()
@@ -119,6 +120,7 @@ export class SettingsController {
   }
 
   @Get('logo/:filename')
+  @Public()
   @ApiOperation({ summary: 'Serve a company logo from the repository' })
   async getLogo(@Param('filename') filename: string, @Res() res: Response) {
     const safeName = basename(filename);
