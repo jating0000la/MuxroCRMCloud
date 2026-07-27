@@ -10,6 +10,15 @@ export const DEFAULT_BRANDING: BrandingConfig = {
   appLogoUrl: '',
 };
 
+const toAbsoluteLogoUrl = (value: string): string => {
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith('/')) {
+    return `${window.location.origin}${value}`;
+  }
+  return value;
+};
+
 export const readBranding = (): BrandingConfig => {
   try {
     const raw = localStorage.getItem(BRANDING_STORAGE_KEY);
@@ -17,7 +26,7 @@ export const readBranding = (): BrandingConfig => {
     const parsed = JSON.parse(raw);
     return {
       appName: (parsed?.appName || DEFAULT_BRANDING.appName).toString(),
-      appLogoUrl: (parsed?.appLogoUrl || '').toString(),
+      appLogoUrl: toAbsoluteLogoUrl((parsed?.appLogoUrl || '').toString()),
     };
   } catch {
     return DEFAULT_BRANDING;
@@ -34,6 +43,6 @@ export const brandingFromSettings = (settings: Array<{ key: string; value: strin
 
   return {
     appName: (appNameSetting || DEFAULT_BRANDING.appName).toString(),
-    appLogoUrl: (appLogoSetting || '').toString(),
+    appLogoUrl: toAbsoluteLogoUrl((appLogoSetting || '').toString()),
   };
 };
