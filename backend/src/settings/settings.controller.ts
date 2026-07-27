@@ -12,23 +12,19 @@ import {
   Query,
   MethodNotAllowedException,
   BadRequestException,
-  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Response } from 'express';
 import { mkdir, writeFile } from 'fs/promises';
-import { existsSync } from 'fs';
-import { extname, join, basename } from 'path';
+import { extname, join } from 'path';
 import { randomUUID } from 'crypto';
 import { SettingsService } from './settings.service';
 import { CreateSettingDto, UpdateSettingDto, SettingResponseDto } from './dto/setting.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('Settings')
 @ApiBearerAuth()
@@ -115,22 +111,8 @@ export class SettingsController {
 
     return {
       fileName,
-      url: `/api/v1/settings/logo/${fileName}`,
+      url: `/logo/${fileName}`,
     };
-  }
-
-  @Get('logo/:filename')
-  @Public()
-  @ApiOperation({ summary: 'Serve a company logo from the repository' })
-  async getLogo(@Param('filename') filename: string, @Res() res: Response) {
-    const safeName = basename(filename);
-    const filePath = join(process.cwd(), 'uploads', 'logos', safeName);
-
-    if (!existsSync(filePath)) {
-      throw new BadRequestException('Logo not found');
-    }
-
-    res.sendFile(filePath);
   }
 
   @Post('/:key/test')

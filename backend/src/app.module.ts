@@ -17,6 +17,7 @@ import { SettingsModule } from './settings/settings.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { HealthController } from './health.controller';
 import { AdminDashboardController } from './admin-dashboard.controller';
+import { LogoController } from './logo.controller';
 
 // New infrastructure modules
 import { JobModule } from './jobs/job.module';
@@ -58,7 +59,7 @@ import { StructuredLoggingMiddleware } from './common/logging/structured-logging
     BackupModule,
     DataExportModule,
   ],
-  controllers: [HealthController, AdminDashboardController],
+  controllers: [HealthController, AdminDashboardController, LogoController],
   providers: [
     {
       provide: APP_GUARD,
