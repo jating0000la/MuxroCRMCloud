@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { eq, and, asc, inArray } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
 import { leads, followups, campaignStatuses } from '../db/schema';
@@ -6,8 +6,12 @@ import { parse } from 'csv-parse/sync';
 import { BulkLeadRowSchema, sanitizeJson } from '../common/validation';
 import { RoundRobinService } from '../common/services/round-robin.service';
 
+const BATCH_SIZE = 200; // Rows per batch to avoid PostgreSQL 65,535 bind parameter limit
+
 @Injectable()
 export class BulkImportService {
+  private readonly logger = new Logger(BulkImportService.name);
+
   constructor(
     private database: DatabaseService,
     private roundRobinService: RoundRobinService,
@@ -28,6 +32,8 @@ export class BulkImportService {
     if (records.length === 0) {
       throw new BadRequestException('CSV file is empty');
     }
+
+    this.logger.log(`CSV parsed: ${records.length} rows found`);
 
     const validatedRecords: any[] = [];
     for (let i = 0; i < records.length; i++) {
@@ -56,29 +62,57 @@ export class BulkImportService {
       .orderBy(asc(campaignStatuses.order))
       .limit(1);
 
-    // Batch insert — use .returning() to get only the newly inserted lead IDs
-    const newLeads = await this.database.db.insert(leads).values(
-      validatedRecords.map((record) => ({
-        campaignId,
-        name: record.name,
-        email: record.email || null,
-        phone: record.phone || null,
-        source: 'bulk',
-        customData: record.customData,
-        statusId: firstStatus?.id || null,
-      })),
-    ).returning();
+    // Insert in batches to avoid PostgreSQL 65,535 bind parameter limit
+    const allNewLeads: any[] = [];
+    const totalBatches = Math.ceil(validatedRecords.length / BATCH_SIZE);
 
-    if (allocateRoundRobin && newLeads.length > 0) {
-      await this.roundRobinService.allocateRoundRobin(campaignId, newLeads.map((l) => l.id));
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const start = batchIndex * BATCH_SIZE;
+      const end = Math.min(start + BATCH_SIZE, validatedRecords.length);
+      const batch = validatedRecords.slice(start, end);
+
+      this.logger.log(`Inserting batch ${batchIndex + 1}/${totalBatches} (${batch.length} rows)`);
+
+      const newLeads = await this.database.db.insert(leads).values(
+        batch.map((record) => ({
+          campaignId,
+          name: record.name,
+          email: record.email || null,
+          phone: record.phone || null,
+          source: 'bulk',
+          customData: record.customData,
+          statusId: firstStatus?.id || null,
+        })),
+      ).returning();
+
+      allNewLeads.push(...newLeads);
+    }
+
+    this.logger.log(`Total leads inserted: ${allNewLeads.length}`);
+
+    if (allocateRoundRobin && allNewLeads.length > 0) {
+      // Allocate round-robin in batches too
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const start = batchIndex * BATCH_SIZE;
+        const end = Math.min(start + BATCH_SIZE, allNewLeads.length);
+        const batchLeadIds = allNewLeads.slice(start, end).map((l) => l.id);
+        await this.roundRobinService.allocateRoundRobin(campaignId, batchLeadIds);
+      }
     }
 
     // Re-fetch new leads to get updated doerId after allocation
-    const newLeadIds = newLeads.map((l) => l.id);
-    const updatedLeads = await this.database.db
-      .select()
-      .from(leads)
-      .where(inArray(leads.id, newLeadIds));
+    const allNewLeadIds = allNewLeads.map((l) => l.id);
+    const updatedLeads: any[] = [];
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const start = batchIndex * BATCH_SIZE;
+      const end = Math.min(start + BATCH_SIZE, allNewLeadIds.length);
+      const batchIds = allNewLeadIds.slice(start, end);
+      const batch = await this.database.db
+        .select()
+        .from(leads)
+        .where(inArray(leads.id, batchIds));
+      updatedLeads.push(...batch);
+    }
 
     // Batch create followups for newly imported leads only
     const statusLabel = firstStatus?.label || 'New';
@@ -91,12 +125,18 @@ export class BulkImportService {
         remarks: 'Imported via bulk upload',
       }));
 
-    if (followupData.length > 0) {
-      await this.database.db.insert(followups).values(followupData);
+    // Insert followups in batches too
+    for (let batchIndex = 0; batchIndex < Math.ceil(followupData.length / BATCH_SIZE); batchIndex++) {
+      const start = batchIndex * BATCH_SIZE;
+      const end = Math.min(start + BATCH_SIZE, followupData.length);
+      const batch = followupData.slice(start, end);
+      if (batch.length > 0) {
+        await this.database.db.insert(followups).values(batch);
+      }
     }
 
     return {
-      imported: newLeads.length,
+      imported: allNewLeads.length,
       total: validatedRecords.length,
       leads: updatedLeads,
     };
@@ -130,28 +170,51 @@ export class BulkImportService {
       .orderBy(asc(campaignStatuses.order))
       .limit(1);
 
-    // Batch insert — use .returning() to get only the newly inserted lead IDs
-    const newLeads = await this.database.db.insert(leads).values(
-      validatedRecords.map((record) => ({
-        campaignId,
-        name: record.name,
-        email: record.email || null,
-        phone: record.phone || null,
-        source: 'bulk',
-        customData: record.customData,
-        statusId: firstStatus?.id || null,
-      })),
-    ).returning();
+    // Insert in batches to avoid PostgreSQL 65,535 bind parameter limit
+    const allNewLeads: any[] = [];
+    const totalBatches = Math.ceil(validatedRecords.length / BATCH_SIZE);
 
-    if (allocateRoundRobin && newLeads.length > 0) {
-      await this.roundRobinService.allocateRoundRobin(campaignId, newLeads.map((l) => l.id));
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const start = batchIndex * BATCH_SIZE;
+      const end = Math.min(start + BATCH_SIZE, validatedRecords.length);
+      const batch = validatedRecords.slice(start, end);
+
+      const newLeads = await this.database.db.insert(leads).values(
+        batch.map((record) => ({
+          campaignId,
+          name: record.name,
+          email: record.email || null,
+          phone: record.phone || null,
+          source: 'bulk',
+          customData: record.customData,
+          statusId: firstStatus?.id || null,
+        })),
+      ).returning();
+
+      allNewLeads.push(...newLeads);
     }
 
-    const newLeadIds = newLeads.map((l) => l.id);
-    const updatedLeads = await this.database.db
-      .select()
-      .from(leads)
-      .where(inArray(leads.id, newLeadIds));
+    if (allocateRoundRobin && allNewLeads.length > 0) {
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const start = batchIndex * BATCH_SIZE;
+        const end = Math.min(start + BATCH_SIZE, allNewLeads.length);
+        const batchLeadIds = allNewLeads.slice(start, end).map((l) => l.id);
+        await this.roundRobinService.allocateRoundRobin(campaignId, batchLeadIds);
+      }
+    }
+
+    const allNewLeadIds = allNewLeads.map((l) => l.id);
+    const updatedLeads: any[] = [];
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const start = batchIndex * BATCH_SIZE;
+      const end = Math.min(start + BATCH_SIZE, allNewLeadIds.length);
+      const batchIds = allNewLeadIds.slice(start, end);
+      const batch = await this.database.db
+        .select()
+        .from(leads)
+        .where(inArray(leads.id, batchIds));
+      updatedLeads.push(...batch);
+    }
 
     const statusLabel = firstStatus?.label || 'New';
     const followupData = updatedLeads
@@ -163,13 +226,18 @@ export class BulkImportService {
         remarks: 'Imported via bulk upload',
       }));
 
-    if (followupData.length > 0) {
-      await this.database.db.insert(followups).values(followupData);
+    for (let batchIndex = 0; batchIndex < Math.ceil(followupData.length / BATCH_SIZE); batchIndex++) {
+      const start = batchIndex * BATCH_SIZE;
+      const end = Math.min(start + BATCH_SIZE, followupData.length);
+      const batch = followupData.slice(start, end);
+      if (batch.length > 0) {
+        await this.database.db.insert(followups).values(batch);
+      }
     }
 
     return {
-      imported: newLeads.length,
-      total: data.length,
+      imported: allNewLeads.length,
+      total: validatedRecords.length,
       leads: updatedLeads,
     };
   }

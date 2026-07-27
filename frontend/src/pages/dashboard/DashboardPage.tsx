@@ -375,9 +375,9 @@ export default function DashboardPage() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v) => format(new Date(v), 'MMM d')} />
+                    <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v) => format(new Date(String(v)), 'MMM d')} />
                     <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip labelFormatter={(v) => format(new Date(v), 'MMM d, yyyy')} />
+                    <Tooltip labelFormatter={(v) => format(new Date(String(v)), 'MMM d, yyyy')} />
                     <Legend />
                     <Area type="monotone" dataKey="newLeads" name="New Leads" stroke="#3b82f6" fill="url(#colorNewLeads)" strokeWidth={2} />
                     <Area type="monotone" dataKey="convertedLeads" name="Converted" stroke="#22c55e" fill="url(#colorConverted)" strokeWidth={2} />

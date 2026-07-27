@@ -2,6 +2,7 @@ import {
   Controller, Post, Param, Body, UseGuards, UploadedFile, UseInterceptors, BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import 'multer';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { BulkImportService } from './bulk-import.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -19,8 +20,8 @@ export class BulkImportController {
 
   @Post('csv')
   @Roles('ADMIN')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
-  @ApiOperation({ summary: 'Import leads from CSV file (max 5MB)' })
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
+  @ApiOperation({ summary: 'Import leads from CSV file (max 50MB)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
