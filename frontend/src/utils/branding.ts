@@ -13,6 +13,7 @@ export const DEFAULT_BRANDING: BrandingConfig = {
 const toAbsoluteLogoUrl = (value: string): string => {
   if (!value) return '';
   if (/^https?:\/\//i.test(value)) return value;
+
   if (value.startsWith('/')) {
     return `${window.location.origin}${value}`;
   }

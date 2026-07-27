@@ -14,12 +14,14 @@ import {
   BadRequestException,
   UploadedFile,
   UseInterceptors,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { mkdir, writeFile } from 'fs/promises';
 import { extname, join } from 'path';
 import { randomUUID } from 'crypto';
+import { Request } from 'express';
 import { SettingsService } from './settings.service';
 import { CreateSettingDto, UpdateSettingDto, SettingResponseDto } from './dto/setting.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -96,7 +98,7 @@ export class SettingsController {
     },
   }))
   @ApiOperation({ summary: 'Upload a company logo to the repository' })
-  async uploadLogo(@UploadedFile() file: Express.Multer.File) {
+  async uploadLogo(@UploadedFile() file: Express.Multer.File, @Req() req: Request) {
     if (!file?.buffer) {
       throw new BadRequestException('No file uploaded');
     }
@@ -109,9 +111,11 @@ export class SettingsController {
     const filePath = join(uploadDir, fileName);
     await writeFile(filePath, file.buffer);
 
+    const origin = `${req.protocol}://${req.get('host')}`;
+
     return {
       fileName,
-      url: `/logo/${fileName}`,
+      url: `${origin}/api/v1/logo/${fileName}`,
     };
   }
 
