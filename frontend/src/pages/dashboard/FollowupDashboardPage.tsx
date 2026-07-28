@@ -220,48 +220,49 @@ export default function FollowupDashboardPage() {
 
   // Missed: nextCallDate < twoHoursAgo
   const activeCampaignIds = useMemo(() => new Set(campaigns.filter((c) => c.isActive).map((c) => c.id)), [campaigns]);
+  const campaignsLoaded = campaigns.length > 0;
 
   const missedCount = useMemo(() => {
     return leads.filter((l) => {
-      if (!activeCampaignIds.has(l.campaignId)) return false;
+      if (campaignsLoaded && !activeCampaignIds.has(l.campaignId)) return false;
       const next = l.followups?.[0]?.nextCallDate;
       if (!next) return false;
       const nextDate = new Date(next);
       return isBefore(nextDate, twoHoursAgo) && !(l.status?.label || '').toLowerCase().includes('completed');
     }).length;
-  }, [leads, activeCampaignIds]);
+  }, [leads, activeCampaignIds, campaignsLoaded]);
 
   // Pending: nextCallDate > twoHoursAgo AND nextCallDate < now
   const dueCount = useMemo(() => {
     const now = new Date();
     return leads.filter((l) => {
-      if (!activeCampaignIds.has(l.campaignId)) return false;
+      if (campaignsLoaded && !activeCampaignIds.has(l.campaignId)) return false;
       const next = l.followups?.[0]?.nextCallDate;
       if (!next) return false;
       const nextDate = new Date(next);
       return isAfter(nextDate, twoHoursAgo) && isBefore(nextDate, now) && !(l.status?.label || '').toLowerCase().includes('completed');
     }).length;
-  }, [leads, activeCampaignIds]);
+  }, [leads, activeCampaignIds, campaignsLoaded]);
 
   const todayCount = useMemo(() => {
     return leads.filter((l) => {
-      if (!activeCampaignIds.has(l.campaignId)) return false;
+      if (campaignsLoaded && !activeCampaignIds.has(l.campaignId)) return false;
       const next = l.followups?.[0]?.nextCallDate;
       return next && isToday(new Date(next)) && !(l.status?.label || '').toLowerCase().includes('completed');
     }).length;
-  }, [leads, activeCampaignIds]);
+  }, [leads, activeCampaignIds, campaignsLoaded]);
 
   const upcomingCount = useMemo(() => {
     const now = new Date();
     const tenMinutesFromNow = addMinutes(now, 10);
     return leads.filter((l) => {
-      if (!activeCampaignIds.has(l.campaignId)) return false;
+      if (campaignsLoaded && !activeCampaignIds.has(l.campaignId)) return false;
       const next = l.followups?.[0]?.nextCallDate;
       if (!next) return false;
       const nextDate = new Date(next);
       return isAfter(nextDate, now) && isBefore(nextDate, tenMinutesFromNow) && !(l.status?.label || '').toLowerCase().includes('completed');
     }).length;
-  }, [leads, activeCampaignIds]);
+  }, [leads, activeCampaignIds, campaignsLoaded]);
 
   const getUrgencyScore = useCallback((lead: Lead) => {
     const notif = notifications.find((n) => n.followupId === lead.followups?.[0]?.id);
@@ -286,7 +287,7 @@ export default function FollowupDashboardPage() {
 
     return leads
       .filter((lead) => {
-        if (!activeCampaignIds.has(lead.campaignId)) return false;
+        if (campaignsLoaded && !activeCampaignIds.has(lead.campaignId)) return false;
         if (search) {
           const q = search.toLowerCase();
           const matchName = lead.name.toLowerCase().includes(q);
@@ -332,7 +333,7 @@ export default function FollowupDashboardPage() {
         }
         return sortDir === 'asc' ? cmp : -cmp;
       });
-  }, [leads, activeCampaignIds, search, sourceFilter, dndFilter, dueFilter, statusFilter, sortField, sortDir, getUrgencyScore]);
+  }, [leads, activeCampaignIds, campaignsLoaded, search, sourceFilter, dndFilter, dueFilter, statusFilter, sortField, sortDir, getUrgencyScore]);
 
   const totalPages = Math.max(1, Math.ceil(filteredLeads.length / pageSize));
   const currentPage = Math.min(page, totalPages);
