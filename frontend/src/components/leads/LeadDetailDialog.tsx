@@ -1,12 +1,18 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import RemarkRenderer from './RemarkRenderer';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Lead, CampaignStatus, Followup } from '../../types';
 import { leadService } from '../../services/leads';
 import { followupService } from '../../services/followups';
+import whatsappService from '../../services/whatsapp';
 import integrationService from '../../services/integrations';
 import { useAuth } from '../../context/AuthContext';
-import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import LeadHistoryTimeline from './timeline/LeadHistoryTimeline';
+import {
+  TimelineEvent,
+  whatsappMessageToEvent,
+  followupToStatusEvent,
+  crossCampaignToEvent,
+} from './timeline/types';
 
 interface Props {
   leadId: string;
@@ -31,6 +37,10 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
   const [submitting, setSubmitting] = useState(false);
   const [sendWhatsapp, setSendWhatsapp] = useState(false);
 
+  // WhatsApp messages
+  const [whatsappMessages, setWhatsappMessages] = useState<any[]>([]);
+  const [loadingWhatsApp, setLoadingWhatsApp] = useState(false);
+
   // Cross-campaign history
   const [crossCampaignFollowups, setCrossCampaignFollowups] = useState<any[]>([]);
   const [loadingCross, setLoadingCross] = useState(false);
@@ -45,6 +55,18 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
       setFollowups(followupsData);
       if (leadData.statusId) setStatusId(leadData.statusId);
       setDnd(leadData.dnd || false);
+
+      // Load WhatsApp messages
+      if (leadData.phone) {
+        setLoadingWhatsApp(true);
+        try {
+          const messages = await whatsappService.getChatMessages(leadData.phone, 200, 0);
+          setWhatsappMessages(messages || []);
+        } catch {
+          // WhatsApp history is optional
+        }
+        setLoadingWhatsApp(false);
+      }
 
       // Load cross-campaign history
       if (leadData.phone || leadData.email) {
@@ -134,16 +156,39 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
     'Request sent via email',
   ];
 
-  const handleDeleteFollowup = async (followupId: string) => {
-    if (!confirm('Delete this followup record?')) return;
-    try {
-      await followupService.remove(followupId);
-      toast.success('Followup deleted');
-      setFollowups((prev) => prev.filter((f) => f.id !== followupId));
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to delete followup');
+  // ── Unified Timeline Events ──────────────────────────────────────────────
+  const unifiedEvents: TimelineEvent[] = useMemo(() => {
+    const result: TimelineEvent[] = [];
+    const campaignName = lead?.campaign?.name || 'Campaign';
+
+    // WhatsApp messages
+    for (const msg of whatsappMessages) {
+      result.push(whatsappMessageToEvent(msg, campaignName));
     }
-  };
+
+    // Current campaign followups (sorted ascending for oldStatus computation)
+    const sortedFollowups = [...followups].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+    for (let i = 0; i < sortedFollowups.length; i++) {
+      const prevStatus = i > 0 ? sortedFollowups[i - 1].status : null;
+      result.push(
+        followupToStatusEvent(
+          sortedFollowups[i],
+          campaignName,
+          lead?.campaignId || '',
+          prevStatus,
+        ),
+      );
+    }
+
+    // Cross-campaign followups
+    for (const cc of crossCampaignFollowups) {
+      result.push(crossCampaignToEvent(cc));
+    }
+
+    return result;
+  }, [whatsappMessages, followups, crossCampaignFollowups, lead]);
 
   // Escape key and focus trap
   useEffect(() => {
@@ -304,104 +349,13 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
             </div>
           )}
 
-          {/* History Tab */}
+          {/* History Tab — Enterprise Timeline */}
           {activeTab === 'history' && (
             <div className="p-5">
-              {followups.length === 0 && crossCampaignFollowups.length === 0 ? (
-                <div className="text-center py-8">
-                  <svg className="w-10 h-10 text-gray-400 dark:text-gray-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-gray-500 dark:text-gray-400">No history yet</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Current campaign history */}
-                  {followups.length > 0 && (
-                    <div>
-                      <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">This Campaign</h4>
-                      <div className="space-y-4">
-                        {followups.map((item, index) => (
-                          <div key={item.id} className="relative pl-6 pb-4">
-                            {index < followups.length - 1 && (
-                              <div className="absolute left-2 top-3 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700" />
-                            )}
-                            <div className="absolute left-0 top-1.5 w-4 h-4 rounded-full bg-primary-100 dark:bg-primary-900/30 border-2 border-primary-500 dark:border-primary-400" />
-                            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.status}</span>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {format(new Date(item.createdAt), 'MMM d, h:mm a')}
-                                  </span>
-                                  {canSendWhatsapp && (
-                                    <button
-                                      onClick={() => handleDeleteFollowup(item.id)}
-                                      className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                                      title="Delete followup"
-                                    >
-                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                      </svg>
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                              {item.remarks && (
-                                <RemarkRenderer remarks={item.remarks} />
-                              )}
-                              {item.nextCallDate && (
-                                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-                                  Next call: {format(new Date(item.nextCallDate), 'MMM d, h:mm a')}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Cross-campaign history */}
-                  {crossCampaignFollowups.length > 0 && (
-                    <div>
-                      <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">
-                        Other Campaigns ({crossCampaignFollowups.length})
-                      </h4>
-                      {loadingCross ? (
-                        <p className="text-sm text-gray-400">Loading...</p>
-                      ) : (
-                        <div className="space-y-4">
-                          {crossCampaignFollowups.map((item, index) => (
-                            <div key={item.id} className="relative pl-6 pb-4">
-                              {index < crossCampaignFollowups.length - 1 && (
-                                <div className="absolute left-2 top-3 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700" />
-                              )}
-                              <div className="absolute left-0 top-1.5 w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-900/30 border-2 border-orange-500 dark:border-orange-400" />
-                              <div className="bg-orange-50 dark:bg-orange-900/10 rounded-lg p-3 border border-orange-200 dark:border-orange-800">
-                                <div className="flex items-center justify-between mb-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.status}</span>
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 font-medium">
-                                      {item.lead?.campaign?.name || 'Other Campaign'}
-                                    </span>
-                                  </div>
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {format(new Date(item.createdAt), 'MMM d, h:mm a')}
-                                  </span>
-                                </div>
-                                {item.remarks && (
-                                  <RemarkRenderer remarks={item.remarks} />
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
+              <LeadHistoryTimeline
+                events={unifiedEvents}
+                loading={loading || loadingWhatsApp}
+              />
             </div>
           )}
 
