@@ -107,7 +107,7 @@ export class FollowupsService {
         .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
         .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
         .leftJoin(users, eq(leads.doerId, users.id))
-        .where(and(eq(followups.userId, userId), eq(leads.campaignId, campaignId)))
+        .where(and(eq(followups.userId, userId), eq(leads.campaignId, campaignId), eq(campaigns.isActive, true)))
         .orderBy(desc(followups.createdAt))
         .offset(skip)
         .limit(take);
@@ -130,7 +130,7 @@ export class FollowupsService {
         .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
         .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
         .leftJoin(users, eq(leads.doerId, users.id))
-        .where(eq(followups.userId, userId))
+        .where(and(eq(followups.userId, userId), eq(campaigns.isActive, true)))
         .orderBy(desc(followups.createdAt))
         .offset(skip)
         .limit(take);
@@ -166,7 +166,7 @@ export class FollowupsService {
         .innerJoin(leads, eq(followups.leadId, leads.id))
         .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
         .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
-        .where(and(eq(followups.userId, userId), eq(leads.campaignId, campaignId), sql`${followups.nextCallDate} >= ${new Date()}`))
+        .where(and(eq(followups.userId, userId), eq(leads.campaignId, campaignId), eq(campaigns.isActive, true), sql`${followups.nextCallDate} >= ${new Date()}`))
         .orderBy(asc(followups.nextCallDate));
     } else {
       results = await this.database.db
@@ -185,7 +185,7 @@ export class FollowupsService {
         .innerJoin(leads, eq(followups.leadId, leads.id))
         .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
         .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
-        .where(and(eq(followups.userId, userId), sql`${followups.nextCallDate} >= ${new Date()}`))
+        .where(and(eq(followups.userId, userId), eq(campaigns.isActive, true), sql`${followups.nextCallDate} >= ${new Date()}`))
         .orderBy(asc(followups.nextCallDate));
     }
 

@@ -111,14 +111,18 @@ export class DashboardService {
     }
     if (campaignId) leadConditions.push(eq(leads.campaignId, campaignId));
 
+    // Only include leads from active campaigns
+    const campaignActiveCondition = eq(campaigns.isActive, true);
+
     const whereClause = leadConditions.length > 0 ? and(...leadConditions) : undefined;
 
-    // Count only distinct leads that have at least one followup
+    // Count only distinct leads from active campaigns that have at least one followup
     const [{ total }] = await this.database.db
       .select({ total: sql<number>`count(distinct ${leads.id})::int` })
       .from(leads)
       .innerJoin(followups, eq(leads.id, followups.leadId))
-      .where(whereClause);
+      .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
+      .where(and(campaignActiveCondition, whereClause));
 
     // Fetch distinct leads with their latest followup
     // Use a subquery approach: get leads, then separately get latest followup per lead
@@ -145,7 +149,7 @@ export class DashboardService {
       .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
       .leftJoin(users, eq(leads.doerId, users.id))
       .innerJoin(followups, eq(leads.id, followups.leadId))
-      .where(whereClause)
+      .where(and(campaignActiveCondition, whereClause))
       .groupBy(leads.id, campaigns.id, campaigns.name, campaignStatuses.id, users.id, users.name, users.username)
       .orderBy(desc(sql`max(${followups.createdAt})`))
       .offset(offset)
@@ -200,7 +204,7 @@ export class DashboardService {
   }
 
   async getAllLeadsDashboard(userId: string, role: string, campaignId?: string, page: number = 1, limit: number = 50) {
-    const conditions: any[] = [eq(leads.isDeleted, false)];
+    const conditions: any[] = [eq(leads.isDeleted, false), eq(campaigns.isActive, true)];
     if (campaignId) conditions.push(eq(leads.campaignId, campaignId));
     if (role === 'USER') conditions.push(eq(leads.doerId, userId));
 
@@ -209,6 +213,7 @@ export class DashboardService {
     const [{ total }] = await this.database.db
       .select({ total: sql<number>`count(*)::int` })
       .from(leads)
+      .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined);
 
     const results = await this.database.db
