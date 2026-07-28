@@ -2,10 +2,11 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { AxiosResponse } from 'axios';
 import { firstValueFrom } from 'rxjs';
-import { eq, and, desc, like, sql, isNull, or } from 'drizzle-orm';
+import { eq, and, desc, asc, like, sql, isNull, or } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
 import { SettingsService } from '../settings/settings.service';
-import { whatsappMessages, whatsappContacts, leads } from '../db/schema';
+import { RoundRobinService } from '../common/services/round-robin.service';
+import { whatsappMessages, whatsappContacts, leads, campaigns, followups, campaignStatuses } from '../db/schema';
 
 export interface GupshupMessageResponse {
   status: string;
@@ -22,6 +23,7 @@ export class WhatsAppService {
     private http: HttpService,
     private database: DatabaseService,
     private settingsService: SettingsService,
+    private roundRobinService: RoundRobinService,
   ) {}
 
   // ─── Config Resolution ────────────────────────────────────────────────────
@@ -370,6 +372,22 @@ export class WhatsAppService {
       // No lead found — that's fine
     }
 
+    // Auto-create lead if no existing lead and auto-campaign is configured
+    if (!leadId) {
+      try {
+        const autoCampaignId = await this.settingsService
+          .getSettingForUse('whatsappAutoCampaignId')
+          .catch(() => '');
+        if (autoCampaignId) {
+          const newLead = await this.createLeadFromWhatsApp(phone, inbound.name, autoCampaignId);
+          leadId = newLead.id;
+          campaignId = newLead.campaignId;
+        }
+      } catch (error: any) {
+        this.logger.error(`Failed to auto-create lead from WhatsApp: ${error.message}`);
+      }
+    }
+
     // Upsert contact
     await this.upsertContact(phone, inbound.name, leadId);
 
@@ -551,6 +569,68 @@ export class WhatsAppService {
       .update(whatsappMessages)
       .set(updateData)
       .where(eq(whatsappMessages.messageId, messageId));
+  }
+
+  // ─── Auto-Create Lead from WhatsApp ──────────────────────────────────────
+
+  private async createLeadFromWhatsApp(phone: string, name: string, campaignId: string) {
+    // Get campaign details
+    const [campaign] = await this.database.db
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.id, campaignId))
+      .limit(1);
+
+    if (!campaign) throw new Error('Auto-campaign not found');
+
+    // Get first status in the campaign
+    const [firstStatus] = await this.database.db
+      .select()
+      .from(campaignStatuses)
+      .where(eq(campaignStatuses.campaignId, campaignId))
+      .orderBy(asc(campaignStatuses.order))
+      .limit(1);
+
+    // Get round-robin user, fallback to campaign manager
+    let doerId: string | undefined = campaign.managerId || undefined;
+    try {
+      doerId = await this.roundRobinService.getNextRoundRobinUser(campaignId);
+    } catch {
+      // Fallback to campaign manager if round-robin has no users
+    }
+
+    const leadName = (name || phone || 'Unknown').substring(0, 255);
+
+    // Create lead and initial followup in a transaction
+    const [newLead] = await this.database.db.transaction(async (tx) => {
+      const [lead] = await tx
+        .insert(leads)
+        .values({
+          campaignId,
+          name: leadName,
+          phone,
+          source: 'whatsapp',
+          doerId: doerId || null,
+          statusId: firstStatus?.id,
+        })
+        .returning();
+
+      // Create initial followup if we have a valid userId
+      const followupUserId = doerId || campaign.managerId;
+      if (followupUserId) {
+        await tx.insert(followups).values({
+          leadId: lead.id,
+          userId: followupUserId,
+          status: firstStatus?.label || 'New',
+          remarks: 'Lead auto-created from WhatsApp inbound message',
+        });
+      }
+
+      return [lead];
+    });
+
+    this.logger.log(`Auto-created lead ${newLead.id} from WhatsApp (${phone}) in campaign ${campaignId}`);
+    return newLead;
   }
 
   // ─── Private Helpers ──────────────────────────────────────────────────────

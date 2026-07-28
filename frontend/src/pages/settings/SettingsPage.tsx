@@ -52,6 +52,7 @@ export default function SettingsPage() {
   const [gupshupAppId, setGupshupAppId] = useState('');
   const [gupshupTestPhone, setGupshupTestPhone] = useState('');
   const [gupshupWebhookUrl, setGupshupWebhookUrl] = useState('');
+  const [whatsappAutoCampaignId, setWhatsappAutoCampaignId] = useState('');
 
 
 
@@ -98,6 +99,7 @@ export default function SettingsPage() {
             case 'gupshupAppId': setGupshupAppId(setting.value); break;
             case 'gupshupTestPhone': setGupshupTestPhone(setting.value); break;
             case 'gupshupWebhookUrl': setGupshupWebhookUrl(setting.value); break;
+            case 'whatsappAutoCampaignId': setWhatsappAutoCampaignId(setting.value); break;
           }
         });
         try {
@@ -257,6 +259,7 @@ export default function SettingsPage() {
         { key: 'gupshupAppId', value: gupshupAppId },
         { key: 'gupshupTestPhone', value: gupshupTestPhone },
         { key: 'gupshupWebhookUrl', value: gupshupWebhookUrl },
+        { key: 'whatsappAutoCampaignId', value: whatsappAutoCampaignId },
       ];
       if (!isMasked(gupshupApiKey)) {
         settingsPayload.unshift({ key: 'gupshupApiKey', value: gupshupApiKey });
@@ -623,6 +626,29 @@ export default function SettingsPage() {
                   <button onClick={handleTestGupshup} disabled={testingGupshup || !gupshupApiKey || !gupshupSource || !gupshupAppName || !gupshupTestPhone} className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium">
                     {testingGupshup ? <><svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Testing...</> : 'Test Connection'}
                   </button>
+                </div>
+
+                {/* WhatsApp Lead Auto-Creation */}
+                <div className="p-5 border border-gray-200 rounded-xl dark:border-gray-600 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center dark:bg-blue-900/30">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">WhatsApp Lead Auto-Creation</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Automatically create leads from new WhatsApp conversations</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className={labelCls}>Auto-Creation Campaign</label>
+                      <select value={whatsappAutoCampaignId} onChange={(e) => setWhatsappAutoCampaignId(e.target.value)} className={inputCls}>
+                        <option value="">Disabled — No auto-creation</option>
+                        {campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                      <p className={hintCls}>When a new customer sends a WhatsApp message, a lead will be auto-created in this campaign with round-robin assignment to telecallers.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
