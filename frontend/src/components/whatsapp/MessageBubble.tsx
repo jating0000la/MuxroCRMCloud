@@ -138,8 +138,8 @@ export default function MessageBubble({ msg }: MessageBubbleProps) {
           </div>
         </div>
 
-        {/* Hover action menu */}
-        <div ref={menuRef} className="absolute right-0 top-0 z-10">
+        {/* Hover action menu — right for received, left for sent */}
+        <div ref={menuRef} className={`absolute top-0 z-10 ${isOut ? 'left-0' : 'right-0'}`}>
           <button
             onClick={() => setShowMenu(!showMenu)}
             aria-label="Message options"
@@ -148,7 +148,7 @@ export default function MessageBubble({ msg }: MessageBubbleProps) {
             <MoreVertical className="h-4 w-4" />
           </button>
           {showMenu && (
-            <div className="absolute right-0 top-full z-50 mt-1 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl dark:border-gray-600 dark:bg-gray-800">
+            <div className={`absolute top-full z-50 mt-1 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl dark:border-gray-600 dark:bg-gray-800 ${isOut ? 'left-0' : 'right-0'}`}>
               <MenuButton icon={<Copy className="h-3.5 w-3.5" />} label="Copy" onClick={handleCopy} />
             </div>
           )}
