@@ -11,6 +11,7 @@ import {
   index,
   pgEnum,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 export const roleEnum = pgEnum('Role', ['ADMIN', 'USER']);
 
@@ -24,8 +25,8 @@ export const users = pgTable(
     email: varchar('email', { length: 255 }),
     role: roleEnum('role').notNull().default('USER'),
     isActive: boolean('isActive').notNull().default(true),
-    createdAt: timestamp('createdAt').notNull().defaultNow(),
-    updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+    createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('User_role_idx').on(table.role),
@@ -40,8 +41,8 @@ export const campaigns = pgTable(
     name: varchar('name', { length: 255 }).notNull(),
     description: varchar('description', { length: 1000 }),
     isActive: boolean('isActive').notNull().default(true),
-    createdAt: timestamp('createdAt').notNull().defaultNow(),
-    updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+    createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
     managerId: uuid('managerId').references(() => users.id),
   },
   (table) => [
@@ -61,7 +62,7 @@ export const campaignUsers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     isActive: boolean('isActive').notNull().default(true),
-    assignedAt: timestamp('assignedAt').notNull().defaultNow(),
+    assignedAt: timestamp('assignedAt', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex('CampaignUser_campaignId_userId_key').on(table.campaignId, table.userId),
@@ -99,8 +100,8 @@ export const forms = pgTable(
     fields: json('fields').default([]).$type<any[]>(),
     isPublished: boolean('isPublished').notNull().default(false),
     publicSlug: varchar('publicSlug', { length: 255 }).notNull().unique(),
-    createdAt: timestamp('createdAt').notNull().defaultNow(),
-    updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+    createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('Form_campaignId_idx').on(table.campaignId),
@@ -116,7 +117,7 @@ export const enquiries = pgTable(
       .notNull()
       .references(() => forms.id, { onDelete: 'cascade' }),
     data: json('data').notNull(),
-    submittedAt: timestamp('submittedAt').notNull().defaultNow(),
+    submittedAt: timestamp('submittedAt', { withTimezone: true }).notNull().defaultNow(),
     ipAddress: varchar('ipAddress', { length: 45 }),
   },
   (table) => [
@@ -141,9 +142,9 @@ export const leads = pgTable(
     customData: json('customData'),
     dnd: boolean('dnd').notNull().default(false),
     isDeleted: boolean('isDeleted').notNull().default(false),
-    deletedAt: timestamp('deletedAt'),
-    createdAt: timestamp('createdAt').notNull().defaultNow(),
-    updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+    deletedAt: timestamp('deletedAt', { withTimezone: true }),
+    createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
     doerId: uuid('doerId').references(() => users.id),
     statusId: uuid('statusId').references(() => campaignStatuses.id),
   },
@@ -162,6 +163,9 @@ export const leads = pgTable(
     index('Lead_campaignId_statusId_idx').on(table.campaignId, table.statusId),
     index('Lead_doerId_dnd_idx').on(table.doerId, table.dnd),
     index('Lead_isDeleted_idx').on(table.isDeleted),
+    index('Lead_isDeleted_doerId_idx')
+      .on(table.isDeleted, table.doerId)
+      .where(sql`${table.isDeleted} = false`),
   ],
 );
 
@@ -177,8 +181,8 @@ export const followups = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     status: varchar('status', { length: 255 }).notNull(),
     remarks: varchar('remarks', { length: 1000 }),
-    nextCallDate: timestamp('nextCallDate'),
-    createdAt: timestamp('createdAt').notNull().defaultNow(),
+    nextCallDate: timestamp('nextCallDate', { withTimezone: true }),
+    createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('Followup_leadId_idx').on(table.leadId),
@@ -186,6 +190,8 @@ export const followups = pgTable(
     index('Followup_nextCallDate_idx').on(table.nextCallDate),
     index('Followup_createdAt_idx').on(table.createdAt),
     index('Followup_userId_nextCallDate_idx').on(table.userId, table.nextCallDate),
+    index('Followup_userId_createdAt_idx').on(table.userId, table.createdAt),
+    index('Followup_leadId_createdAt_idx').on(table.leadId, table.createdAt),
   ],
 );
 
@@ -201,8 +207,8 @@ export const notifications = pgTable(
       .references(() => followups.id, { onDelete: 'cascade' }),
     type: varchar('type', { length: 50 }).notNull(),
     isRead: boolean('isRead').notNull().default(false),
-    createdAt: timestamp('createdAt').notNull().defaultNow(),
-    updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+    createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex('Notification_userId_followupId_key').on(table.userId, table.followupId),
@@ -219,9 +225,9 @@ export const settings = pgTable(
     key: varchar('key', { length: 255 }).notNull().unique(),
     encryptedValue: varchar('encryptedValue', { length: 2000 }).notNull(),
     isEncrypted: boolean('isEncrypted').notNull().default(true),
-    lastTestedAt: timestamp('lastTestedAt'),
-    createdAt: timestamp('createdAt').notNull().defaultNow(),
-    updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+    lastTestedAt: timestamp('lastTestedAt', { withTimezone: true }),
+    createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('Setting_updatedAt_idx').on(table.updatedAt),
@@ -240,7 +246,7 @@ export const settingAuditLogs = pgTable(
     oldValue: varchar('oldValue', { length: 2000 }),
     newValue: varchar('newValue', { length: 2000 }),
     reason: varchar('reason', { length: 500 }),
-    createdAt: timestamp('createdAt').notNull().defaultNow(),
+    createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('SettingAuditLog_settingId_idx').on(table.settingId),
@@ -282,9 +288,9 @@ export const refreshSessions = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     tokenHash: varchar('tokenHash', { length: 255 }).notNull().unique(),
-    expiresAt: timestamp('expiresAt').notNull(),
-    revokedAt: timestamp('revokedAt'),
-    createdAt: timestamp('createdAt').notNull().defaultNow(),
+    expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+    revokedAt: timestamp('revokedAt', { withTimezone: true }),
+    createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('RefreshSession_userId_idx').on(table.userId),
@@ -304,11 +310,11 @@ export const outboxEvents = pgTable(
     eventType: varchar('eventType', { length: 100 }).notNull(),
     payload: json('payload').notNull(),
     published: boolean('published').notNull().default(false),
-    publishedAt: timestamp('publishedAt'),
+    publishedAt: timestamp('publishedAt', { withTimezone: true }),
     retryCount: integer('retryCount').notNull().default(0),
     maxRetries: integer('maxRetries').notNull().default(3),
     lastError: text('lastError'),
-    createdAt: timestamp('createdAt').notNull().defaultNow(),
+    createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('OutboxEvent_published_idx').on(table.published),
@@ -334,9 +340,9 @@ export const jobLogs = pgTable(
     retryCount: integer('retryCount').notNull().default(0),
     maxRetries: integer('maxRetries').notNull().default(3),
     idempotencyKey: varchar('idempotencyKey', { length: 255 }),
-    startedAt: timestamp('startedAt'),
-    completedAt: timestamp('completedAt'),
-    createdAt: timestamp('createdAt').notNull().defaultNow(),
+    startedAt: timestamp('startedAt', { withTimezone: true }),
+    completedAt: timestamp('completedAt', { withTimezone: true }),
+    createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('JobLog_jobType_idx').on(table.jobType),
@@ -364,7 +370,7 @@ export const whatsappMessages = pgTable(
     campaignId: uuid('campaignId').references(() => campaigns.id, { onDelete: 'set null' }),
     userId: uuid('userId').references(() => users.id, { onDelete: 'set null' }),
     raw: json('raw'), // full Gupshup response payload
-    createdAt: timestamp('createdAt').notNull().defaultNow(),
+    createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('WhatsappMessage_phone_idx').on(table.phone),
@@ -386,9 +392,9 @@ export const whatsappContacts = pgTable(
     leadId: uuid('leadId').references(() => leads.id, { onDelete: 'set null' }),
     tags: varchar('tags', { length: 500 }),
     optIn: boolean('optIn').notNull().default(true),
-    lastSeen: timestamp('lastSeen'),
-    createdAt: timestamp('createdAt').notNull().defaultNow(),
-    updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+    lastSeen: timestamp('lastSeen', { withTimezone: true }),
+    createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('WhatsappContact_phone_idx').on(table.phone),

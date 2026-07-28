@@ -80,20 +80,24 @@ export default function CampaignDetailPage() {
 
   const canManage = user?.role === 'ADMIN';
 
-  // Escape key to close modals
+  // Escape key to close modals — uses refs to avoid stale closures from dependency array
+  const modalsRef = useRef({ showFormBuilder, showBulkImport, showAssignUsers, editingCampaign, selectedLead });
+  modalsRef.current = { showFormBuilder, showBulkImport, showAssignUsers, editingCampaign, selectedLead };
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (showFormBuilder) { setShowFormBuilder(false); setEditingForm(null); }
-        else if (showBulkImport) { setShowBulkImport(false); setFile(null); }
-        else if (showAssignUsers) setShowAssignUsers(false);
-        else if (editingCampaign) setEditingCampaign(false);
-        else if (selectedLead) setSelectedLead(null);
+        const m = modalsRef.current;
+        if (m.showFormBuilder) { setShowFormBuilder(false); setEditingForm(null); }
+        else if (m.showBulkImport) { setShowBulkImport(false); setFile(null); }
+        else if (m.showAssignUsers) setShowAssignUsers(false);
+        else if (m.editingCampaign) setEditingCampaign(false);
+        else if (m.selectedLead) setSelectedLead(null);
       }
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [showFormBuilder, showBulkImport, showAssignUsers, editingCampaign, selectedLead]);
+  }, []);
 
   // Bulk actions
   const toggleLeadSelection = (leadId: string) => {

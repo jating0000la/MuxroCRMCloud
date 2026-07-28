@@ -264,7 +264,7 @@ export class LeadsService {
     });
 
     // Create notification after transaction commits (best-effort, non-critical)
-    await this.notificationsService.createNotificationForFollowup(userId, followup.id);
+    await this.notificationsService.createNotificationForFollowup(userId, followup.id, followup.nextCallDate);
 
     return followup;
   }

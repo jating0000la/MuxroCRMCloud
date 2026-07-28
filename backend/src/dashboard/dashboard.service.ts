@@ -10,6 +10,13 @@ import {
   campaignUsers,
 } from '../db/schema';
 
+/** Lead columns commonly needed by the dashboard (avoids fetching large JSON blobs unnecessarily). */
+const LEAD_LIST_COLUMNS = [
+  'id', 'campaignId', 'name', 'email', 'phone', 'source',
+  'dnd', 'isDeleted', 'deletedAt', 'createdAt', 'updatedAt',
+  'doerId', 'statusId',
+] as const;
+
 @Injectable()
 export class DashboardService {
   constructor(private database: DatabaseService) {}
@@ -102,173 +109,159 @@ export class DashboardService {
     };
   }
 
-  async getFollowupDashboard(userId: string, role: string, campaignId?: string, page: number = 1, limit: number = 50) {
-    // Query leads first (deduplicated), then fetch latest followup per lead
-    // This avoids N duplicate rows when a lead has N followups
-    const leadConditions: any[] = [eq(leads.isDeleted, false)];
-    if (role === 'USER') {
-      leadConditions.push(eq(leads.doerId, userId));
+  /** Whitelist of allowed ORDER BY columns to prevent SQL injection. */
+  private readonly ALLOWED_ORDER_COLUMNS = [
+    'latest."createdAt"',
+    'l."updatedAt"',
+    'l."createdAt"',
+  ] as const;
+
+  /** Whitelist of allowed ORDER BY directions to prevent SQL injection. */
+  private readonly ALLOWED_ORDER_DIRS = [
+    'DESC NULLS LAST',
+    'DESC',
+    'ASC',
+  ] as const;
+
+  /**
+   * Shared helper — fetches a page of leads with their latest followup attached.
+   * Uses a single raw SQL query with DISTINCT ON to get the latest followup per lead,
+   * replacing the old N+1 pattern (lead query + separate followup query + user query).
+   */
+  private async getLeadsPageWithLatestFollowup(
+    userId: string,
+    role: string,
+    campaignId: string | undefined,
+    page: number,
+    limit: number,
+    orderByColumn: string,
+    orderByDir: string,
+    onlyWithFollowups: boolean,
+  ) {
+    // Validate against whitelist to prevent SQL injection
+    if (!this.ALLOWED_ORDER_COLUMNS.includes(orderByColumn as any)) {
+      throw new Error(`Invalid order column: ${orderByColumn}`);
     }
-    if (campaignId) leadConditions.push(eq(leads.campaignId, campaignId));
+    if (!this.ALLOWED_ORDER_DIRS.includes(orderByDir as any)) {
+      throw new Error(`Invalid order direction: ${orderByDir}`);
+    }
 
-    // Only include leads from active campaigns
-    const campaignActiveCondition = eq(campaigns.isActive, true);
+    const pool = this.database.getPool();
+    const conditions: string[] = ['l."isDeleted" = false', 'c."isActive" = true'];
+    const params: any[] = [];
+    let paramIdx = 1;
 
-    const whereClause = leadConditions.length > 0 ? and(...leadConditions) : undefined;
+    if (campaignId) { conditions.push(`l."campaignId" = $${paramIdx++}`); params.push(campaignId); }
+    if (role === 'USER') { conditions.push(`l."doerId" = $${paramIdx++}`); params.push(userId); }
 
-    // Count only distinct leads from active campaigns that have at least one followup
-    const [{ total }] = await this.database.db
-      .select({ total: sql<number>`count(distinct ${leads.id})::int` })
-      .from(leads)
-      .innerJoin(followups, eq(leads.id, followups.leadId))
-      .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
-      .where(and(campaignActiveCondition, whereClause));
-
-    // Fetch distinct leads with their latest followup
-    // Use a subquery approach: get leads, then separately get latest followup per lead
+    const whereClause = conditions.join(' AND ');
     const offset = (page - 1) * limit;
 
-    const leadResults = await this.database.db
-      .select({
-        lead: {
-          ...leads,
-          campaign: {
-            id: campaigns.id,
-            name: campaigns.name,
-          },
-          status: campaignStatuses,
-          doer: {
-            id: users.id,
-            name: users.name,
-            username: users.username,
-          },
-        },
-      })
-      .from(leads)
-      .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
-      .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
-      .leftJoin(users, eq(leads.doerId, users.id))
-      .innerJoin(followups, eq(leads.id, followups.leadId))
-      .where(and(campaignActiveCondition, whereClause))
-      .groupBy(leads.id, campaigns.id, campaigns.name, campaignStatuses.id, users.id, users.name, users.username)
-      .orderBy(desc(sql`max(${followups.createdAt})`))
-      .offset(offset)
-      .limit(limit);
+    const followupJoin = onlyWithFollowups
+      ? 'INNER JOIN "Followup" f ON l.id = f."leadId"'
+      : '';
 
-    // Fetch the latest followup for each lead in the result
-    const leadIds = leadResults.map((r) => r.lead.id);
-    let latestFollowups: any[] = [];
-    if (leadIds.length > 0) {
-      latestFollowups = await this.database.db
-        .select()
-        .from(followups)
-        .where(inArray(followups.leadId, leadIds))
-        .orderBy(desc(followups.createdAt));
-    }
+    // Count
+    const countSql = `
+      SELECT COUNT(DISTINCT l.id)::int AS total
+      FROM "Lead" l
+      INNER JOIN "Campaign" c ON l."campaignId" = c.id
+      ${followupJoin}
+      WHERE ${whereClause}
+    `;
+    const { rows: countRows } = await pool.query(countSql, params);
+    const total = countRows[0]?.total ?? 0;
 
-    const followupMap = new Map<string, any>();
-    for (const f of latestFollowups) {
-      if (!followupMap.has(f.leadId)) {
-        followupMap.set(f.leadId, f);
-      }
-    }
+    // Main query — use LATERAL JOIN to get the latest followup per lead
+    // This is MUCH faster than fetching all followups and deduplicating in JS.
+    const mainSql = `
+      SELECT
+        l.id, l."campaignId", l.name, l.email, l.phone, l.source,
+        l.dnd, l."isDeleted", l."deletedAt", l."createdAt", l."updatedAt",
+        l."doerId", l."statusId",
+        c.id AS "campaign.id", c.name AS "campaign.name",
+        cs.id AS "status.id", cs.label AS "status.label",
+        cs.color AS "status.color", cs."order" AS "status.order",
+        u.id AS "doer.id", u.name AS "doer.name", u.username AS "doer.username",
+        latest.id AS "fup.id", latest."leadId" AS "fup.leadId",
+        latest."userId" AS "fup.userId", latest.status AS "fup.status",
+        latest.remarks AS "fup.remarks",
+        latest."nextCallDate" AS "fup.nextCallDate",
+        latest."createdAt" AS "fup.createdAt"
+      FROM "Lead" l
+      INNER JOIN "Campaign" c ON l."campaignId" = c.id
+      LEFT JOIN "CampaignStatus" cs ON l."statusId" = cs.id
+      LEFT JOIN "User" u ON l."doerId" = u.id
+      LEFT JOIN LATERAL (
+        SELECT f2.id, f2."leadId", f2."userId", f2.status, f2.remarks,
+               f2."nextCallDate", f2."createdAt"
+        FROM "Followup" f2
+        WHERE f2."leadId" = l.id
+        ORDER BY f2."createdAt" DESC
+        LIMIT 1
+      ) latest ON true
+      WHERE ${whereClause}
+      ORDER BY ${orderByColumn} ${orderByDir}
+      OFFSET ${offset}
+      LIMIT ${limit}
+    `;
 
-    // Also fetch the followup user info for the latest followup
-    const followupUserIds = latestFollowups
-      .filter((f) => followupMap.get(f.leadId)?.id === f.id)
-      .map((f) => f.userId)
-      .filter(Boolean);
-    const uniqueUserIds = [...new Set(followupUserIds)];
-    let userMap = new Map<string, any>();
-    if (uniqueUserIds.length > 0) {
-      const followupUsers = await this.database.db
-        .select({ id: users.id, name: users.name, username: users.username })
-        .from(users)
-        .where(inArray(users.id, uniqueUserIds));
-      userMap = new Map(followupUsers.map((u) => [u.id, u]));
-    }
+    const { rows } = await pool.query(mainSql, params);
 
-    return {
-      data: leadResults.map((r) => ({
-        ...(followupMap.get(r.lead.id) || {}),
-        lead: r.lead,
-        user: followupMap.get(r.lead.id)
-          ? userMap.get(followupMap.get(r.lead.id).userId) || null
+    const data = rows.map((r: any) => {
+      const followupId = r['fup.id'];
+      return {
+        id: r.id,
+        campaignId: r.campaignId,
+        name: r.name,
+        email: r.email,
+        phone: r.phone,
+        source: r.source,
+        dnd: r.dnd,
+        isDeleted: r.isDeleted,
+        deletedAt: r.deletedAt,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        doerId: r.doerId,
+        statusId: r.statusId,
+        campaign: r['campaign.id'] ? { id: r['campaign.id'], name: r['campaign.name'] } : null,
+        doer: r['doer.id'] ? { id: r['doer.id'], name: r['doer.name'], username: r['doer.username'] } : null,
+        status: r['status.id']
+          ? { id: r['status.id'], label: r['status.label'], color: r['status.color'], order: r['status.order'] }
           : null,
-      })),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+        followups: followupId
+          ? [{
+              id: followupId,
+              leadId: r['fup.leadId'],
+              userId: r['fup.userId'],
+              status: r['fup.status'],
+              remarks: r['fup.remarks'],
+              nextCallDate: r['fup.nextCallDate'],
+              createdAt: r['fup.createdAt'],
+            }]
+          : [],
+      };
+    });
+
+    return { data, total, page, limit };
+  }
+
+  async getFollowupDashboard(userId: string, role: string, campaignId?: string, page: number = 1, limit: number = 50) {
+    const result = await this.getLeadsPageWithLatestFollowup(
+      userId, role, campaignId, page, limit,
+      'latest."createdAt"', 'DESC NULLS LAST',
+      true,
+    );
+    return { ...result, totalPages: Math.ceil(result.total / limit) };
   }
 
   async getAllLeadsDashboard(userId: string, role: string, campaignId?: string, page: number = 1, limit: number = 50) {
-    const conditions: any[] = [eq(leads.isDeleted, false), eq(campaigns.isActive, true)];
-    if (campaignId) conditions.push(eq(leads.campaignId, campaignId));
-    if (role === 'USER') conditions.push(eq(leads.doerId, userId));
-
-    const offset = (page - 1) * limit;
-
-    const [{ total }] = await this.database.db
-      .select({ total: sql<number>`count(*)::int` })
-      .from(leads)
-      .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
-      .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-    const results = await this.database.db
-      .select({
-        lead: leads,
-        campaign: {
-          id: campaigns.id,
-          name: campaigns.name,
-        },
-        doer: {
-          id: users.id,
-          name: users.name,
-          username: users.username,
-        },
-        status: campaignStatuses,
-      })
-      .from(leads)
-      .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
-      .leftJoin(users, eq(leads.doerId, users.id))
-      .leftJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(leads.updatedAt))
-      .offset(offset)
-      .limit(limit);
-
-    const leadIds = results.map((r) => r.lead.id);
-    let latestFollowups: any[] = [];
-    if (leadIds.length > 0) {
-      latestFollowups = await this.database.db
-        .select()
-        .from(followups)
-        .where(inArray(followups.leadId, leadIds))
-        .orderBy(desc(followups.createdAt));
-    }
-
-    const followupMap = new Map<string, any>();
-    for (const f of latestFollowups) {
-      if (!followupMap.has(f.leadId)) {
-        followupMap.set(f.leadId, f);
-      }
-    }
-
-    return {
-      data: results.map((r) => ({
-        ...r.lead,
-        campaign: r.campaign,
-        doer: r.doer,
-        status: r.status,
-        followups: followupMap.has(r.lead.id) ? [followupMap.get(r.lead.id)] : [],
-      })),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+    const result = await this.getLeadsPageWithLatestFollowup(
+      userId, role, campaignId, page, limit,
+      'l."updatedAt"', 'DESC',
+      false,
+    );
+    return { ...result, totalPages: Math.ceil(result.total / limit) };
   }
 
   async getSalesFunnel(userId: string, role: string, campaignId?: string) {

@@ -1,6 +1,5 @@
 import api from './api';
 import { DashboardStats, Lead, Followup } from '../types';
-import { fetchAllPages } from './pagination';
 
 export interface SalesFunnelData {
   totalLeads: number;
@@ -78,15 +77,17 @@ export const dashboardService = {
   },
 
   getFollowupDashboard: async (campaignId?: string): Promise<Followup[]> => {
-    const params: Record<string, string> = {};
+    const params: Record<string, string> = { limit: '5000' };
     if (campaignId) params.campaignId = campaignId;
-    return fetchAllPages<Followup>('/dashboard/followups', params, { deduplicateKey: 'leadId' });
+    const { data } = await api.get('/dashboard/followups', { params });
+    return Array.isArray(data) ? data : (data?.data || []);
   },
 
   getAllLeadsDashboard: async (campaignId?: string): Promise<Lead[]> => {
-    const params: Record<string, string> = {};
+    const params: Record<string, string> = { limit: '5000' };
     if (campaignId) params.campaignId = campaignId;
-    return fetchAllPages<Lead>('/dashboard/leads', params, { deduplicateKey: 'id' });
+    const { data } = await api.get('/dashboard/leads', { params });
+    return Array.isArray(data) ? data : (data?.data || []);
   },
 
   getCampaignStats: async (campaignId: string) => {

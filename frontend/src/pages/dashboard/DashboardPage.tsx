@@ -91,7 +91,23 @@ export default function DashboardPage() {
   const loadUpcomingFollowups = async () => {
     try {
       const data = await dashboardService.getFollowupDashboard(selectedCampaign || undefined);
-      setUpcomingFollowups(data.slice(0, 5));
+      // Backend now returns leads with followup[0] attached via LATERAL JOIN
+      const mapped: Followup[] = (data || []).flatMap((lead: any) => {
+        if (!lead.followups?.length) return [];
+        const fup = lead.followups[0];
+        return [{
+          id: fup.id,
+          leadId: fup.leadId || lead.id,
+          userId: fup.userId || lead.doerId,
+          status: fup.status,
+          nextCallDate: fup.nextCallDate,
+          createdAt: fup.createdAt,
+          remarks: fup.remarks,
+          lead: { id: lead.id, name: lead.name, email: lead.email, phone: lead.phone },
+          user: lead.doer || undefined,
+        }] as Followup[];
+      });
+      setUpcomingFollowups(mapped.slice(0, 5));
     } catch {
       // Followups load failure is non-critical
     }

@@ -22,49 +22,43 @@ export class NotificationsService {
     return 'warning';
   }
 
+  /**
+   * Create or update a notification for a followup.
+   *
+   * Optimized to use a single UPSERT (INSERT … ON CONFLICT DO UPDATE)
+   * instead of the previous 3-query pattern (SELECT followup → SELECT notification
+   * → INSERT or UPDATE). The caller should pass `nextCallDate` when available
+   * to also eliminate the followup lookup query.
+   */
   async createNotificationForFollowup(
     userId: string,
     followupId: string,
+    nextCallDate?: Date | null,
   ): Promise<void> {
-    const [followup] = await this.database.db
-      .select()
-      .from(followups)
-      .where(eq(followups.id, followupId))
-      .limit(1);
-
-    if (!followup) return;
-
-    const type = this.getNotificationType(followup.nextCallDate);
-
-    if (!followup.nextCallDate) return;
-
-    const [existing] = await this.database.db
-      .select()
-      .from(notifications)
-      .where(
-        and(
-          eq(notifications.userId, userId),
-          eq(notifications.followupId, followupId),
-        ),
-      )
-      .limit(1);
-
-    if (existing && existing.type === type) {
-      return;
+    // Resolve followup date if not provided by caller
+    if (nextCallDate === undefined) {
+      const [followup] = await this.database.db
+        .select({ nextCallDate: followups.nextCallDate })
+        .from(followups)
+        .where(eq(followups.id, followupId))
+        .limit(1);
+      if (!followup) return;
+      nextCallDate = followup.nextCallDate;
     }
 
-    if (existing) {
-      await this.database.db
-        .update(notifications)
-        .set({ type })
-        .where(eq(notifications.id, existing.id));
-    } else {
-      await this.database.db.insert(notifications).values({
-        userId,
-        followupId,
-        type,
+    if (!nextCallDate) return;
+
+    const type = this.getNotificationType(nextCallDate);
+
+    // Single UPSERT — handles insert-or-update in one round-trip
+    // Uses the existing unique constraint on (userId, followupId)
+    await this.database.db
+      .insert(notifications)
+      .values({ userId, followupId, type })
+      .onConflictDoUpdate({
+        target: [notifications.userId, notifications.followupId],
+        set: { type },
       });
-    }
   }
 
   async getPendingNotifications(userId: string) {

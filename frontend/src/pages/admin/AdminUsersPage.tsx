@@ -93,7 +93,7 @@ export default function AdminUsersPage() {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault(); if (saving) return;
-    if (newPassword.length < 6) { toast.error('Min 6 characters'); return; }
+    if (newPassword.length < 8) { toast.error('Min 8 characters'); return; }
     if (newPassword !== confirmPassword) { toast.error('Passwords do not match'); return; }
     setSaving(true);
     try { await userService.resetPassword(selectedUser!.id, newPassword); toast.success('Password reset'); closeModal(); }

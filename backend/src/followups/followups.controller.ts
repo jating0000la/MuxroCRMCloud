@@ -41,17 +41,27 @@ export class FollowupsController {
   }
 
   @Get('my')
-  @ApiOperation({ summary: 'Get my follow-ups' })
+  @ApiOperation({ summary: 'Get my follow-ups (keyset-paginated)' })
   @ApiQuery({ name: 'campaignId', required: false })
-  getMyFollowups(@Request() req, @Query('campaignId') campaignId?: string, @Query() pagination?: PaginationDto) {
-    return this.followupsService.getMyFollowups(req.user.id, campaignId, pagination);
+  @ApiQuery({ name: 'cursor', required: false, description: 'ISO timestamp cursor for keyset pagination (from previous response)' })
+  getMyFollowups(
+    @Request() req,
+    @Query('campaignId') campaignId?: string,
+    @Query() pagination?: PaginationDto,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.followupsService.getMyFollowups(req.user.id, campaignId, pagination, cursor);
   }
 
   @Get('upcoming')
   @ApiOperation({ summary: 'Get upcoming scheduled follow-ups' })
   @ApiQuery({ name: 'campaignId', required: false })
-  getUpcomingFollowups(@Request() req, @Query('campaignId') campaignId?: string) {
-    return this.followupsService.getUpcomingFollowups(req.user.id, campaignId);
+  getUpcomingFollowups(
+    @Request() req,
+    @Query('campaignId') campaignId?: string,
+    @Query() pagination?: PaginationDto,
+  ) {
+    return this.followupsService.getUpcomingFollowups(req.user.id, campaignId, pagination);
   }
 
   @Put(':id')

@@ -71,7 +71,7 @@ export class AuthService {
       const expiresAt = new Date(Date.now() + this.getRefreshTokenExpirationMs());
       await this.refreshSessionService.createSession(user.id, refreshToken, expiresAt);
     } catch (sessionError) {
-      await this.refreshSessionService.revokeSession(refreshToken);
+      // If createSession failed, there is no session to revoke — the user just needs to retry
       throw new UnauthorizedException('Login failed. Please try again.');
     }
 
@@ -119,7 +119,7 @@ export class AuthService {
       const expiresAt = new Date(Date.now() + this.getRefreshTokenExpirationMs());
       await this.refreshSessionService.createSession(user.id, refreshToken, expiresAt);
     } catch (sessionError) {
-      await this.refreshSessionService.revokeSession(refreshToken);
+      // If createSession failed, there is no session to revoke
       throw new ConflictException('Registration failed. Please try again.');
     }
 
@@ -159,9 +159,6 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token is expired. Please log in again.');
     }
 
-    // Revoke old refresh token (rotate)
-    await this.refreshSessionService.revokeSession(refreshToken);
-
     // Issue new token pair
     const userPayload = { sub: payload.sub, username: payload.username, role: payload.role };
     const newAccessToken = this.jwtService.sign(userPayload);
@@ -169,14 +166,17 @@ export class AuthService {
       expiresIn: this.getRefreshTokenExpiration() as any,
     });
 
-    // Create new DB session
+    // Create new DB session FIRST — if this fails, the old token remains valid
     try {
       const expiresAt = new Date(Date.now() + this.getRefreshTokenExpirationMs());
       await this.refreshSessionService.createSession(payload.sub, newRefreshToken, expiresAt);
     } catch (sessionError) {
-      await this.refreshSessionService.revokeSession(newRefreshToken);
+      // New session failed, old token stays valid — user can retry
       throw new UnauthorizedException('Token refresh failed. Please log in again.');
     }
+
+    // Revoke old refresh token AFTER new session is safely created (atomic rotation)
+    await this.refreshSessionService.revokeSession(refreshToken);
 
     return {
       access_token: newAccessToken,
