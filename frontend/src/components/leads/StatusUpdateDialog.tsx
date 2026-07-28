@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import RemarkRenderer from './RemarkRenderer';
 import { Lead, CampaignStatus, Followup } from '../../types';
 import { leadService } from '../../services/leads';
 import { followupService } from '../../services/followups';
@@ -233,7 +234,7 @@ export default function StatusUpdateDialog({ lead, statuses, onClose, onUpdate }
                           </span>
                         </div>
                         {item.remarks && (
-                          <p className="text-sm text-gray-600 dark:text-gray-300">{item.remarks}</p>
+                          <RemarkRenderer remarks={item.remarks} />
                         )}
                         {item.nextCallDate && (
                           <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
