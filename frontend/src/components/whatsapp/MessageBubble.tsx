@@ -142,6 +142,7 @@ export default function MessageBubble({ msg }: MessageBubbleProps) {
         <div ref={menuRef} className="absolute right-0 top-0 z-10">
           <button
             onClick={() => setShowMenu(!showMenu)}
+            aria-label="Message options"
             className="hidden rounded-full p-1 text-slate-400 opacity-0 shadow-sm transition-all group-hover:inline-flex group-hover:opacity-100 hover:bg-white/90 hover:text-slate-600 dark:hover:bg-gray-800 dark:hover:text-slate-300"
           >
             <MoreVertical className="h-4 w-4" />

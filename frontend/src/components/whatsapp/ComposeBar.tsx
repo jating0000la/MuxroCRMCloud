@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Smile, Paperclip, Mic } from 'lucide-react';
+import { Send, Paperclip } from 'lucide-react';
 import AttachmentMenu, { AttachmentType } from './AttachmentMenu';
 
 interface ComposeBarProps {
@@ -21,14 +21,15 @@ export default function ComposeBar({
   const textRef = useRef<HTMLTextAreaElement>(null);
   const attachRef = useRef<HTMLDivElement>(null);
 
-  // Close menu on outside click
+  // Close menu on outside click (only when open)
   useEffect(() => {
+    if (!showAttach) return;
     const handler = (e: MouseEvent) => {
       if (attachRef.current && !attachRef.current.contains(e.target as Node)) setShowAttach(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  }, [showAttach]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -131,6 +132,7 @@ export default function ComposeBar({
         <div ref={attachRef} className="relative">
           <button
             onClick={() => { setShowAttach(!showAttach); }}
+            aria-label="Attach file"
             className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-gray-400 dark:hover:bg-gray-800"
           >
             <Paperclip className="h-5 w-5" />
@@ -146,32 +148,25 @@ export default function ComposeBar({
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
+            aria-label="Message text"
             className="max-h-[120px] min-h-[24px] flex-1 resize-none bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none dark:text-slate-100 dark:placeholder-gray-500"
             rows={1}
           />
-          <button className="ml-2 flex-shrink-0 text-slate-400 transition-colors hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300">
-            <Smile className="h-5 w-5" />
-          </button>
         </div>
 
-        {/* Voice / Send button */}
-        {text.trim() ? (
-          <button
-            onClick={handleSendText}
-            disabled={sending}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white shadow-lg shadow-green-500/30 transition-all hover:bg-green-600 hover:shadow-xl hover:shadow-green-500/40 disabled:opacity-50 disabled:shadow-none"
-          >
-            {sending ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </button>
-        ) : (
-          <button className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-gray-400 dark:hover:bg-gray-800">
-            <Mic className="h-5 w-5" />
-          </button>
-        )}
+        {/* Send button */}
+        <button
+          onClick={handleSendText}
+          disabled={sending || !text.trim()}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white shadow-lg shadow-green-500/30 transition-all hover:bg-green-600 hover:shadow-xl hover:shadow-green-500/40 disabled:opacity-50 disabled:shadow-none"
+          aria-label="Send message"
+        >
+          {sending ? (
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+        </button>
       </div>
 
       {/* Hint */}

@@ -49,6 +49,7 @@ const ChatCard = memo(function ChatCard({ chat, isActive, onClick }: ChatCardPro
   return (
     <button
       onClick={onClick}
+      aria-current={isActive ? 'true' : undefined}
       className={`group flex w-full items-center gap-3 border-b border-slate-100/80 px-3 py-3 text-left transition-all duration-150 hover:bg-primary-50/60 dark:border-gray-800/60 dark:hover:bg-gray-800/40 ${
         isActive
           ? 'bg-primary-50 dark:bg-gray-800/50'

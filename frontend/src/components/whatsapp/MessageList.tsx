@@ -13,18 +13,23 @@ interface MessageListProps {
 export default function MessageList({ messages, loading }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
   const [showScrollBtn, setShowScrollBtn] = React.useState(false);
 
-  // Auto-scroll on new messages
+  // Auto-scroll on new messages only if user was already near bottom
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isNearBottomRef.current) {
+      endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   // Detect scroll position for "scroll to bottom" button
   const handleScroll = () => {
     if (!containerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    setShowScrollBtn(scrollHeight - scrollTop - clientHeight > 200);
+    const distFromBottom = scrollHeight - scrollTop - clientHeight;
+    isNearBottomRef.current = distFromBottom < 100;
+    setShowScrollBtn(distFromBottom > 200);
   };
 
   const scrollToBottom = () => {
@@ -51,14 +56,15 @@ export default function MessageList({ messages, loading }: MessageListProps) {
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="h-full overflow-y-auto bg-[#efeae2] bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9InAiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMSIgZmlsbD0icmdiYSgwLDAsMCwwLjAzKSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3QgZmlsbD0idXJsKCNwKSIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIvPjwvc3ZnPg==')] px-4 py-3 dark:bg-gray-900"
-        style={{ backgroundImage: 'none' }}
+        role="log"
+        aria-live="polite"
+        aria-label="Chat messages"
+        className="h-full overflow-y-auto bg-[#efeae2] px-4 py-3 dark:bg-gray-900"
+        style={{
+          backgroundImage: `radial-gradient(circle, rgba(0,0,0,0.08) 1px, transparent 1px)`,
+          backgroundSize: '24px 24px',
+        }}
       >
-        {/* WhatsApp dot pattern for light mode */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{
-          backgroundImage: `radial-gradient(circle, #000 1px, transparent 1px)`,
-          backgroundSize: '24px 24px'
-        }} />
 
         {loading ? (
           <div className="flex items-center justify-center py-16">

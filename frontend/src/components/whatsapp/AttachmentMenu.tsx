@@ -22,7 +22,7 @@ export default function AttachmentMenu({ isOpen, onClose, onSelect }: Attachment
     <div className="absolute bottom-full left-0 z-50 mb-2 w-72 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-gray-600 dark:bg-gray-800">
       <div className="mb-3 flex items-center justify-between">
         <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Attachments</h4>
-        <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-gray-700">
+        <button onClick={onClose} aria-label="Close attachment menu" className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-gray-700">
           <X className="h-4 w-4" />
         </button>
       </div>

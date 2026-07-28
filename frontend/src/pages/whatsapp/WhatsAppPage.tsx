@@ -60,6 +60,15 @@ export default function WhatsAppPage() {
 
   // ─── Load Messages ────────────────────────────────────────────────────────
 
+  const loadMessages = useCallback(async (phone: string) => {
+    try {
+      const data = await whatsappService.getChatMessages(phone, 100, 0);
+      setMessages(data);
+    } catch {
+      toast.error('Failed to load messages');
+    }
+  }, []);
+
   useEffect(() => {
     if (!activePhone) return;
     setLoadingMessages(true);
@@ -68,7 +77,15 @@ export default function WhatsAppPage() {
       .then(setMessages)
       .catch(() => toast.error('Failed to load messages'))
       .finally(() => setLoadingMessages(false));
-  }, [activePhone]);
+
+    // Poll for new messages every 10s while chat is active
+    const interval = setInterval(() => {
+      loadMessages(activePhone);
+    }, 10000);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [activePhone, loadMessages]);
 
   // ─── Select Chat ──────────────────────────────────────────────────────────
 
@@ -93,8 +110,7 @@ export default function WhatsAppPage() {
     setSending(true);
     try {
       await whatsappService.sendText({ phone: activePhone, text });
-      const updated = await whatsappService.getChatMessages(activePhone, 100, 0);
-      setMessages(updated);
+      await loadMessages(activePhone);
       await loadChats();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Send failed');
@@ -123,8 +139,7 @@ export default function WhatsAppPage() {
           toast.error('Unsupported attachment type');
           return;
       }
-      const updated = await whatsappService.getChatMessages(activePhone, 100, 0);
-      setMessages(updated);
+      await loadMessages(activePhone);
       await loadChats();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Send failed');

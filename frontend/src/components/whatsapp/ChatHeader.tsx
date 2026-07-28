@@ -73,6 +73,7 @@ function ActionButton({ icon, onClick, active, tooltip }: { icon: React.ReactNod
     <button
       onClick={onClick}
       title={tooltip}
+      aria-label={tooltip}
       className={`flex h-8 w-8 items-center justify-center rounded-full transition-all ${
         active
           ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400'
