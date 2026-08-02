@@ -58,7 +58,7 @@ export default function CampaignDetailPage() {
 
   // Bulk selection
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
-  const [bulkAction, setBulkAction] = useState<'status' | 'assign' | null>(null);
+  const [bulkAction, setBulkAction] = useState<'status' | 'assign' | 'delete' | null>(null);
   const [bulkStatusId, setBulkStatusId] = useState('');
   const [bulkDoerId, setBulkDoerId] = useState('');
   const [bulkProcessing, setBulkProcessing] = useState(false);
@@ -138,6 +138,18 @@ export default function CampaignDetailPage() {
           );
         }
         toast.success(`Assigned ${selectedLeadIds.length} lead(s)`);
+      } else if (bulkAction === 'delete') {
+        if (!confirm(`Delete ${selectedLeadIds.length} selected lead(s)? This cannot be undone.`)) {
+          setBulkProcessing(false);
+          return;
+        }
+        const BATCH = 25;
+        for (let i = 0; i < selectedLeadIds.length; i += BATCH) {
+          await Promise.all(
+            selectedLeadIds.slice(i, i + BATCH).map((leadId) => leadService.remove(leadId))
+          );
+        }
+        toast.success(`Deleted ${selectedLeadIds.length} lead(s)`);
       }
       setSelectedLeadIds([]);
       setBulkAction(null);
@@ -567,12 +579,13 @@ export default function CampaignDetailPage() {
                   </span>
                   <select
                     value={bulkAction || ''}
-                    onChange={(e) => setBulkAction(e.target.value as 'status' | 'assign' || null)}
+                    onChange={(e) => setBulkAction(e.target.value as 'status' | 'assign' | 'delete' || null)}
                     className="px-2 py-1 text-sm border border-primary-300 rounded-md dark:bg-gray-700 dark:border-primary-700 dark:text-gray-100"
                   >
                     <option value="">Bulk action...</option>
                     <option value="status">Change Status</option>
                     <option value="assign">Assign To</option>
+                    <option value="delete">Delete</option>
                   </select>
                   {bulkAction === 'status' && (
                     <select
@@ -601,7 +614,11 @@ export default function CampaignDetailPage() {
                   <button
                     onClick={handleBulkAction}
                     disabled={bulkProcessing || !bulkAction || (bulkAction === 'status' && !bulkStatusId) || (bulkAction === 'assign' && !bulkDoerId)}
-                    className="px-3 py-1 bg-primary-600 text-white rounded-md text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
+                    className={`px-3 py-1 rounded-md text-sm font-medium disabled:opacity-50 ${
+                      bulkAction === 'delete'
+                        ? 'bg-red-600 text-white hover:bg-red-700'
+                        : 'bg-primary-600 text-white hover:bg-primary-700'
+                    }`}
                   >
                     {bulkProcessing ? 'Processing...' : 'Apply'}
                   </button>
