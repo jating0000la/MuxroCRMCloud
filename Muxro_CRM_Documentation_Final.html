@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Muxro CRM Cloud - Complete Customer Documentation</title>
+    <style>
+        :root {
+            --primary-color: #1a365d;
+            --secondary-color: #2b6cb0;
+            --accent-color: #4299e1;
+            --text-main: #2d3748;
+            --text-light: #718096;
+            --bg-color: #f7fafc;
+            --container-bg: #ffffff;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-main);
+            background-color: var(--bg-color);
+            line-height: 1.7;
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: var(--container-bg);
+            padding: 60px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+            border-radius: 12px;
+        }
+
+        header {
+            text-align: center;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 40px;
+            margin-bottom: 50px;
+        }
+
+        .logo {
+            max-width: 280px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        .meta-info {
+            color: var(--text-light);
+            font-size: 1.1em;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .meta-info span {
+            background: var(--bg-color);
+            padding: 5px 15px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        h2 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 12px;
+            margin-top: 60px;
+            font-size: 1.8em;
+            font-weight: 700;
+        }
+
+        h3 {
+            color: var(--secondary-color);
+            margin-top: 35px;
+            font-size: 1.4em;
+        }
+
+        p {
+            margin-bottom: 20px;
+        }
+
+        ul, ol {
+            margin-bottom: 25px;
+            padding-left: 25px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        .toc {
+            background: var(--bg-color);
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 50px;
+            border: 1px solid var(--border-color);
+        }
+
+        .toc h2 {
+            margin-top: 0;
+            border-bottom: none;
+            padding-bottom: 0;
+            font-size: 1.5em;
+        }
+
+        .toc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .toc a {
+            text-decoration: none;
+            color: var(--secondary-color);
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .toc a:hover {
+            color: var(--primary-color);
+            text-decoration: underline;
+        }
+
+        img.screenshot {
+            width: 100%;
+            height: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin: 30px 0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            display: block;
+        }
+
+        .feature-box {
+            background: #ebf8ff;
+            border-left: 5px solid var(--accent-color);
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .feature-box h4 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 30px 0;
+            background: white;
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            text-align: left;
+        }
+
+        th {
+            background: var(--bg-color);
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background-color: #fafbfc;
+        }
+
+        .highlight {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="https://lh3.googleusercontent.com/pw/AP1GczPeZiIOxk2vwmh9XUh6PRst6AM2QKnYb1APny8g6RalHsMMB2jrDn_Xs2OVN_fZyU-vM3a5SWEaQRje1T8ptTGAyTNUJTVrcUqFpk_atVbnwST5RDhWcJdJgIiY4B18uB0KAVzx5o-vCUALHa1dEt2T=w436-h170-s-no-gm?authuser=0" alt="Muxro CRM Cloud Logo" class="logo">
+            <h1>Complete Customer Documentation</h1>
+            <div class="meta-info">
+                <span><strong>Version:</strong> 2.0</span>
+                <span><strong>Type:</strong> Customer User Guide</span>
+                <span><strong>Audience:</strong> Admin, Sales, Business Owners</span>
+            </div>
+        </header>
+
+        <div class="toc">
+            <h2>Table of Contents</h2>
+            <div class="toc-grid">
+                <div><a href="#sec-1">1. Introduction</a></div>
+                <div><a href="#sec-2">2. First Login</a></div>
+                <div><a href="#sec-3">3. Company Profile Setup</a></div>
+                <div><a href="#sec-4">4. Dashboard</a></div>
+                <div><a href="#sec-5">5. Campaign Management</a></div>
+                <div><a href="#sec-6">6. Bulk Lead Import</a></div>
+                <div><a href="#sec-7">7. Public Enquiry Form Builder</a></div>
+                <div><a href="#sec-8">8. Landing Page Builder</a></div>
+                <div><a href="#sec-9">9. Lead Management</a></div>
+                <div><a href="#sec-10">10. Follow-up Management</a></div>
+                <div><a href="#sec-11">11. WhatsApp CRM</a></div>
+                <div><a href="#sec-12">12. DND Management</a></div>
+                <div><a href="#sec-13">13. User Management</a></div>
+                <div><a href="#sec-14">14. Workspace</a></div>
+                <div><a href="#sec-15">15. IndiaMART Integration</a></div>
+                <div><a href="#sec-16">16. Process Sutra Integration</a></div>
+                <div><a href="#sec-17">17. WhatsApp Business API</a></div>
+                <div><a href="#sec-18">18. Notifications</a></div>
+                <div><a href="#sec-19">19. Lead Assignment</a></div>
+                <div><a href="#sec-20">20. Roles & Permissions</a></div>
+                <div><a href="#sec-21">21. Best Practices</a></div>
+                <div><a href="#sec-22">22. Troubleshooting</a></div>
+                <div><a href="#sec-23">23. Frequently Asked Questions</a></div>
+            </div>
+        </div>
+
+        <section id="sec-1">
+            <h2>1. Introduction</h2>
+            <p><strong>Muxro CRM Cloud</strong> is a cloud-based Lead Management and Sales CRM designed for businesses that receive enquiries from multiple sources such as:</p>
+            <ul>
+                <li>Website</li>
+                <li>Facebook</li>
+                <li>Google Ads</li>
+                <li>WhatsApp</li>
+                <li>IndiaMART</li>
+                <li>Manual Entry</li>
+                <li>CSV Import</li>
+            </ul>
+            <p>The CRM automatically manages Lead Assignment, Sales Follow-ups, WhatsApp Communication, Notifications, User Management, Campaign Tracking, and Reports.</p>
+        </section>
+
+        <section id="sec-2">
+            <h2>2. First Login</h2>
+            <p>Login using the credentials shared by your administrator.</p>
+            <div class="feature-box">
+                <h4>During your first login:</h4>
+                <ol>
+                    <li>Open <strong>Users</strong>.</li>
+                    <li>Change the password of the <em>Admin</em> and <em>Sales User</em>.</li>
+                </ol>
+                <p><em>Note: This is highly recommended for security.</em></p>
+            </div>
+        </section>
+
+        <section id="sec-3">
+            <h2>3. Company Profile Setup</h2>
+            <p>Navigate to <strong>Workspace &rarr; Profile</strong>.</p>
+            <ul>
+                <li>Fill in your Company Name, Website, Company Email, Phone, and Address.</li>
+                <li>Upload your Logo.</li>
+                <li>Click <strong>Save</strong>.</li>
+            </ul>
+            <p>The uploaded branding will appear throughout the CRM.</p>
+            <img src="https://lh3.googleusercontent.com/pw/AP1GczMyRRgK4oS4vklKO76hwbGFX1D-NRwnPzDGZyXRmy2UUIjhuze0Q9pI_f5-gS_dmRn-25nH517f64qvc4Sn41_QaLzsG1Dap-pjVGLzDu_7jbqO9R_PntqnGlGxHaDY2FJHEuFgTsoIzGtt4aEk5cRw=w2370-h1318-s-no-gm?authuser=0" alt="Company Profile Workspace" class="screenshot">
+        </section>
+
+        <section id="sec-4">
+            <h2>4. Dashboard</h2>
+            <p>The Dashboard gives a real-time overview of sales activities.</p>
+            <ul>
+                <li><strong>Business Alerts:</strong> Examples include upcoming follow-ups, best-performing user, and top campaign.</li>
+                <li><strong>KPI Cards:</strong> Total Leads, Today's Leads, Pending Follow-ups, Missed Follow-ups, Won Deals, Conversion %.</li>
+                <li><strong>Daily Trend Chart:</strong> Displays daily lead growth.</li>
+                <li><strong>Sales Funnel:</strong> Shows New, Contacted, Interested, Converted, and Lost leads.</li>
+                <li><strong>Filters:</strong> Dashboard can be filtered by Campaign and Date Range.</li>
+            </ul>
+            <img src="https://lh3.googleusercontent.com/pw/AP1GczMptSwcX2KGcf4jwg2sqbFefMXSsnwTUS5EMhjGmpEooQpAgKgtwQAxY3JHV971J55_gr243j-ksK3DFA3mnItmr7FqHBMrgl-CUjy0H4ERCzRbUzkFR8SHsNjxheh1acyDCOrJ27FBVjbYOB9ZSReq=w2546-h1310-s-no-gm?authuser=0" alt="Muxro CRM Dashboard" class="screenshot">
+        </section>
+
+        <section id="sec-5">
+            <h2>5. Campaign Management</h2>
+            <p>Navigate to <strong>Campaigns</strong>. Campaigns are used to organize leads effectively (e.g., Facebook Leads, Google Ads, Website, IndiaMART, Trade Fair, WhatsApp).</p>
+            <div class="feature-box">
+                <h4>Create Campaign:</h4>
+                <ol>
+                    <li>Click <strong>New Campaign</strong>.</li>
+                    <li>Enter Campaign Name and Description.</li>
+                    <li>Next &rarr; Create Form (or Skip).</li>
+                    <li>Assign Users.</li>
+                    <li>Finish. The campaign becomes active immediately.</li>
+                </ol>
+            </div>
+            <p>The Campaign Card displays Campaign Status, Number of Leads, Forms, and Assigned Users.</p>
+            <img src="https://lh3.googleusercontent.com/pw/AP1GczO10OBVTsodIAZTWG3Xtwh2qukn87kbBp_-zu6Z-GfXdAGVFF4eKHuV8iJUjWHIijNbnvxKvGi9DaXpfrzpe5F1ATXu6ib2Xz74GMy6cZIAI77-snaKky4g6NjQdRsNiz0mbfkri_UoI8tYDU4xhbmm=w2474-h1304-s-no-gm?authuser=0" alt="Campaign Management" class="screenshot">
+        </section>
+
+        <section id="sec-6">
+            <h2>6. Bulk Lead Import</h2>
+            <p>Open a Campaign and select <strong>Import CSV</strong>. Upload your CSV file.</p>
+            <p><strong>Required Columns:</strong> Name, Phone, Email.</p>
+            <p>After upload, the CRM automatically creates leads, removes invalid rows, and assigns leads equally among users using Round Robin Allocation.</p>
+        </section>
+
+        <section id="sec-7">
+            <h2>7. Public Enquiry Form Builder</h2>
+            <p>Each campaign can have unlimited forms. Open a Campaign and click <strong>Create Form</strong>.</p>
+            <ul>
+                <li><strong>Supported Fields:</strong> Name, Mobile, Email, Company, City, Dropdown, Radio, Checkbox, Paragraph, Date, File Upload, and Custom Fields.</li>
+                <li><strong>Customize:</strong> Theme, Colors, Logo, and Button Style.</li>
+            </ul>
+            <img src="https://lh3.googleusercontent.com/pw/AP1GczOEqROv42iWqxHZNQ4Age03QUVtb39qoFjIktGG1VwHA2KkN4qbOK81zA-qYyFqIvFvb0Ac-Q_yULHi8L5CQl54PHb22TkDbsggApu3Gj0kGDkvDabCpmIUSdF9nJEyEP8B31C-c-X9rtjYyC4UImqU=w2340-h1308-s-no-gm?authuser=0" alt="Form Builder Page" class="screenshot">
+            <div class="feature-box">
+                <h4>WhatsApp Configuration</h4>
+                <p>You can configure automated WhatsApp greeting messages directly from the form builder to engage new enquiries instantly.</p>
+            </div>
+            <img src="https://lh3.googleusercontent.com/pw/AP1GczMRUGY9mjF9CA5mptt7wZVYd2HEP3OQu2Itio2WaF1ykH-kwAy4ReU0fdDODByAUUvsZ5QsGfy8ezofZONYXTcaYUQGVqJMWX5_7Is-ebEkHSWYntZ3J1xuhH7_OX2CS5HSoIeoIX2XhW3EYVjESKQb=w2420-h1320-s-no-gm?authuser=0" alt="WhatsApp Configuration inside Form Builder" class="screenshot">
+        </section>
+
+        <section id="sec-8">
+            <h2>8. Landing Page Builder</h2>
+            <p>Each form includes a landing page builder. Available sections include Header, Banner, About Company, Services, Gallery, Contact Details, Google Maps, Enquiry Form, SEO Meta, and Additional Custom Sections.</p>
+            <p>Click <strong>Publish</strong> and the CRM generates a Public URL.</p>
+            <img src="https://lh3.googleusercontent.com/pw/AP1GczOWKGwojmC1du3kNLPE4qusJJWewWC-S5PRZ_RevuS0_T9oxwXN1UiswwLECfhm3Vq_ETC-gEpngsRr1SAbB2nZeugm6ChT-7330w-hTWkEotb5WgEISKBAeFZ2pOKzUhsM1T-QeQ9J43ms5s38Fpde=w2452-h1298-s-no-gm?authuser=0" alt="Landing Page Builder interface" class="screenshot">
+            <p>Share on Website, Facebook, Instagram, LinkedIn, Google Ads, or WhatsApp. Whenever someone submits the form, the CRM automatically creates a lead, assigns a user, sends a WhatsApp Greeting (optional), and creates a follow-up.</p>
+        </section>
+
+        <section id="sec-9">
+            <h2>9. Lead Management</h2>
+            <p>Every Lead contains Contact Details, Campaign, Assigned User, Status, Source, Communication History, Follow-up History, and WhatsApp History.</p>
+            <img src="https://lh3.googleusercontent.com/pw/AP1GczMHPl0gKnnSaGIyVaQc69ciwBZakq7Lj7AF4h_EkpGv43twyZE7-cX4I3u_1ZVEPylDbAhahONkQ2ZiI-J3eSllTDdMPBoonp7Luo6acbrmckj98bmwNwuvtkRTc761CZ25VAydIYYhqvgIdzWJqUCK=w2514-h1318-s-no-gm?authuser=0" alt="Leads Page inside Campaign" class="screenshot">
+        </section>
+
+        <section id="sec-10">
+            <h2>10. Follow-up Management</h2>
+            <p>The Follow-up page is the heart of the CRM. Sales users can view leads, call customers, send WhatsApp messages, send emails, update statuses, schedule next follow-ups, and view history.</p>
+            <ul>
+                <li><strong>Smart Filters:</strong> All, Upcoming, Today, Pending, Missed.</li>
+                <li><strong>Additional Filters:</strong> Campaign, Source, User, Status.</li>
+                <li><strong>Actions:</strong> Every lead supports WhatsApp, Email, View Details, and History.</li>
+            </ul>
+            <p>Every follow-up automatically stores User, Date, Status, Notes, WhatsApp Messages, and Previous Follow-ups.</p>
+            <img src="https://lh3.googleusercontent.com/pw/AP1GczN2W93VNliOG1lWO_N4xjUUkvzDdG2ZPfQ63tECq8OMq5nsobjyYrC4BIGisUphOlgC3Ff9muUVbXnxbqkZMxWvkkQI9TGhDyBhZ1FkZzmAf7Wv8Y5gZejQsV-A3izVkIMzu_6PsTXHo88NwHwIakt1=w2522-h1316-s-no-gm?authuser=0" alt="Follow-up Management" class="screenshot">
+        </section>
+
+        <section id="sec-11">
+            <h2>11. WhatsApp CRM</h2>
+            <p>The CRM contains a complete WhatsApp Inbox. Features include Conversation List, Customer Search, Live Chat, and Media Preview (Images, Documents, Audio, Videos).</p>
+            <div class="feature-box">
+                <h4>Shared Conversation Architecture</h4>
+                <p>Each phone number owns one conversation. <strong>One Customer &rarr; One Conversation &rarr; Multiple Leads &rarr; Multiple Campaigns.</strong> No duplicate chats. No duplicate messages.</p>
+            </div>
+            <ul>
+                <li><strong>Incoming Messages:</strong> Whenever a customer sends a WhatsApp message, the CRM finds the conversation (creates if not available), updates chat, links all leads, and sends a notification.</li>
+                <li><strong>Outgoing Messages:</strong> Users can send Text, Images, Files, and Templates. Messages are saved only once.</li>
+                <li><strong>Unknown WhatsApp Number:</strong> If a customer messages without an existing lead, the CRM automatically creates a lead, assigns a campaign, assigns a user, creates a conversation, and sends a notification.</li>
+            </ul>
+            <img src="https://lh3.googleusercontent.com/pw/AP1GczMsDzkVHbFKwqlwBqrE5j4p2OR7qR_Cx2isxMqHCVN46TB-djWDiZ-4V-T_H3oiq9chFoNC63fT3JWdojX2Jjmvz4ncmjWqrgsMmKoDqXEhOHI6td7ZkRrREX4wvmdd4PU4LabzDKPkJWKMLzsBEyta=w2518-h1312-s-no-gm?authuser=0" alt="WhatsApp CRM" class="screenshot">
+        </section>
+
+        <section id="sec-12">
+            <h2>12. DND Management</h2>
+            <p>The DND (Do Not Disturb) page stores customers who should not receive marketing communication.</p>
+            <p>Functions include Search, View Lead, Remove DND, and Export CSV.</p>
+            <img src="https://lh3.googleusercontent.com/pw/AP1GczOuaz0Utn8JzFs_O1U6YbxJX_gAbJSxLsMb32Zyh4q0516SrLdcgHfONOJZJkOeIVVYcQh4a8srVM2U-j1s18v_h6fU_DDmhk_2p2hE6M_4Pfey_h5jxXMQgod9c7Tl8HxJSjjEyyYI70W17V_-arNJ=w2470-h1316-s-no-gm?authuser=0" alt="DND Management" class="screenshot">
+        </section>
+
+        <section id="sec-13">
+            <h2>13. User Management</h2>
+            <p>Administrators can Add Users, Edit Users, Reset Password, Activate, Deactivate, and Delete users.</p>
+            <p>The Dashboard displays Total Users, Active, Inactive, and Admin Count.</p>
+            <img src="https://lh3.googleusercontent.com/pw/AP1GczPafeNM5UY8W8d_8AMvJZ1uG-RFWMVind_IAy1WDDf-O5RQL_YOu7CfXl2u4LJhkaEN-uYw6DrAzd4rM9pA1bdXExyHvfykVgniMIc0wdxFwUSVxb-4yjqS2ZNJclsWYuWvbp7rV20RFIYHdcwn5SZJ=w2476-h1312-s-no-gm?authuser=0" alt="User Management" class="screenshot">
+        </section>
+
+        <section id="sec-14">
+            <h2>14. Workspace</h2>
+            <p>The Workspace contains essential structural settings:</p>
+            <ul>
+                <li><strong>Profile:</strong> Company Branding.</li>
+                <li><strong>API & Webhooks:</strong> Configure IndiaMART, Process Sutra.</li>
+                <li><strong>Communication:</strong> Configure WhatsApp API, Greeting Messages, Default Campaign, Webhook.</li>
+            </ul>
+        </section>
+
+        <section id="sec-15">
+            <h2>15. IndiaMART & Integrations</h2>
+            <p>Navigate to <strong>Workspace &rarr; API &rarr; Integrations</strong>.</p>
+            <p>Configure the Pull API Key and Target Campaign for services like IndiaMART. Options include Test Connection, Fetch Now, and Auto Fetch. Every new enquiry is imported automatically.</p>
+            <img src="https://lh3.googleusercontent.com/pw/AP1GczOQN1j7LLTZ6v04P6bY_eBkynqbwzBnT4XMdTbVmUIbNXOWs99Owrbnh1j5m0dE2tFxSS1vyVeD-KAcxBFlwA8PeCdCh8kit8NldmKgc7pCFPyKBZX-ZbwL6aHlvo7DIbBNmm9LM_myMgzgdcpXEr2s=w2276-h1324-s-no-gm?authuser=0" alt="Integration Setup" class="screenshot">
+        </section>
+
+        <section id="sec-16">
+            <h2>16. Process Sutra Integration</h2>
+            <p>Configure API Key and System Name. Click <strong>Test Connection</strong>. The CRM connects directly with Process Sutra workflow automation.</p>
+        </section>
+
+        <section id="sec-17">
+            <h2>17. WhatsApp Business API Integration</h2>
+            <p>Supported officially via <strong>Gupshup</strong>.</p>
+            <ul>
+                <li>Configure API Key, Source Number, App Name, App ID, and Test Number.</li>
+                <li>Webhook URL is generated automatically.</li>
+                <li>Click <strong>Test Connection</strong>.</li>
+            </ul>
+            <p><strong>WhatsApp Auto Lead Creation:</strong> The Administrator selects a Default Campaign. Whenever an unknown customer messages, the CRM automatically creates a Lead, creates a Conversation, assigns a User, and starts the follow-up.</p>
+            <img src="https://lh3.googleusercontent.com/pw/AP1GczPYowE-J1or51N4K88of0dxMtugtpBObBGlSHrayaVoyKCfEPnPfBWl63ioLyrho6Z-uPy61VOs9JabuicJ76--Bo-anfThToWl00VbHnPi5jIJGooSahkyfeoMr9JwWhr1V9j0JDNBQ8e4oF93SP-j=w2278-h1316-s-no-gm?authuser=0" alt="WhatsApp Business API Integration" class="screenshot">
+        </section>
+
+        <section id="sec-18">
+            <h2>18. Notifications</h2>
+            <p>CRM automatically reminds users. Notifications include Upcoming Follow-up, New WhatsApp, New Lead, Browser Notification, and Sound Alerts.</p>
+            <p>Upcoming reminders appear 10 minutes before follow-up.</p>
+        </section>
+
+        <section id="sec-19">
+            <h2>19. Lead Assignment</h2>
+            <p>Supports <strong>Round Robin Allocation</strong>. Every imported or generated lead is automatically assigned equally among available users.</p>
+        </section>
+
+        <section id="sec-20">
+            <h2>20. Roles & Permissions</h2>
+            <table>
+                <tr>
+                    <th>Role</th>
+                    <th>Permissions</th>
+                </tr>
+                <tr>
+                    <td><strong>Administrator</strong></td>
+                    <td>Can access Dashboard, Campaigns, Forms, Users, Reports, Integrations, DND, WhatsApp, Settings.</td>
+                </tr>
+                <tr>
+                    <td><strong>Sales User</strong></td>
+                    <td>Can access Assigned Leads, Follow-ups, WhatsApp, DND, Performance.<br><em>Cannot manage Users, Workspace, Integrations.</em></td>
+                </tr>
+            </table>
+        </section>
+
+        <section id="sec-21">
+            <h2>21. Best Practices</h2>
+            <ul>
+                <li>Create separate campaigns for each marketing source.</li>
+                <li>Import only clean CSV data with valid phone numbers.</li>
+                <li>Update lead status after every customer interaction.</li>
+                <li>Schedule the next follow-up before closing the current one.</li>
+                <li>Configure WhatsApp Business API before enabling automated messaging.</li>
+                <li>Use the Landing Page Builder for campaign-specific enquiry forms.</li>
+                <li>Review the Dashboard daily to monitor pending and missed follow-ups.</li>
+                <li>Keep company branding and profile information up to date.</li>
+                <li>Regularly monitor DND records to comply with customer communication preferences.</li>
+            </ul>
+        </section>
+
+        <section id="sec-22">
+            <h2>22. Troubleshooting</h2>
+            <table>
+                <tr>
+                    <th>Problem</th>
+                    <th>Solution</th>
+                </tr>
+                <tr>
+                    <td>Unable to login</td>
+                    <td>Verify username/password or contact the administrator.</td>
+                </tr>
+                <tr>
+                    <td>CSV import failed</td>
+                    <td>Check required columns (Name, Phone, Email) and CSV format.</td>
+                </tr>
+                <tr>
+                    <td>Leads not assigned</td>
+                    <td>Ensure at least one active user is assigned to the campaign.</td>
+                </tr>
+                <tr>
+                    <td>WhatsApp messages not sending</td>
+                    <td>Verify Gupshup credentials and test the connection.</td>
+                </tr>
+                <tr>
+                    <td>IndiaMART sync not working</td>
+                    <td>Check the Pull API Key and Auto-Fetch configuration.</td>
+                </tr>
+                <tr>
+                    <td>Notifications not appearing</td>
+                    <td>Enable browser notifications and keep the CRM tab open.</td>
+                </tr>
+                <tr>
+                    <td>Form not receiving enquiries</td>
+                    <td>Confirm the form is published and the public URL is correct.</td>
+                </tr>
+            </table>
+        </section>
+
+        <section id="sec-23">
+            <h2>23. Frequently Asked Questions (FAQ)</h2>
+            <p><strong>Q. How many campaigns can I create?</strong><br>Unlimited.</p>
+            <p><strong>Q. How many users are supported?</strong><br>Unlimited (subject to your deployment and licensing).</p>
+            <p><strong>Q. Can one customer belong to multiple campaigns?</strong><br>Yes. Multiple leads can reference the same customer while sharing a single WhatsApp conversation.</p>
+            <p><strong>Q. Does the CRM support automatic lead assignment?</strong><br>Yes. Round Robin allocation distributes leads equally among assigned users.</p>
+            <p><strong>Q. Can I integrate IndiaMART?</strong><br>Yes. Configure the Pull API Key in the Workspace.</p>
+            <p><strong>Q. Does the CRM support WhatsApp Business API?</strong><br>Yes. Official integration is available through Gupshup.</p>
+            <p><strong>Q. Will the CRM remind users about follow-ups?</strong><br>Yes. Smart reminders appear approximately 10 minutes before scheduled follow-ups.</p>
+            <p><strong>Q. Can I create public enquiry forms and landing pages?</strong><br>Yes. Each campaign can have customizable forms and landing pages with branding, SEO, and contact sections.</p>
+        </section>
+        
+        <section style="background: #1a365d; color: white; padding: 30px; border-radius: 8px; margin-top: 50px;">
+            <h2 style="color: white; border-bottom: 1px solid #2d3748; margin-top: 0;">Core Features Summary</h2>
+            <ul style="column-count: 2; column-gap: 40px; margin-bottom: 0;">
+                <li>Dashboard with KPIs and sales funnel</li>
+                <li>Campaign Management</li>
+                <li>Unlimited Lead Capture Forms</li>
+                <li>Landing Page Builder</li>
+                <li>Bulk CSV Import</li>
+                <li>Automatic Round Robin Lead Assignment</li>
+                <li>Smart Follow-up Management</li>
+                <li>Shared WhatsApp Conversation Architecture</li>
+                <li>DND Management</li>
+                <li>User & Role Management</li>
+                <li>Company Branding</li>
+                <li>IndiaMART Integration</li>
+                <li>Process Sutra Integration</li>
+                <li>Official WhatsApp Business API (Gupshup)</li>
+                <li>Browser Notifications & Smart Alerts</li>
+                <li>Communication History</li>
+                <li>Real-Time Lead Tracking</li>
+                <li>Campaign Performance Monitoring</li>
+            </ul>
+        </section>
+
+    </div>
+</body>
+</html>
