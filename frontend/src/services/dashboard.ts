@@ -77,14 +77,14 @@ export const dashboardService = {
   },
 
   getFollowupDashboard: async (campaignId?: string): Promise<Followup[]> => {
-    const params: Record<string, string> = { limit: '5000' };
+    const params: Record<string, string> = { limit: '20000' };
     if (campaignId) params.campaignId = campaignId;
     const { data } = await api.get('/dashboard/followups', { params });
     return Array.isArray(data) ? data : (data?.data || []);
   },
 
   getAllLeadsDashboard: async (campaignId?: string): Promise<Lead[]> => {
-    const params: Record<string, string> = { limit: '5000' };
+    const params: Record<string, string> = { limit: '20000' };
     if (campaignId) params.campaignId = campaignId;
     const { data } = await api.get('/dashboard/leads', { params });
     return Array.isArray(data) ? data : (data?.data || []);

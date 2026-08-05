@@ -44,7 +44,7 @@ export class DashboardController {
       await this.authService.ensureCampaignAccess(campaignId, req.user.id, req.user.role);
     }
     const pageNum = Math.max(1, parseInt(page || '1') || 1);
-    const limitNum = Math.min(5000, Math.max(1, parseInt(limit || '50') || 50));
+    const limitNum = Math.min(20000, Math.max(1, parseInt(limit || '50') || 50));
     return this.dashboardService.getFollowupDashboard(req.user.id, req.user.role, campaignId, pageNum, limitNum);
   }
 
@@ -63,7 +63,7 @@ export class DashboardController {
       await this.authService.ensureCampaignAccess(campaignId, req.user.id, req.user.role);
     }
     const pageNum = Math.max(1, parseInt(page || '1') || 1);
-    const limitNum = Math.min(5000, Math.max(1, parseInt(limit || '50') || 50));
+    const limitNum = Math.min(20000, Math.max(1, parseInt(limit || '50') || 50));
     return this.dashboardService.getAllLeadsDashboard(req.user.id, req.user.role, campaignId, pageNum, limitNum);
   }
 
