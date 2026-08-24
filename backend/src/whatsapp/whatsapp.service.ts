@@ -43,16 +43,17 @@ export class WhatsAppService {
   async getChats(limit = 50, offset = 0) {
     // Get distinct phones with their last message, ordered by most recent
     const chats = await this.database.db.execute(sql`
-      SELECT DISTINCT ON (phone)
-        phone,
-        name,
+      SELECT DISTINCT ON (wm.phone)
+        wm.phone,
+        COALESCE(wm.name, wc.name, '') as name,
         (SELECT message FROM "WhatsappMessage" WHERE phone = wm.phone ORDER BY "createdAt" DESC LIMIT 1) as "lastMessage",
         (SELECT "createdAt" FROM "WhatsappMessage" WHERE phone = wm.phone ORDER BY "createdAt" DESC LIMIT 1) as "lastMessageAt",
         (SELECT direction FROM "WhatsappMessage" WHERE phone = wm.phone ORDER BY "createdAt" DESC LIMIT 1) as "lastDirection",
         (SELECT type FROM "WhatsappMessage" WHERE phone = wm.phone ORDER BY "createdAt" DESC LIMIT 1) as "lastType",
         (SELECT COUNT(*) FROM "WhatsappMessage" WHERE phone = wm.phone AND direction = 'in' AND status IS NULL) as "unreadCount"
       FROM "WhatsappMessage" wm
-      ORDER BY phone, "createdAt" DESC
+      LEFT JOIN "WhatsappContact" wc ON wc.phone = wm.phone
+      ORDER BY wm.phone, wm."createdAt" DESC
       LIMIT ${limit} OFFSET ${offset}
     `);
 
@@ -119,7 +120,8 @@ export class WhatsAppService {
     };
 
     const result = await this.sendToGupshup(cfg, dest, payload);
-    await this.logMessage(dest, text, 'out', 'text', undefined, result, opts);
+    const name = await this.getContactName(dest);
+    await this.logMessage(dest, text, 'out', 'text', undefined, result, { ...opts, name });
     return result;
   }
 
@@ -135,7 +137,8 @@ export class WhatsAppService {
     };
 
     const result = await this.sendToGupshup(cfg, dest, payload);
-    await this.logMessage(dest, caption || '[Image]', 'out', 'image', url, result, opts);
+    const name = await this.getContactName(dest);
+    await this.logMessage(dest, caption || '[Image]', 'out', 'image', url, result, { ...opts, name });
     return result;
   }
 
@@ -150,7 +153,8 @@ export class WhatsAppService {
     };
 
     const result = await this.sendToGupshup(cfg, dest, payload);
-    await this.logMessage(dest, caption || '[Video]', 'out', 'video', url, result, opts);
+    const name = await this.getContactName(dest);
+    await this.logMessage(dest, caption || '[Video]', 'out', 'video', url, result, { ...opts, name });
     return result;
   }
 
@@ -160,7 +164,8 @@ export class WhatsAppService {
 
     const payload: any = { type: 'audio', url };
     const result = await this.sendToGupshup(cfg, dest, payload);
-    await this.logMessage(dest, '[Audio]', 'out', 'audio', url, result, opts);
+    const name = await this.getContactName(dest);
+    await this.logMessage(dest, '[Audio]', 'out', 'audio', url, result, { ...opts, name });
     return result;
   }
 
@@ -175,7 +180,8 @@ export class WhatsAppService {
     };
 
     const result = await this.sendToGupshup(cfg, dest, payload);
-    await this.logMessage(dest, caption || filename || '[Document]', 'out', 'file', url, result, opts);
+    const name = await this.getContactName(dest);
+    await this.logMessage(dest, caption || filename || '[Document]', 'out', 'file', url, result, { ...opts, name });
     return result;
   }
 
@@ -192,7 +198,8 @@ export class WhatsAppService {
     };
 
     const result = await this.sendToGupshup(cfg, dest, payload);
-    await this.logMessage(dest, `[Location] ${name || ''} ${lat},${lng}`, 'out', 'location', undefined, result, opts);
+    const contactName = await this.getContactName(dest);
+    await this.logMessage(dest, `[Location] ${name || ''} ${lat},${lng}`, 'out', 'location', undefined, result, { ...opts, name: contactName });
     return result;
   }
 
@@ -218,7 +225,8 @@ export class WhatsAppService {
     };
 
     const result = await this.sendToGupshup(cfg, dest, contact);
-    await this.logMessage(dest, `[Contact] ${firstName}`, 'out', 'contact', undefined, result, opts);
+    const contactName = await this.getContactName(dest);
+    await this.logMessage(dest, `[Contact] ${firstName}`, 'out', 'contact', undefined, result, { ...opts, name: contactName });
     return result;
   }
 
@@ -241,7 +249,8 @@ export class WhatsAppService {
     };
 
     const result = await this.sendToGupshup(cfg, dest, payload);
-    await this.logMessage(dest, text, 'out', 'quick_reply', undefined, result, opts);
+    const contactName = await this.getContactName(dest);
+    await this.logMessage(dest, text, 'out', 'quick_reply', undefined, result, { ...opts, name: contactName });
     return result;
   }
 
@@ -265,7 +274,8 @@ export class WhatsAppService {
     };
 
     const result = await this.sendToGupshup(cfg, dest, payload);
-    await this.logMessage(dest, text, 'out', 'list', undefined, result, opts);
+    const contactName = await this.getContactName(dest);
+    await this.logMessage(dest, text, 'out', 'list', undefined, result, { ...opts, name: contactName });
     return result;
   }
 
@@ -306,7 +316,8 @@ export class WhatsAppService {
         messageId: body.messageId || '',
       };
 
-      await this.logMessage(dest, `[Template] ${templateId}`, 'out', 'template', mediaUrl, result, opts);
+      const name = await this.getContactName(dest);
+      await this.logMessage(dest, `[Template] ${templateId}`, 'out', 'template', mediaUrl, result, { ...opts, name });
       return result;
     } catch (error: any) {
       const status = error.response?.status || 'Unknown';
@@ -399,7 +410,7 @@ export class WhatsAppService {
     await this.logMessage(phone, text, 'in', inbound.msgType || 'text', undefined, {
       status: 'received',
       messageId: inbound.messageId,
-    }, { leadId, campaignId });
+    }, { leadId, campaignId, name: inbound.name });
 
     return { status: 'ok', messageId: inbound.messageId };
   }
@@ -668,6 +679,20 @@ export class WhatsAppService {
     }
   }
 
+  private async getContactName(phone: string): Promise<string> {
+    try {
+      const normalized = this.normalizePhone(phone);
+      const [contact] = await this.database.db
+        .select({ name: whatsappContacts.name })
+        .from(whatsappContacts)
+        .where(eq(whatsappContacts.phone, normalized))
+        .limit(1);
+      return contact?.name || '';
+    } catch {
+      return '';
+    }
+  }
+
   private async logMessage(
     phone: string,
     message: string,
@@ -675,12 +700,12 @@ export class WhatsAppService {
     type: string,
     mediaUrl: string | undefined,
     result: { status: string; messageId: string },
-    opts?: { leadId?: string; campaignId?: string; userId?: string },
+    opts?: { leadId?: string; campaignId?: string; userId?: string; name?: string },
   ) {
     try {
       await this.database.db.insert(whatsappMessages).values({
         phone: this.normalizePhone(phone),
-        name: '',
+        name: opts?.name || '',
         direction,
         message: (message || '').substring(0, 2000),
         type,
