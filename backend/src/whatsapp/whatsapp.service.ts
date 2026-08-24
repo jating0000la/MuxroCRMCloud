@@ -41,19 +41,21 @@ export class WhatsAppService {
   // ─── Chat Inbox ───────────────────────────────────────────────────────────
 
   async getChats(limit = 50, offset = 0) {
-    // Get distinct phones with their last message
+    // Get distinct phones with their last message, ordered by most recent chat at top
     const chats = await this.database.db.execute(sql`
-      SELECT DISTINCT ON (wm.phone)
-        wm.phone,
+      SELECT wm.phone,
         COALESCE(wm.name, wc.name, '') as name,
-        (SELECT message FROM "WhatsappMessage" WHERE phone = wm.phone ORDER BY "createdAt" DESC LIMIT 1) as "lastMessage",
-        (SELECT "createdAt" FROM "WhatsappMessage" WHERE phone = wm.phone ORDER BY "createdAt" DESC LIMIT 1) as "lastMessageAt",
-        (SELECT direction FROM "WhatsappMessage" WHERE phone = wm.phone ORDER BY "createdAt" DESC LIMIT 1) as "lastDirection",
-        (SELECT type FROM "WhatsappMessage" WHERE phone = wm.phone ORDER BY "createdAt" DESC LIMIT 1) as "lastType",
-        (SELECT COUNT(*) FROM "WhatsappMessage" WHERE phone = wm.phone AND direction = 'in' AND status IS NULL) as "unreadCount"
+        wm.message as "lastMessage",
+        wm."createdAt" as "lastMessageAt",
+        wm.direction as "lastDirection",
+        wm.type as "lastType",
+        (SELECT COUNT(*) FROM "WhatsappMessage" wm2 WHERE wm2.phone = wm.phone AND direction = 'in' AND wm2.status IS NULL) as "unreadCount"
       FROM "WhatsappMessage" wm
       LEFT JOIN "WhatsappContact" wc ON wc.phone = wm.phone
-      ORDER BY wm.phone, wm."createdAt" DESC
+      WHERE wm."createdAt" = (
+        SELECT MAX(wm2."createdAt") FROM "WhatsappMessage" wm2 WHERE wm2.phone = wm.phone
+      )
+      ORDER BY wm."createdAt" DESC
       LIMIT ${limit} OFFSET ${offset}
     `);
 
