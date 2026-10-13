@@ -49,6 +49,7 @@ export default function CampaignDetailPage() {
   const [editingForm, setEditingForm] = useState<Form | null>(null);
   const [leadSearch, setLeadSearch] = useState('');
   const [leadStatusFilter, setLeadStatusFilter] = useState('');
+    const [leadUserFilter, setLeadUserFilter] = useState('');
   const [leadPage, setLeadPage] = useState(1);
   const [leadPageSize, setLeadPageSize] = useState(DEFAULT_LEAD_PAGE_SIZE);
   const [file, setFile] = useState<File | null>(null);
@@ -353,8 +354,9 @@ export default function CampaignDetailPage() {
       lead.email?.toLowerCase().includes(leadSearch.toLowerCase()) ||
       lead.phone?.includes(leadSearch);
     const matchStatus = !leadStatusFilter || lead.statusId === leadStatusFilter;
-    return matchSearch && matchStatus;
-  }), [leads, leadSearch, leadStatusFilter]);
+    const matchUser = !leadUserFilter || lead.doerId === leadUserFilter;
+    return matchSearch && matchStatus && matchUser;
+  }), [leads, leadSearch, leadStatusFilter, leadUserFilter]);
 
   const totalLeadPages = Math.max(1, Math.ceil(filteredLeads.length / leadPageSize));
   const currentLeadPage = Math.min(leadPage, totalLeadPages);
@@ -362,12 +364,13 @@ export default function CampaignDetailPage() {
 
   useEffect(() => {
     setLeadPage(1);
-  }, [leadSearch, leadStatusFilter, leadPageSize]);
+    }, [leadSearch, leadStatusFilter, leadPageSize, leadUserFilter]);
 
   const clearLeadFilters = () => {
     setLeadSearch('');
     setLeadStatusFilter('');
-  };
+      setLeadUserFilter('');
+    };
 
   if (loading) {
     return (
@@ -520,7 +523,7 @@ export default function CampaignDetailPage() {
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden dark:bg-gray-800 dark:border-gray-700">
               <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2 dark:border-b dark:border-gray-700 dark:bg-gray-900/50">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
-                  <div className="lg:col-span-5 relative">
+                                  <div className="lg:col-span-4 relative">
                     <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
@@ -542,7 +545,17 @@ export default function CampaignDetailPage() {
                       <option key={s.id} value={s.id}>{s.label}</option>
                     ))}
                   </select>
-                  <div className="lg:col-span-5 flex items-center justify-end gap-2 flex-wrap">
+                                  <select
+                                    value={leadUserFilter}
+                                    onChange={(e) => setLeadUserFilter(e.target.value)}
+                                    className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                                  >
+                                    <option value="">All users</option>
+                                    {users.map((u) => (
+                                      <option key={u.id} value={u.id}>{u.name || u.username}</option>
+                                    ))}
+                                  </select>
+                                  <div className="lg:col-span-4 flex items-center justify-end gap-2 flex-wrap">
                     <select
                       value={leadPageSize}
                       onChange={(e) => setLeadPageSize(Number(e.target.value))}
