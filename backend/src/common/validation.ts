@@ -79,12 +79,16 @@ export const FormSubmissionSchema = z.object({
 });
 
 // Bulk import row validation
+// Note: name is required and must have at least 1 character (matches DB notNull constraint)
 export const BulkLeadRowSchema = z.object({
   name: z.string().min(1).max(255).trim(),
   email: z.string().email().optional().or(z.literal('')),
   phone: z.string().refine(validatePhoneNumber, 'Invalid phone number').optional(),
   source: z.string().default('bulk'),
 });
+
+// Valid column name variations for "name" in CSV imports
+export const VALID_NAME_COLUMNS = ['name', 'Name', 'contact_name', 'full_name', 'customer_name', 'first_name', 'last_name'];
 
 export type CreateLeadInput = z.infer<typeof CreateLeadSchema>;
 export type FormSubmissionInput = z.infer<typeof FormSubmissionSchema>;

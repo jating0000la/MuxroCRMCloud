@@ -38,22 +38,38 @@ export class BulkImportService {
     const validatedRecords: any[] = [];
     for (let i = 0; i < records.length; i++) {
       try {
-        const validated = BulkLeadRowSchema.parse({
-          name: records[i].name || records[i].Name || records[i].contact_name || '',
-          email: records[i].email || records[i].Email || '',
-          phone: records[i].phone || records[i].Phone || records[i].contact_phone || '',
-          source: 'bulk',
-        });
-        validatedRecords.push({
-          ...validated,
-          customData: sanitizeJson(records[i]),
-        });
-      } catch (error) {
-        throw new BadRequestException(
-          `Invalid data in row ${i + 1}: ${error instanceof Error ? error.message : 'Validation failed'}`
-        );
-      }
-    }
+            // Normalize row to ensure name column exists with proper key for validation
+            const normalizedRow = { ...records[i] };
+            const nameKeys = ['name', 'Name', 'contact_name', 'full_name', 'customer_name', 'first_name', 'last_name'];
+            const nameValue = nameKeys.find(key => normalizedRow[key] !== undefined);
+        
+            if (!nameValue) {
+              throw new Error('No valid name column found. Expected one of: ' + nameKeys.join(', '));
+            }
+        
+            const normalizedName = normalizedRow[nameValue];
+        
+            // Use exact field name (name) for validation to match BulkLeadRowSchema expectations
+            const rowForValidation = {
+              name: normalizedName,
+              email: records[i].email || records[i].Email || '',
+              phone: records[i].phone || records[i].Phone || records[i].contact_phone || '',
+              source: 'bulk',
+            };
+        
+            const validated = BulkLeadRowSchema.parse(rowForValidation);
+        
+            // Add original row data for customData preservation (before sanitization)
+            validatedRecords.push({
+              ...validated,
+              customData: sanitizeJson(records[i]),
+            });
+          } catch (error) {
+            throw new BadRequestException(
+              `Invalid data in row ${i + 1}: ${error instanceof Error ? error.message : 'Validation failed'}`
+            );
+          }
+        }
 
     const [firstStatus] = await this.database.db
       .select()
@@ -146,22 +162,31 @@ export class BulkImportService {
     const validatedRecords: any[] = [];
     for (let i = 0; i < data.length; i++) {
       try {
-        const validated = BulkLeadRowSchema.parse({
-          name: data[i].name || data[i].Name || '',
-          email: data[i].email || data[i].Email || '',
-          phone: data[i].phone || data[i].Phone || '',
-          source: 'bulk',
-        });
-        validatedRecords.push({
-          ...validated,
-          customData: sanitizeJson(data[i]),
-        });
-      } catch (error) {
-        throw new BadRequestException(
-          `Invalid data in record ${i + 1}: ${error instanceof Error ? error.message : 'Validation failed'}`
-        );
+          const row = data[i];
+          // Handle name column variations similar to CSV import
+          const nameKeys = ['name', 'Name', 'contact_name', 'full_name', 'customer_name', 'first_name', 'last_name'];
+          const nameValue = nameKeys.find(key => row[key] !== undefined);
+        
+          if (!nameValue) {
+            throw new Error('No valid name column found. Expected one of: ' + nameKeys.join(', '));
+          }
+        
+          const validated = BulkLeadRowSchema.parse({
+            name: row[nameValue] || '',
+            email: row.email || row.Email || '',
+            phone: row.phone || row.Phone || '',
+            source: 'bulk',
+          });
+          validatedRecords.push({
+            ...validated,
+            customData: sanitizeJson(row),
+          });
+        } catch (error) {
+          throw new BadRequestException(
+            `Invalid data in record ${i + 1}: ${error instanceof Error ? error.message : 'Validation failed'}`
+          );
+        }
       }
-    }
 
     const [firstStatus] = await this.database.db
       .select()
