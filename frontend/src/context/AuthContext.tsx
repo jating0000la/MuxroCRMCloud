@@ -6,6 +6,7 @@ interface AuthContextType {
   user: User | null;
   login: (username: string, password: string, remember?: boolean) => Promise<void>;
   logout: () => Promise<void>;
+  clearSession: () => void;
   isLoading: boolean;
   isSubmitting: boolean;
 }
@@ -75,8 +76,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const clearSession = useCallback(() => {
+    clearStoredAuth();
+    setUser(null);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading, isSubmitting }}>
+    <AuthContext.Provider value={{ user, login, logout, clearSession, isLoading, isSubmitting }}>
       {children}
     </AuthContext.Provider>
   );

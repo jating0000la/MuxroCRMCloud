@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import Layout from '../../components/layout/Layout';
-import { adminService, BackupInfo } from '../../services/admin';
+import { adminService, BackupInfo, BackupStatus, backupErrorMessage } from '../../services/admin';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 function formatBytes(bytes: number): string {
   if (!bytes) return '0 B';
@@ -12,6 +14,11 @@ function formatBytes(bytes: number): string {
 }
 
 export default function BackupsPage() {
+  const { clearSession } = useAuth();
+  const navigate = useNavigate();
+  const [status, setStatus] = useState<BackupStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
   const [backups, setBackups] = useState<BackupInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
@@ -21,16 +28,19 @@ export default function BackupsPage() {
   const [restoreConfirmText, setRestoreConfirmText] = useState('');
   const [restoringFile, setRestoringFile] = useState<string | null>(null);
 
+  const busy = triggering || !!deletingFile || !!restoringFile || !!downloadingFile || !!status?.busy;
+
   useEffect(() => {
     let cancelled = false;
 
     const loadAll = async () => {
       try {
         setLoading(true);
-        const data = await adminService.getBackups();
-        if (!cancelled) setBackups(data);
+        const [data, capabilities] = await Promise.all([adminService.getBackups(), adminService.getBackupStatus()]);
+        if (!cancelled) { setBackups(data); setStatus(capabilities); setError(null); }
       } catch (error: any) {
-        if (!cancelled) toast.error(error.response?.data?.message || 'Failed to load backups');
+        const message = await backupErrorMessage(error, 'Failed to load backups');
+        if (!cancelled) setError(message);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -43,29 +53,34 @@ export default function BackupsPage() {
   const loadBackups = async () => {
     try {
       setLoading(true);
-      const data = await adminService.getBackups();
-      setBackups(data);
+      const [data, capabilities] = await Promise.all([adminService.getBackups(), adminService.getBackupStatus()]);
+      setBackups(data); setStatus(capabilities); setError(null);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to load backups');
+      setError(await backupErrorMessage(error, 'Failed to load backups'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleTriggerBackup = async () => {
+    if (busy || !status?.creationAvailable) return;
     setTriggering(true);
     try {
       const result = await adminService.triggerBackup();
       toast.success(`Backup created: ${formatBytes(result.size)} in ${(result.duration / 1000).toFixed(1)}s`);
+      if (result.warnings) toast(result.warnings, { icon: '⚠️', duration: 8000 });
       await loadBackups();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Backup failed');
+      toast.error(await backupErrorMessage(error, 'Backup failed'));
+      await loadBackups();
     } finally {
       setTriggering(false);
     }
   };
 
   const handleDownload = async (filename: string) => {
+    if (busy) return;
+    setDownloadingFile(filename);
     try {
       const blob = await adminService.downloadBackup(filename);
       const url = URL.createObjectURL(blob);
@@ -77,12 +92,12 @@ export default function BackupsPage() {
       link.remove();
       URL.revokeObjectURL(url);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Download failed');
-    }
+      toast.error(await backupErrorMessage(error, 'Download failed'));
+    } finally { setDownloadingFile(null); }
   };
 
   const handleDelete = async () => {
-    if (!confirmDelete) return;
+    if (!confirmDelete || busy) return;
     setDeletingFile(confirmDelete.filename);
     try {
       await adminService.deleteBackup(confirmDelete.filename);
@@ -90,28 +105,24 @@ export default function BackupsPage() {
       setConfirmDelete(null);
       await loadBackups();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to delete backup');
+      toast.error(await backupErrorMessage(error, 'Failed to delete backup'));
     } finally {
       setDeletingFile(null);
     }
   };
 
   const handleRestore = async () => {
-    if (!confirmRestore) return;
+    if (!confirmRestore || busy || restoreConfirmText !== 'RESTORE' || !status?.restoreAvailable) return;
     setRestoringFile(confirmRestore.filename);
     try {
-      const result = await adminService.restoreBackup(confirmRestore.filename);
-      toast.success(
-        `Database restored from ${result.filename} in ${(result.duration / 1000).toFixed(1)}s. Restart the backend and worker now.`,
-        { duration: 8000 },
-      );
-      if (result.warnings) {
-        toast(`Restore completed with warnings — check server logs.`, { icon: '⚠️', duration: 8000 });
-      }
-      setConfirmRestore(null);
-      setRestoreConfirmText('');
+      const result = await adminService.restoreBackup(confirmRestore.filename, restoreConfirmText);
+      sessionStorage.setItem('backupRestoreNotice',
+        `Database restored successfully. Sign in using an account and password from the selected backup. A recovery backup was saved as ${result.recoveryBackup}. Restart any workers you stopped.`);
+      clearSession();
+      navigate('/login', { replace: true });
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Restore failed');
+      toast.error(await backupErrorMessage(error, 'Restore failed. Check the server before retrying.'), { duration: 8000 });
+      await loadBackups();
     } finally {
       setRestoringFile(null);
     }
@@ -129,7 +140,7 @@ export default function BackupsPage() {
           </div>
           <button
             onClick={handleTriggerBackup}
-            disabled={triggering}
+            disabled={busy || !status?.creationAvailable}
             className="inline-flex items-center justify-center px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {triggering ? (
@@ -147,10 +158,17 @@ export default function BackupsPage() {
         </div>
 
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-900/20 dark:text-blue-300">
-          Automatic backups run daily at 2:00 AM server time and old backups are cleaned up automatically based on
-          the configured retention period. Use "Create Backup Now" for an on-demand backup, or "Restore" to recover
-          the database from a specific backup.
+          Backups contain database records; uploaded files and server encryption keys must be backed up separately.
+          Automatic backups require a server schedule. On-demand backups retain {status?.retentionDays ?? 7} days of backups.
+          Restore saves a recovery backup first and signs everyone out after success.
         </div>
+
+        {(status?.unavailableReason || status?.restoreUnavailableReason || status?.busy) && (
+          <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-900/20 dark:text-amber-300">
+            {status.busy ? 'A backup or restore operation is already running.' : status.unavailableReason || status.restoreUnavailableReason}
+          </div>
+        )}
+        <button onClick={loadBackups} disabled={triggering || !!restoringFile || !!deletingFile} className="text-sm font-semibold text-primary-700 disabled:opacity-50">Refresh backups</button>
 
         <div className="bg-white rounded-xl shadow-sm border dark:bg-gray-800 dark:border-gray-700 overflow-hidden">
           {loading ? (
@@ -160,11 +178,13 @@ export default function BackupsPage() {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
             </div>
+          ) : error ? (
+            <div role="alert" className="p-6 text-sm text-red-700 dark:text-red-300">{error}</div>
           ) : backups.length === 0 ? (
             <div className="p-10 text-center">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-300">No backups yet</p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                Click "Create Backup Now" to generate the first one, or wait for the nightly scheduled backup.
+                Click "Create Backup Now" to generate the first one.
               </p>
             </div>
           ) : (
@@ -189,20 +209,21 @@ export default function BackupsPage() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleDownload(backup.filename)}
+                          disabled={busy}
                           className="px-2.5 py-1 text-xs font-semibold rounded-md border border-primary-200 text-primary-700 hover:bg-primary-50 dark:border-primary-800 dark:text-primary-300 dark:hover:bg-primary-900/30"
                         >
-                          Download
+                          {downloadingFile === backup.filename ? 'Downloading…' : 'Download'}
                         </button>
                         <button
                           onClick={() => { setConfirmRestore(backup); setRestoreConfirmText(''); }}
-                          disabled={restoringFile === backup.filename}
+                          disabled={busy || !status?.restoreAvailable}
                           className="px-2.5 py-1 text-xs font-semibold rounded-md border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-60 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/30"
                         >
                           Restore
                         </button>
                         <button
                           onClick={() => setConfirmDelete(backup)}
-                          disabled={deletingFile === backup.filename}
+                          disabled={busy}
                           className="px-2.5 py-1 text-xs font-semibold rounded-md border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-60 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/30"
                         >
                           Delete
@@ -228,6 +249,7 @@ export default function BackupsPage() {
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setConfirmDelete(null)}
+                disabled={!!deletingFile}
                 className="px-4 py-2 text-sm font-semibold rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 Cancel
@@ -237,7 +259,7 @@ export default function BackupsPage() {
                 disabled={deletingFile === confirmDelete.filename}
                 className="px-4 py-2 text-sm font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
               >
-                Delete
+                {deletingFile ? 'Deleting…' : 'Delete'}
               </button>
             </div>
           </div>
@@ -251,7 +273,9 @@ export default function BackupsPage() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
               This will <span className="font-semibold text-red-600 dark:text-red-400">overwrite all current data</span> in
               the database with the contents of <span className="font-mono text-xs">{confirmRestore.filename}</span>.
-              This cannot be undone, and the backend/worker should be restarted immediately after.
+              A recovery backup is saved first. Database changes are applied atomically; if restore fails, current data is preserved.
+              After success, all sessions and pending jobs are cleared. Sign in using an account from the backup, then restart any stopped workers.
+              Uploaded files and server encryption keys are unchanged.
             </p>
             <label className="block mt-4">
               <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
@@ -263,19 +287,21 @@ export default function BackupsPage() {
                 onChange={(e) => setRestoreConfirmText(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                 placeholder="RESTORE"
+                disabled={!!restoringFile}
                 autoFocus
               />
             </label>
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => { setConfirmRestore(null); setRestoreConfirmText(''); }}
+                disabled={!!restoringFile}
                 className="px-4 py-2 text-sm font-semibold rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 Cancel
               </button>
               <button
                 onClick={handleRestore}
-                disabled={restoreConfirmText !== 'RESTORE' || restoringFile === confirmRestore.filename}
+                disabled={restoreConfirmText !== 'RESTORE' || busy || !status?.restoreAvailable}
                 className="px-4 py-2 text-sm font-semibold rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {restoringFile === confirmRestore.filename ? 'Restoring…' : 'Restore'}

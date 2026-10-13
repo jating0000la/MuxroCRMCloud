@@ -10,12 +10,38 @@ export interface TriggerBackupResult {
   file: string;
   size: number;
   duration: number;
+  warnings?: string;
 }
 
 export interface RestoreBackupResult {
   filename: string;
   duration: number;
-  warnings?: string;
+  recoveryBackup: string;
+  requiresLogin: true;
+}
+
+export interface BackupStatus {
+  scope: 'database';
+  retentionDays: number;
+  scheduling: 'external';
+  busy: boolean;
+  creationAvailable: boolean;
+  unavailableReason: string | null;
+  restoreAvailable: boolean;
+  restoreUnavailableReason: string | null;
+}
+
+const BACKUP_REQUEST_TIMEOUT = 660000;
+
+export async function backupErrorMessage(error: any, fallback: string): Promise<string> {
+  let data = error.response?.data;
+  if (data instanceof Blob) {
+    try { data = JSON.parse(await data.text()); } catch { /* use fallback */ }
+  }
+  if (Array.isArray(data?.message)) return data.message.join('. ');
+  if (typeof data?.message === 'string') return data.message;
+  if (error.code === 'ECONNABORTED') return 'Request timed out. Check the backup list before retrying; the server may still be working.';
+  return fallback;
 }
 
 export const adminService = {
@@ -24,13 +50,18 @@ export const adminService = {
     return data;
   },
 
+  getBackupStatus: async (): Promise<BackupStatus> => {
+    const { data } = await api.get('/admin/backups/status');
+    return data;
+  },
+
   triggerBackup: async (retentionDays?: number): Promise<TriggerBackupResult> => {
     // pg_dump can take a while on larger databases; use a longer timeout than
     // the default 30s so the request isn't aborted while the backup is still running.
     const { data } = await api.post(
       '/admin/backups/trigger',
-      retentionDays ? { retentionDays } : {},
-      { timeout: 300000 },
+      retentionDays === undefined ? {} : { retentionDays },
+      { timeout: BACKUP_REQUEST_TIMEOUT },
     );
     return data;
   },
@@ -39,13 +70,12 @@ export const adminService = {
     await api.delete(`/admin/backups/${encodeURIComponent(filename)}`);
   },
 
-  restoreBackup: async (filename: string): Promise<RestoreBackupResult> => {
-    // pg_restore can take a while on larger databases; match the backend's own
-    // 300s child-process timeout so the request isn't aborted mid-restore.
+  restoreBackup: async (filename: string, confirmation: string): Promise<RestoreBackupResult> => {
+    // Allow time for recovery backup, SQL generation, and transactional restore.
     const { data } = await api.post(
       `/admin/backups/${encodeURIComponent(filename)}/restore`,
-      undefined,
-      { timeout: 300000 },
+      { confirmation },
+      { timeout: BACKUP_REQUEST_TIMEOUT },
     );
     return data;
   },
@@ -57,7 +87,7 @@ export const adminService = {
   downloadBackup: async (filename: string): Promise<Blob> => {
     const { data } = await api.get(
       `/admin/backups/${encodeURIComponent(filename)}/download`,
-      { responseType: 'blob', timeout: 300000 },
+      { responseType: 'blob', timeout: BACKUP_REQUEST_TIMEOUT },
     );
     return data;
   },

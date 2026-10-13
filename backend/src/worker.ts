@@ -36,6 +36,7 @@ const logger = new Logger('Worker');
 class WorkerModule {}
 
 async function bootstrap() {
+  process.env.CRM_PROCESS_ROLE = 'worker';
   logger.log('Starting worker process...');
 
   const app = await NestFactory.createApplicationContext(WorkerModule);

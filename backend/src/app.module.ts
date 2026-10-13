@@ -28,6 +28,7 @@ import { DataExportModule } from './data-export/data-export.module';
 
 // Middleware
 import { StructuredLoggingMiddleware } from './common/logging/structured-logging.middleware';
+import { BackupMaintenanceMiddleware } from './common/backup/backup-maintenance.middleware';
 
 @Module({
   imports: [
@@ -69,6 +70,6 @@ import { StructuredLoggingMiddleware } from './common/logging/structured-logging
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(StructuredLoggingMiddleware).forRoutes('*');
+    consumer.apply(BackupMaintenanceMiddleware, StructuredLoggingMiddleware).forRoutes('*');
   }
 }

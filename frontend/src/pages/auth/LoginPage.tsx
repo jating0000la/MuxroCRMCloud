@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { readBranding } from '../../utils/branding';
 
 export default function LoginPage() {
+  const [restoreNotice] = useState(() => sessionStorage.getItem('backupRestoreNotice'));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -29,6 +30,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(username.trim(), password, rememberMe);
+      sessionStorage.removeItem('backupRestoreNotice');
       toast.success('Welcome back!');
       navigate('/dashboard');
     } catch (error: any) {
@@ -89,6 +91,7 @@ export default function LoginPage() {
             <p className="text-gray-500 dark:text-gray-400 mt-1">Sign in to your CRM account</p>
           </div>
 
+          {restoreNotice && <div role="status" className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:bg-green-900/20 dark:text-green-300">{restoreNotice}</div>}
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>

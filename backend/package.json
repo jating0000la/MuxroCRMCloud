@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "CRM Backend API",
   "scripts": {
-    "test": "node --test --require ts-node/register test/user-management.test.ts",
+    "test": "node --test --require ts-node/register test/*.test.ts",
     "build": "nest build",
     "build:worker": "nest build src/worker.ts",
     "start": "nest start",

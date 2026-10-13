@@ -1,7 +1,8 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PgBoss } from 'pg-boss';
-import { DatabaseService } from '../db/database.service';
+import { DatabaseService, databaseApplicationName } from '../db/database.service';
+import { JOB_TYPES } from './job.types';
 
 @Injectable()
 export class JobService implements OnModuleInit, OnModuleDestroy {
@@ -15,13 +16,16 @@ export class JobService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     const connectionString = this.configService.get<string>('DATABASE_URL');
-    this.boss = new PgBoss(connectionString!);
+    const url = new URL(connectionString!);
+    url.searchParams.set('application_name', databaseApplicationName('jobs'));
+    this.boss = new PgBoss(url.toString());
 
     this.boss.on('error', (err) => {
       this.logger.error(`pg-boss error: ${err.message}`);
     });
 
     await this.boss.start();
+    for (const name of Object.values(JOB_TYPES)) await this.boss.createQueue(name);
     this.logger.log('pg-boss started');
   }
 
@@ -44,13 +48,15 @@ export class JobService implements OnModuleInit, OnModuleDestroy {
       idempotencyKey?: string;
     },
   ): Promise<string | null> {
-    const jobId = await this.boss.send(queueName, data, {
+    const jobOptions = {
       priority: options?.priority,
       startAfter: options?.startAfter,
       singletonKey: options?.singletonKey || options?.idempotencyKey,
       retryLimit: options?.retryLimit ?? 3,
       retryBackoff: options?.retryBackoff ?? true,
-    });
+    };
+    const jobId = await this.boss.send(queueName, data,
+      Object.fromEntries(Object.entries(jobOptions).filter(([, value]) => value !== undefined)));
     this.logger.debug(`Job ${queueName} queued: ${jobId}`);
     return jobId;
   }
@@ -67,12 +73,11 @@ export class JobService implements OnModuleInit, OnModuleDestroy {
     const jobs = items.map((data) => ({
       name: queueName,
       data,
-      options: {
-        retryLimit: options?.retryLimit ?? 3,
-        retryBackoff: options?.retryBackoff ?? true,
-      },
+      priority: options?.priority ?? 0,
+      retryLimit: options?.retryLimit ?? 3,
+      retryBackoff: options?.retryBackoff ?? true,
     }));
-    const result = await this.boss.insert(queueName, jobs);
+    const result = await this.boss.insert(queueName, jobs, { returnId: true });
     this.logger.debug(`Bulk jobs ${queueName}: ${result?.length ?? 0} queued`);
     return result || [];
   }

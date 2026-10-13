@@ -96,7 +96,7 @@ export class JobProcessors {
         return { processed: count };
       }},
       { type: JOB_TYPES.BACKUP_DATABASE, handler: async (data: any) => {
-        return await this.backupService.createBackup(data.retentionDays || 7);
+        return await this.backupService.createBackup(data.retentionDays);
       }},
     ];
 

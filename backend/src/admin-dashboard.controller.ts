@@ -1,5 +1,7 @@
-import { Controller, Get, Post, Delete, Body, Param, Res, UseGuards, Query } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Post, Delete, Body, Param, Res, UseGuards, Query, Next } from '@nestjs/common';
+import { Response, NextFunction } from 'express';
+import { ConfigService } from '@nestjs/config';
+import { TriggerBackupDto, RestoreBackupDto } from './common/backup/backup.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { sql } from 'drizzle-orm';
 import { DatabaseService } from './db/database.service';
@@ -27,6 +29,7 @@ export class AdminDashboardController {
     private outboxService: OutboxService,
     private backupService: BackupService,
     private refreshSessionService: RefreshSessionService,
+    private configService: ConfigService,
   ) {}
 
   @Get('health')
@@ -197,29 +200,43 @@ export class AdminDashboardController {
 
   @Post('backups/trigger')
   @ApiOperation({ summary: 'Trigger a manual database backup now' })
-  async triggerBackup(@Body() body?: { retentionDays?: number }) {
-    const retentionDays =
-      body?.retentionDays && body.retentionDays > 0 ? body.retentionDays : 7;
-    return this.backupService.createBackup(retentionDays);
+  async triggerBackup(@Body() body: TriggerBackupDto) {
+    return this.backupService.createBackup(body?.retentionDays);
+  }
+
+  @Get('backups/status')
+  @ApiOperation({ summary: 'Backup capabilities, retention, and restore availability' })
+  getBackupStatus() {
+    return this.backupService.getStatus();
   }
 
   @Get('backups/:filename/download')
   @ApiOperation({ summary: 'Download a backup file' })
-  async downloadBackup(@Param('filename') filename: string, @Res() res: Response) {
-    const filepath = this.backupService.getBackupFilePath(filename);
-    res.download(filepath, filename);
+  async downloadBackup(@Param('filename') filename: string, @Res() res: Response, @Next() next: NextFunction) {
+    const { stream, size } = this.backupService.openBackup(filename);
+    res.set({ 'Content-Type': 'application/octet-stream', 'Content-Length': String(size),
+      'Content-Disposition': `attachment; filename="${filename}"`, 'Cache-Control': 'no-store' });
+    stream.on('error', next);
+    res.once('close', () => stream.destroy());
+    stream.pipe(res);
   }
 
   @Delete('backups/:filename')
   @ApiOperation({ summary: 'Delete a backup file' })
   async deleteBackup(@Param('filename') filename: string) {
-    this.backupService.deleteBackup(filename);
+    await this.backupService.deleteBackup(filename);
     return { message: 'Backup deleted successfully' };
   }
 
   @Post('backups/:filename/restore')
   @ApiOperation({ summary: 'Restore the database from a backup file (destructive, overwrites current data)' })
-  async restoreBackup(@Param('filename') filename: string) {
-    return this.backupService.restoreBackup(filename);
+  async restoreBackup(@Param('filename') filename: string, @Body() body: RestoreBackupDto,
+    @Res({ passthrough: true }) res: Response) {
+    const result = await this.backupService.restoreBackup(filename);
+    const options = { httpOnly: true, secure: this.configService.get('NODE_ENV') === 'production',
+      sameSite: 'lax' as const, path: '/' };
+    res.clearCookie('auth_token', options);
+    res.clearCookie('refresh_token', options);
+    return result;
   }
 }

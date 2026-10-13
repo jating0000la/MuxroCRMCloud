@@ -68,7 +68,15 @@ beforeEach(async () => {
 
 after(async () => {
   if (database) await database.onModuleDestroy();
-  if (created) await root.query(`DROP DATABASE "${databaseName}" WITH (FORCE)`);
+  if (created) {
+    // pool.end() can resolve before every TCP disconnect reaches PostgreSQL.
+    const deadline = Date.now() + 5000;
+    while (Number((await root.query('SELECT count(*) FROM pg_stat_activity WHERE datname = $1', [databaseName])).rows[0].count) > 0) {
+      assert.ok(Date.now() < deadline, 'Test database connections did not close');
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    await root.query(`DROP DATABASE "${databaseName}"`);
+  }
   if (root) await root.end();
 });
 

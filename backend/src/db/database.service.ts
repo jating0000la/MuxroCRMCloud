@@ -2,7 +2,14 @@ import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
+import { randomUUID } from 'crypto';
 import * as schema from './schema';
+
+const processDatabaseId = randomUUID();
+
+export function databaseApplicationName(kind = 'database'): string {
+  return `muxro-${process.env.CRM_PROCESS_ROLE === 'worker' ? 'worker' : 'api'}-${kind}-${processDatabaseId}`;
+}
 
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
@@ -17,13 +24,18 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
-    const databaseUrl = this.configService.get<string>('DATABASE_URL');
+    const databaseUrl = new URL(this.configService.getOrThrow<string>('DATABASE_URL'));
+    databaseUrl.searchParams.set('application_name', databaseApplicationName());
     this.pool = new Pool({
-      connectionString: databaseUrl,
+      connectionString: databaseUrl.toString(),
+      application_name: databaseApplicationName(),
       max: this.configService.get<number>('DB_POOL_MAX', 5),
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
       options: '-c statement_timeout=30000', // Apply 30s timeout to ALL pool connections
+    });
+    this.pool.on('error', () => {
+      this.logger.error('An idle PostgreSQL connection failed; the pool will reconnect.');
     });
 
     this.db = drizzle(this.pool, { schema });
