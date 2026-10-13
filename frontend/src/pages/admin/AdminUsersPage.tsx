@@ -5,6 +5,7 @@ import Layout from '../../components/layout/Layout';
 import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { useAuth } from '../../context/AuthContext';
 
 const DEFAULT_PAGE_SIZE = 50;
 
@@ -21,6 +22,7 @@ const roleAvatarColors: Record<string, string> = {
 };
 
 export default function AdminUsersPage() {
+  const { user: currentUser, logout } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,7 +98,13 @@ export default function AdminUsersPage() {
     if (newPassword.length < 8) { toast.error('Min 8 characters'); return; }
     if (newPassword !== confirmPassword) { toast.error('Passwords do not match'); return; }
     setSaving(true);
-    try { await userService.resetPassword(selectedUser!.id, newPassword); toast.success('Password reset'); closeModal(); }
+    try {
+      await userService.resetPassword(selectedUser!.id, newPassword);
+      const resetOwnPassword = selectedUser!.id === currentUser?.id;
+      toast.success(resetOwnPassword ? 'Password reset. Sign in with your new password.' : 'Password reset');
+      closeModal();
+      if (resetOwnPassword) await logout();
+    }
     catch (err: any) { toast.error(err.response?.data?.message || 'Failed to reset password'); }
     finally { setSaving(false); }
   };
@@ -107,7 +115,7 @@ export default function AdminUsersPage() {
       if (u.isActive) { await userService.remove(u.id); toast.success(`${u.name} deactivated`); }
       else { await userService.update(u.id, { isActive: true }); toast.success(`${u.name} activated`); }
       loadUsers();
-    } catch { toast.error('Failed to update user'); }
+    } catch (err: any) { toast.error(err.response?.data?.message || 'Failed to update user'); }
     finally { setTogglingUserId(null); }
   };
 
@@ -243,13 +251,13 @@ export default function AdminUsersPage() {
                             <ActionBtn onClick={() => openResetPassword(u)} title="Reset password" color="amber">
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
                             </ActionBtn>
-                            <ActionBtn onClick={() => handleToggleActive(u)} title={u.isActive ? 'Deactivate' : 'Activate'} color={u.isActive ? 'orange' : 'green'} disabled={saving}>
+                            <ActionBtn onClick={() => handleToggleActive(u)} title={u.id === currentUser?.id ? 'You cannot deactivate your own account' : u.isActive ? 'Deactivate' : 'Activate'} color={u.isActive ? 'orange' : 'green'} disabled={saving || !!togglingUserId || u.id === currentUser?.id}>
                               {u.isActive
                                 ? <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
                                 : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                               }
                             </ActionBtn>
-                            <ActionBtn onClick={() => openDelete(u)} title="Delete permanently" color="red">
+                            <ActionBtn onClick={() => openDelete(u)} title={u.id === currentUser?.id ? 'You cannot delete your own account' : 'Delete permanently'} color="red" disabled={saving || u.id === currentUser?.id}>
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                             </ActionBtn>
                           </div>
@@ -290,10 +298,11 @@ export default function AdminUsersPage() {
             <Field label="Username *"><input type="text" value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })} className="input" required /></Field>
             <Field label="Email"><input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="input" /></Field>
             <Field label="Role *">
-              <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} className="input">
+              <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} className="input" disabled={selectedUser.id === currentUser?.id}>
                 <option value="USER">User</option>
                 <option value="ADMIN">Admin</option>
               </select>
+              {selectedUser.id === currentUser?.id && <p className="text-xs text-gray-500 mt-1">Your account must keep admin access.</p>}
             </Field>
             <ModalFooter onCancel={closeModal} saving={saving} label="Save Changes" />
           </form>
@@ -336,7 +345,7 @@ export default function AdminUsersPage() {
               <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
               <div>
                 <p className="font-semibold text-red-900 text-sm dark:text-red-300">This cannot be undone!</p>
-                <p className="text-sm text-red-700 mt-1 dark:text-red-400"><strong>{selectedUser.name}</strong> (@{selectedUser.username}) and all their data will be permanently deleted. Consider <strong>Deactivating</strong> instead.</p>
+                <p className="text-sm text-red-700 mt-1 dark:text-red-400">The account for <strong>{selectedUser.name}</strong> (@{selectedUser.username}) and its related records will be deleted. Reassign their leads and managed campaigns first, or <strong>deactivate</strong> the account to preserve its history.</p>
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">

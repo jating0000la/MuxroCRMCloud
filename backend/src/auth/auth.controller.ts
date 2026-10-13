@@ -1,7 +1,6 @@
 import { Controller, Post, Body, Get, UseGuards, Request, Response } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { TokenBlacklistService } from './services/token-blacklist.service';
 import { StrictThrottle } from '../common/decorators/strict-throttle.decorator';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -9,8 +8,17 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
 import { ConfigService } from '@nestjs/config';
-import { ExtractJwt } from 'passport-jwt';
-import { revokeAccessToken } from './strategies/jwt.strategy';
+import { IsString, MinLength } from 'class-validator';
+
+class ChangePasswordDto {
+  @IsString()
+  @MinLength(1)
+  currentPassword: string;
+
+  @IsString()
+  @MinLength(8)
+  newPassword: string;
+}
 
 function parseExpirationToMs(expiration: string): number {
   const match = expiration.match(/^(\d+)([smhd])$/);
@@ -39,7 +47,6 @@ const COOKIE_OPTIONS = (maxAgeMs: number, isProduction: boolean) => ({
 export class AuthController {
   constructor(
     private authService: AuthService,
-    private tokenBlacklist: TokenBlacklistService,
     private configService: ConfigService,
   ) {}
 
@@ -69,12 +76,6 @@ export class AuthController {
       return res.status(401).json({ message: 'No refresh token found. Please log in again.' });
     }
 
-    // Revoke old access token in in-memory blacklist
-    const oldAccessToken = req.cookies?.auth_token;
-    if (oldAccessToken) {
-      revokeAccessToken(oldAccessToken);
-    }
-
     const result = await this.authService.refreshAccessToken(refreshToken);
     const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
     const accessExpiration = this.configService.get<string>('ACCESS_TOKEN_EXPIRATION', '15m');
@@ -93,17 +94,9 @@ export class AuthController {
   @Roles('ADMIN')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Register new user (Admin only)' })
-  async register(@Body() registerDto: RegisterDto, @Response() res) {
-    const result = await this.authService.register(registerDto);
-    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
-    const accessExpiration = this.configService.get<string>('ACCESS_TOKEN_EXPIRATION', '15m');
-    const refreshExpiration = this.configService.get<string>('REFRESH_TOKEN_EXPIRATION', '7d');
-    const accessMaxAge = parseExpirationToMs(accessExpiration);
-    const refreshMaxAge = parseExpirationToMs(refreshExpiration);
-
-    res.cookie('auth_token', result.access_token, COOKIE_OPTIONS(accessMaxAge, isProduction));
-    res.cookie('refresh_token', result.refresh_token, COOKIE_OPTIONS(refreshMaxAge, isProduction));
-    return res.json({ user: result.user, message: 'Registration successful' });
+  async register(@Body() registerDto: RegisterDto, @Request() req) {
+    // Creating another account must preserve the acting admin's cookies.
+    return this.authService.register(registerDto, req.user.id);
   }
 
   @Get('profile')
@@ -119,16 +112,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Logout and revoke current token' })
   async logout(@Request() req, @Response() res) {
-    // Revoke refresh token in DB
-    const refreshToken = req.cookies?.refresh_token;
-    if (refreshToken) {
-      await this.tokenBlacklist.revoke(refreshToken);
-    }
-    // Revoke access token in in-memory blacklist (expires in 15 min automatically)
-    const accessToken = ExtractJwt.fromAuthHeaderAsBearerToken()(req) || req.cookies?.auth_token;
-    if (accessToken) {
-      revokeAccessToken(accessToken);
-    }
+    await this.authService.logout(req.user.sessionId, req.user.id);
     const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
     // Clear both cookies
     res.clearCookie('auth_token', {
@@ -152,19 +136,8 @@ export class AuthController {
   @ApiOperation({ summary: 'Change current user password' })
   async changePassword(
     @Request() req,
-    @Body() body: { currentPassword: string; newPassword: string },
+    @Body() body: ChangePasswordDto,
   ) {
-    if (!body.currentPassword || !body.newPassword) {
-      return { success: false, message: 'currentPassword and newPassword are required' };
-    }
-    if (body.newPassword.length < 6) {
-      return { success: false, message: 'New password must be at least 6 characters' };
-    }
-    // Revoke current access token (all sessions invalidated on password change)
-    const accessToken = ExtractJwt.fromAuthHeaderAsBearerToken()(req) || req.cookies?.auth_token;
-    if (accessToken) {
-      revokeAccessToken(accessToken);
-    }
     return this.authService.changePassword(req.user.id, body.currentPassword, body.newPassword);
   }
 }

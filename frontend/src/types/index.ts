@@ -103,8 +103,8 @@ export interface Enquiry {
 }
 
 export interface AuthResponse {
-  access_token: string;
   user: User;
+  message: string;
 }
 
 export interface DashboardStats {

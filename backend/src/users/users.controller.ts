@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, HttpCode, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -40,36 +40,36 @@ export class UsersController {
   @Post()
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Create new user (Admin only)' })
-  create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
+  create(@Body() dto: CreateUserDto, @Request() req) {
+    return this.usersService.create(dto, req.user.id);
   }
 
   @Put(':id')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Update user (Admin only)' })
-  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    return this.usersService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateUserDto, @Request() req) {
+    return this.usersService.update(id, dto, req.user.id);
   }
 
   @Delete(':id')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Deactivate user (Admin only)' })
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+  remove(@Param('id') id: string, @Request() req) {
+    return this.usersService.remove(id, req.user.id);
   }
 
   @Patch(':id/reset-password')
   @Roles('ADMIN')
   @HttpCode(200)
   @ApiOperation({ summary: 'Reset user password (Admin only)' })
-  resetPassword(@Param('id') id: string, @Body() dto: ResetPasswordDto) {
-    return this.usersService.resetPassword(id, dto.password);
+  resetPassword(@Param('id') id: string, @Body() dto: ResetPasswordDto, @Request() req) {
+    return this.usersService.resetPassword(id, dto.password, req.user.id);
   }
 
   @Delete(':id/permanent')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Permanently delete user (Admin only)' })
-  permanentDelete(@Param('id') id: string) {
-    return this.usersService.permanentDelete(id);
+  permanentDelete(@Param('id') id: string, @Request() req) {
+    return this.usersService.permanentDelete(id, req.user.id);
   }
 }

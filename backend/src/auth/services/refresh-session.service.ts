@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { eq, and, lt, isNull, sql } from 'drizzle-orm';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { eq, and, lt, gt, isNull, sql } from 'drizzle-orm';
 import * as crypto from 'crypto';
 import { DatabaseService } from '../../db/database.service';
 import { refreshSessions } from '../../db/schema';
@@ -20,14 +20,32 @@ export class RefreshSessionService {
   /**
    * Create a new refresh session when user logs in.
    */
-  async createSession(userId: string, token: string, expiresAt: Date): Promise<void> {
+  async createSession(userId: string, token: string, expiresAt: Date, id: string = crypto.randomUUID(),
+    db: Pick<DatabaseService['db'], 'insert'> = this.database.db): Promise<void> {
     const tokenHash = this.hashToken(token);
-    await this.database.db.insert(refreshSessions).values({
+    await db.insert(refreshSessions).values({
+      id,
       userId,
       tokenHash,
       expiresAt,
     });
     this.logger.debug(`Session created for user ${userId}`);
+  }
+
+  /** Consume a refresh token once and replace it within the caller's transaction. */
+  async rotateSession(token: string, userId: string, replacement: { sessionId: string; refresh_token: string; expiresAt: Date },
+    tx: Pick<DatabaseService['db'], 'update' | 'insert'>): Promise<void> {
+    const [session] = await tx.update(refreshSessions).set({ revokedAt: new Date() })
+      .where(and(eq(refreshSessions.tokenHash, this.hashToken(token)), eq(refreshSessions.userId, userId),
+        isNull(refreshSessions.revokedAt), gt(refreshSessions.expiresAt, new Date())))
+      .returning({ id: refreshSessions.id });
+    if (!session) throw new UnauthorizedException('Refresh token is invalid. Please log in again.');
+    await this.createSession(userId, replacement.refresh_token, replacement.expiresAt, replacement.sessionId, tx);
+  }
+
+  async revokeSessionById(id: string, userId: string): Promise<void> {
+    await this.database.db.update(refreshSessions).set({ revokedAt: new Date() })
+      .where(and(eq(refreshSessions.id, id), eq(refreshSessions.userId, userId), isNull(refreshSessions.revokedAt)));
   }
 
   /**

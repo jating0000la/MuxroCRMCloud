@@ -1,11 +1,16 @@
-import { PartialType } from '@nestjs/swagger';
+import { OmitType, PartialType } from '@nestjs/swagger';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsEnum, ValidateIf } from 'class-validator';
 import { CreateUserDto } from './create-user.dto';
 
-export class UpdateUserDto extends PartialType(CreateUserDto) {
+export class UpdateUserDto extends PartialType(OmitType(CreateUserDto, ['password', 'role'] as const), { skipNullProperties: false }) {
+	@ApiPropertyOptional({ enum: ['ADMIN', 'USER'] })
+	@ValidateIf((_object, value) => value !== undefined)
+	@IsEnum(['ADMIN', 'USER'])
+	role?: 'ADMIN' | 'USER';
+
 	@ApiPropertyOptional()
-	@IsOptional()
+	@ValidateIf((_object, value) => value !== undefined)
 	@IsBoolean()
 	isActive?: boolean;
 }
