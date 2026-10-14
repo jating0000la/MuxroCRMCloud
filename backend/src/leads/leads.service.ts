@@ -248,13 +248,13 @@ export class LeadsService {
     allowedFields.updatedAt = new Date();
     
     try {
-      const updated = await this.database.db
+      let updated = await this.database.db
         .update(leads)
         .set(allowedFields)
         .where(eq(leads.id, id))
         .returning();
       
-      // Ensure updated is an array (handles both empty and single-result cases)
+      // Ensure updated might be single object, wrap in array
       if (!Array.isArray(updated)) {
         updated = [updated];
       }
