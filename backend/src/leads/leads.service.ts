@@ -248,11 +248,16 @@ export class LeadsService {
     allowedFields.updatedAt = new Date();
     
     try {
-      const [updated] = await this.database.db
+      const updated = await this.database.db
         .update(leads)
         .set(allowedFields)
         .where(eq(leads.id, id))
         .returning();
+      
+      // Ensure updated is an array (handles both empty and single-result cases)
+      if (!Array.isArray(updated)) {
+        updated = [updated];
+      }
       
       if (updated.length === 0) {
         throw new Error(`Failed to update lead ${id}`);
