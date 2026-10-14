@@ -185,9 +185,15 @@ export class LeadsService {
 
   async update(id: string, dto: UpdateLeadDto, userId?: string, role?: string) {
     const lead = await this.findOne(id, userId, role);
+    if (lead === undefined) {
+      throw new NotFoundException(`Lead ${id} not found`);
+    }
+    
+    // Check if user has permission to edit this lead
     if (role === 'USER' && lead.doerId !== userId) {
       throw new ForbiddenException('You can only edit leads assigned to you');
     }
+    
     // Whitelist allowed fields while allowing controlled campaign transfers.
     const allowedFields: Record<string, any> = {};
     if (dto.name !== undefined) allowedFields.name = dto.name;
@@ -196,8 +202,11 @@ export class LeadsService {
     if (dto.statusId !== undefined) allowedFields.statusId = dto.statusId;
     if (dto.customData !== undefined) allowedFields.customData = dto.customData;
     if (dto.source !== undefined) allowedFields.source = dto.source;
+    
     if (role === 'ADMIN') {
       let transferPayload: any = { campaignId: dto.campaignId, doerId: dto.doerId };
+      
+      // Handle campaign transfer if needed
       if (dto.campaignId && dto.campaignId !== lead.campaignId) {
         const targetStatuses = await this.database.db
           .select({ id: campaignStatuses.id, campaignId: campaignStatuses.campaignId })
@@ -212,6 +221,7 @@ export class LeadsService {
         );
       }
 
+      // Apply campaign transfer if needed
       if (transferPayload.campaignId !== undefined) {
         const [targetCampaign] = await this.database.db
           .select({ id: campaigns.id })
@@ -219,20 +229,41 @@ export class LeadsService {
           .where(eq(campaigns.id, transferPayload.campaignId))
           .limit(1);
         if (!targetCampaign) {
-          throw new NotFoundException('Campaign not found');
+          throw new NotFoundException('Target campaign not found');
         }
         allowedFields.campaignId = transferPayload.campaignId;
       }
-      if (transferPayload.doerId !== undefined) allowedFields.doerId = transferPayload.doerId;
-      if (transferPayload.statusId !== undefined) allowedFields.statusId = transferPayload.statusId;
+      
+      // Apply doerId transfer
+      if (transferPayload.doerId !== undefined) {
+        allowedFields.doerId = transferPayload.doerId;
+      }
+      
+      // Apply status transfer if needed
+      if (transferPayload.statusId !== undefined) {
+        allowedFields.statusId = transferPayload.statusId;
+      }
     }
+    
     allowedFields.updatedAt = new Date();
-    const [updated] = await this.database.db
-      .update(leads)
-      .set(allowedFields)
-      .where(eq(leads.id, id))
-      .returning();
-    return updated;
+    
+    try {
+      const [updated] = await this.database.db
+        .update(leads)
+        .set(allowedFields)
+        .where(eq(leads.id, id))
+        .returning();
+      
+      if (updated.length === 0) {
+        throw new Error(`Failed to update lead ${id}`);
+      }
+      
+      return updated[0];
+    } catch (error) {
+      // Log the error for debugging
+      console.error(`Failed to update lead ${id}:`, error);
+      throw error;
+    }
   }
 
   async updateStatus(id: string, dto: UpdateStatusDto, userId: string, role?: string) {
