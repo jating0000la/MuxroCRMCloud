@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { formService } from '../../../../services/forms';
+import { MAX_SUBMISSION_BYTES } from '../constants';
 import { Form, FormField } from '../../../../types';
 import { extractPublicFormConfig, isSafeRedirectUrl } from '../utils';
 
@@ -100,6 +101,10 @@ export function usePublicForm(slug: string | undefined) {
         return;
       }
 
+      if (new TextEncoder().encode(JSON.stringify({ data: formData })).length > MAX_SUBMISSION_BYTES) {
+        toast.error('The complete submission must be under 8 MB. Remove or reduce an attachment.');
+        return;
+      }
       setSubmitting(true);
       try {
         await formService.submitPublicForm(slug!, formData);

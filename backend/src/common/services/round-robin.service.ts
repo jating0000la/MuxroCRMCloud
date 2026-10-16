@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { eq, and, asc, desc, sql } from 'drizzle-orm';
+import { eq, and, asc, desc, sql, inArray } from 'drizzle-orm';
 import { DatabaseService } from '../../db/database.service';
-import { leads, campaignUsers, users, roundRobinCursors } from '../../db/schema';
+import { leads, campaignUsers, users, roundRobinCursors, notifications, followups } from '../../db/schema';
 
 export type AllocationTransaction = Parameters<Parameters<DatabaseService['db']['transaction']>[0]>[0];
 
@@ -56,6 +56,8 @@ export class RoundRobinService {
           .where(and(eq(leads.id, id), eq(leads.campaignId, campaignId), eq(leads.isDeleted, false)))
           .returning();
         if (!updated) throw new BadRequestException('Every lead must be an existing, non-deleted lead in this campaign');
+        await tx.delete(notifications).where(inArray(notifications.followupId,
+          tx.select({ id: followups.id }).from(followups).where(eq(followups.leadId, id))));
         allocations.push(updated);
       }
       await tx.update(roundRobinCursors).set({ userId: allocations[allocations.length - 1].doerId })

@@ -141,7 +141,7 @@ export default function Layout({ children, fullHeight = false }: { children: Rea
     let active = true;
     const loadBranding = async () => {
       try {
-        const settings = await settingsService.getAllSettings(true);
+        const settings = await settingsService.getBranding();
         const nextBranding = brandingFromSettings(settings);
         if (!active) return;
         setBranding(nextBranding);

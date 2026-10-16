@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -15,5 +16,6 @@ export class CreateCampaignDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
+  @Transform(({ obj }) => obj.isActive)
   isActive?: boolean;
 }

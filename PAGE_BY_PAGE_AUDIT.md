@@ -1,5 +1,7 @@
 # Frontend and backend functionality audit
 
+Repair follow-up: [implementation and verification](PAGE_AUDIT_REPAIRS.md). The findings below describe the original audited revision.
+
 Audit date: 16 October 2026. Reviewed commit: `32c7e76` on `work`.
 
 **Result: 21 reproduced findings: 3 P1, 17 P2 and 1 P3.** Core workflows work, but the application does not pass a complete functional audit. Two additional cross-user data exposures and a broken ZIP export are the highest priorities. No application fixes were made during this audit.

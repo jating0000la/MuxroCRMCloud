@@ -236,10 +236,19 @@ export default function CampaignsPage() {
     setWizardStep('users');
   };
 
-  const handleSkipAll = () => {
-    toast.success('Campaign created. You can add form and users later.');
-    closeWizard(true);
-    loadCampaigns();
+  const handleSkipAll = async () => {
+    if (!campaignName.trim() || creating) return;
+    setCreating(true);
+    try {
+      await campaignService.create({ name: campaignName.trim(), description: campaignDescription });
+      toast.success('Campaign created. You can add a form and users later.');
+      closeWizard(true);
+      loadCampaigns();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to create campaign');
+    } finally {
+      setCreating(false);
+    }
   };
 
   const handleAssignUsers = async () => {
@@ -729,9 +738,10 @@ export default function CampaignsPage() {
                     <div className="flex justify-between pt-1">
                       <button
                         onClick={handleSkipAll}
+                        disabled={creating || !campaignName.trim()}
                         className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700/50"
                       >
-                        Skip All
+                        Create campaign only
                       </button>
                       <button
                         onClick={handleCreateCampaign}

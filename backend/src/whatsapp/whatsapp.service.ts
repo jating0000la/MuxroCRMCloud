@@ -78,7 +78,8 @@ export class WhatsAppService {
         wm.direction as "lastDirection", wm.type as "lastType",
         (SELECT COUNT(*) FROM visible unread
           WHERE unread.phone = wm.phone AND unread.direction = 'in'
-            AND unread.status = 'received') as "unreadCount"
+            AND unread.status = 'received') as "unreadCount",
+        (SELECT COUNT(*) FROM visible all_messages WHERE all_messages.phone = wm.phone) as "totalMessages"
       FROM latest wm
       LEFT JOIN "WhatsappContact" wc ON wc.phone = wm.phone
         AND ${this.rowScope(sql`wc."leadId"`, sql`wc.phone`, userId, role)}
@@ -88,7 +89,8 @@ export class WhatsAppService {
     return chats.rows.map((row: any) => ({
       phone: row.phone, name: row.name || row.phone, lastMessage: row.lastMessage || '',
       lastMessageAt: row.lastMessageAt, lastDirection: row.lastDirection,
-      lastType: row.lastType, unreadCount: Number(row.unreadCount) || 0,
+      lastType: row.lastType, lastMessageType: row.lastType, unreadCount: Number(row.unreadCount) || 0,
+      totalMessages: Number(row.totalMessages) || 0,
     }));
   }
 
@@ -110,7 +112,7 @@ export class WhatsAppService {
       uniqueChats: sql<number>`count(DISTINCT ${whatsappMessages.phone})::int`,
     }).from(whatsappMessages)
       .where(this.rowScope(whatsappMessages.leadId, whatsappMessages.phone, userId, role));
-    return stats;
+    return { ...stats, incomingMessages: stats.incoming, outgoingMessages: stats.outgoing };
   }
 
   async ensureSendAccess(dto: { phone: string; leadId?: string; campaignId?: string }, user: { id: string; role: string }) {

@@ -1,7 +1,8 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request,
+  Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, Query, NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { PaginationDto } from '../common/pagination.dto';
 import { FormsService } from './forms.service';
 import { AuthorizationService } from '../common/authorization/authorization.service';
 import { CreateFormDto } from './dto/create-form.dto';
@@ -36,8 +37,9 @@ export class FormsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get form details' })
-  async findOne(@Param('id') id: string, @Request() req) {
+  async findOne(@Param('campaignId') campaignId: string, @Param('id') id: string, @Request() req) {
     const form = await this.formsService.findOne(id);
+    if (form.campaignId !== campaignId) throw new NotFoundException('Form not found in this campaign');
     await this.authService.ensureCampaignAccess((form as any).campaignId || '', req.user.id, req.user.role);
     return form;
   }
@@ -45,8 +47,9 @@ export class FormsController {
   @Put(':id')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Update form' })
-  async update(@Param('id') id: string, @Body() dto: UpdateFormDto, @Request() req) {
+  async update(@Param('campaignId') campaignId: string, @Param('id') id: string, @Body() dto: UpdateFormDto, @Request() req) {
     const form = await this.formsService.findOne(id);
+    if (form.campaignId !== campaignId) throw new NotFoundException('Form not found in this campaign');
     await this.authService.ensureCampaignAccess((form as any).campaignId || '', req.user.id, req.user.role);
     return this.formsService.update(id, dto);
   }
@@ -54,8 +57,9 @@ export class FormsController {
   @Post(':id/publish')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Publish form' })
-  async publish(@Param('id') id: string, @Request() req) {
+  async publish(@Param('campaignId') campaignId: string, @Param('id') id: string, @Request() req) {
     const form = await this.formsService.findOne(id);
+    if (form.campaignId !== campaignId) throw new NotFoundException('Form not found in this campaign');
     await this.authService.ensureCampaignAccess((form as any).campaignId || '', req.user.id, req.user.role);
     return this.formsService.publish(id);
   }
@@ -63,8 +67,9 @@ export class FormsController {
   @Post(':id/unpublish')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Unpublish form' })
-  async unpublish(@Param('id') id: string, @Request() req) {
+  async unpublish(@Param('campaignId') campaignId: string, @Param('id') id: string, @Request() req) {
     const form = await this.formsService.findOne(id);
+    if (form.campaignId !== campaignId) throw new NotFoundException('Form not found in this campaign');
     await this.authService.ensureCampaignAccess((form as any).campaignId || '', req.user.id, req.user.role);
     return this.formsService.unpublish(id);
   }
@@ -72,17 +77,20 @@ export class FormsController {
   @Delete(':id')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Delete form' })
-  async remove(@Param('id') id: string, @Request() req) {
+  async remove(@Param('campaignId') campaignId: string, @Param('id') id: string, @Request() req) {
     const form = await this.formsService.findOne(id);
+    if (form.campaignId !== campaignId) throw new NotFoundException('Form not found in this campaign');
     await this.authService.ensureCampaignAccess((form as any).campaignId || '', req.user.id, req.user.role);
     return this.formsService.remove(id);
   }
 
   @Get(':id/submissions')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get form submissions' })
-  async getSubmissions(@Param('id') id: string, @Request() req) {
+  async getSubmissions(@Param('campaignId') campaignId: string, @Param('id') id: string, @Request() req, @Query() pagination: PaginationDto) {
     const form = await this.formsService.findOne(id);
+    if (form.campaignId !== campaignId) throw new NotFoundException('Form not found in this campaign');
     await this.authService.ensureCampaignAccess((form as any).campaignId || '', req.user.id, req.user.role);
-    return this.formsService.getSubmissions(id);
+    return this.formsService.getSubmissions(id, pagination);
   }
 }

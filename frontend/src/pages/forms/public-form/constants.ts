@@ -34,3 +34,5 @@ export const TRUST_BADGES = ['Fast Response', 'Secure & Private', 'Professional 
 
 /** Max size (bytes) for inline file-upload values, since submissions are plain JSON. */
 export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+export const MAX_SUBMISSION_BYTES = 8 * 1024 * 1024;

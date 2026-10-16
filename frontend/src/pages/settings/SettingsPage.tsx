@@ -148,34 +148,8 @@ export default function SettingsPage() {
 
   const saveSettings = async (settings: { key: string; value: string; reason?: string }[]) => {
     for (const setting of settings) {
-      try {
-        await settingsService.updateSetting(setting.key, {
-          value: setting.value,
-          reason: setting.reason || 'Updated via Settings',
-        });
-      } catch (error: any) {
-        const status = error.response?.status;
-        if (status === 404 || status === 409) {
-          // 404 = setting doesn't exist, create it
-          // 409 = race condition duplicate, retry update
-          try {
-            await settingsService.createSetting({
-              key: setting.key,
-              value: setting.value,
-              reason: setting.reason || 'Updated via Settings',
-            });
-          } catch {
-            // If create also fails (e.g. race condition), retry update
-            await settingsService.updateSetting(setting.key, {
-              value: setting.value,
-              reason: setting.reason || 'Updated via Settings',
-            }).catch(() => {}); // best-effort
-          }
-        } else {
-          console.error(`Failed to save setting ${setting.key}:`, error);
-          // Don't throw — continue saving remaining settings
-        }
-      }
+      // POST is an upsert; propagate failures so callers never announce a partial save as success.
+      await settingsService.createSetting({ ...setting, reason: setting.reason || 'Updated via Settings' });
     }
   };
 
@@ -415,7 +389,7 @@ export default function SettingsPage() {
                       <input
                         ref={logoInputRef}
                         type="file"
-                        accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                        accept="image/png,image/jpeg,image/webp"
                         onChange={handleLogoUpload}
                         className="hidden"
                       />
@@ -427,7 +401,7 @@ export default function SettingsPage() {
                       >
                         {uploadingLogo ? 'Uploading...' : 'Upload logo'}
                       </button>
-                      <p className={hintCls}>PNG, JPG, WebP, or SVG files will be stored inside the repository and used as your branding logo.</p>
+                      <p className={hintCls}>PNG, JPEG, or WebP images up to 2 MB.</p>
                     </div>
                   </div>
                   <div>

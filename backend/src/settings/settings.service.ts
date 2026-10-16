@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, inArray } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
 import { settings, settingAuditLogs } from '../db/schema';
 import { EncryptionService } from './encryption.service';
@@ -12,6 +12,12 @@ export class SettingsService {
     private database: DatabaseService,
     private encryption: EncryptionService,
   ) {}
+
+  async getBranding() {
+    const rows = await this.database.db.select({ key: settings.key }).from(settings)
+      .where(inArray(settings.key, ['companyName', 'appName', 'appLogoUrl', 'companyLogo']));
+    return Promise.all(rows.map(row => this.getSetting(row.key, false)));
+  }
 
   private shouldMaskKey(key: string): boolean {
     return /(apikey|api_key|token|secret|password|passphrase|privatekey|private_key)/i.test(key);

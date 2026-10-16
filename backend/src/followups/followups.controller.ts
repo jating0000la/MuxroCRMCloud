@@ -5,7 +5,7 @@ import { CreateFollowupDto } from './dto/create-followup.dto';
 import { UpdateFollowupDto } from './dto/update-followup.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { PaginationDto } from '../common/pagination.dto';
+import { FollowupQueryDto } from './dto/followup-query.dto';
 
 @ApiTags('Followups')
 @ApiBearerAuth()
@@ -44,24 +44,14 @@ export class FollowupsController {
   @ApiOperation({ summary: 'Get my follow-ups (keyset-paginated)' })
   @ApiQuery({ name: 'campaignId', required: false })
   @ApiQuery({ name: 'cursor', required: false, description: 'ISO timestamp cursor for keyset pagination (from previous response)' })
-  getMyFollowups(
-    @Request() req,
-    @Query('campaignId') campaignId?: string,
-    @Query() pagination?: PaginationDto,
-    @Query('cursor') cursor?: string,
-  ) {
-    return this.followupsService.getMyFollowups(req.user.id, campaignId, pagination, cursor);
+  getMyFollowups(@Request() req, @Query() query: FollowupQueryDto) {
+    return this.followupsService.getMyFollowups(req.user.id, query.campaignId, query, query.cursor);
   }
 
   @Get('upcoming')
   @ApiOperation({ summary: 'Get upcoming scheduled follow-ups' })
-  @ApiQuery({ name: 'campaignId', required: false })
-  getUpcomingFollowups(
-    @Request() req,
-    @Query('campaignId') campaignId?: string,
-    @Query() pagination?: PaginationDto,
-  ) {
-    return this.followupsService.getUpcomingFollowups(req.user.id, campaignId, pagination);
+  getUpcomingFollowups(@Request() req, @Query() query: FollowupQueryDto) {
+    return this.followupsService.getUpcomingFollowups(req.user.id, query.campaignId, query);
   }
 
   @Put(':id')

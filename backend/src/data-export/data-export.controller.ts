@@ -1,5 +1,6 @@
 import {
   Controller,
+  Body,
   Get,
   Delete,
   Res,
@@ -11,6 +12,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { DeleteAllDataDto } from './dto/delete-all-data.dto';
 import { DataExportService } from './data-export.service';
 
 @ApiTags('Data Export')
@@ -36,14 +38,14 @@ export class DataExportController {
         'Content-Disposition': `attachment; filename="${filename}"`,
       });
 
-      stream.pipe(res);
-
       stream.on('error', (err) => {
         console.error('Export stream error:', err);
         if (!res.headersSent) {
           res.status(500).json({ message: 'Export failed' });
-        }
+        } else { res.destroy(err); }
       });
+      res.once('close', () => stream.destroy());
+      stream.pipe(res);
     } catch (error: any) {
       console.error('Export error:', error);
       if (!res.headersSent) {
@@ -54,7 +56,7 @@ export class DataExportController {
 
   @Delete('all')
   @ApiOperation({ summary: 'Delete ALL campaign data (campaigns, leads, forms, followups)' })
-  async deleteAllData() {
-    return this.dataExportService.deleteAllCampaignData();
+  async deleteAllData(@Body() dto: DeleteAllDataDto) {
+    return this.dataExportService.deleteAllCampaignData(dto.confirmation);
   }
 }

@@ -5,7 +5,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
-import * as express from 'express';
+import { configureBodyLimits } from './common/http-body-limits';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -49,7 +49,7 @@ async function bootstrap() {
     forbidNonWhitelisted: true,
     transformOptions: { enableImplicitConversion: true },
   }));
-  app.use(express.json({ limit: '1mb' }));
+  configureBodyLimits(app);
 
   if (process.env.SWAGGER_ENABLED === 'true') {
     const config = new DocumentBuilder()

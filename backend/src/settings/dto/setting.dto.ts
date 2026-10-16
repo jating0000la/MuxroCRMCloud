@@ -6,7 +6,6 @@ export class CreateSettingDto {
   key: string;
 
   @IsString()
-  @IsNotEmpty()
   value: string;
 
   @IsString()

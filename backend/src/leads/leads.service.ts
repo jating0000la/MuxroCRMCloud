@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { eq, and, ne, inArray, desc, asc, sql } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
-import { leads, followups, campaignStatuses, campaignUsers, users, campaigns } from '../db/schema';
+import { leads, followups, campaignStatuses, campaignUsers, users, campaigns, notifications } from '../db/schema';
 import { PaginationDto } from '../common/pagination.dto';
 import { RoundRobinService } from '../common/services/round-robin.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -265,11 +265,14 @@ export class LeadsService {
     allowedFields.updatedAt = new Date();
     
     try {
-      let updated = await this.database.db
-        .update(leads)
-        .set(allowedFields)
-        .where(eq(leads.id, id))
-        .returning();
+      let updated = await this.database.db.transaction(async tx => {
+        const rows = await tx.update(leads).set(allowedFields).where(eq(leads.id, id)).returning();
+        if (allowedFields.doerId !== undefined || allowedFields.campaignId !== undefined) {
+          await tx.delete(notifications).where(inArray(notifications.followupId,
+            tx.select({ id: followups.id }).from(followups).where(eq(followups.leadId, id))));
+        }
+        return rows;
+      });
       
       // Ensure updated might be single object, wrap in array
       if (!Array.isArray(updated)) {

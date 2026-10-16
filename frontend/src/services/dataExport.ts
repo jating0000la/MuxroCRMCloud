@@ -8,6 +8,8 @@ export interface DeleteAllDataResult {
   deletedStatuses: number;
   deletedCampaignUsers: number;
   deletedCampaigns: number;
+  deletedMessages: number;
+  deletedContacts: number;
 }
 
 export const dataExportService = {
@@ -27,8 +29,9 @@ export const dataExportService = {
    * Delete ALL campaign data (campaigns, leads, forms, followups, statuses).
    * This is irreversible.
    */
-  deleteAllData: async (): Promise<DeleteAllDataResult> => {
+  deleteAllData: async (confirmation: string): Promise<DeleteAllDataResult> => {
     const { data } = await api.delete('/admin/data-export/all', {
+      data: { confirmation },
       timeout: 120000, // 2 minutes for large deletions
     });
     return data;

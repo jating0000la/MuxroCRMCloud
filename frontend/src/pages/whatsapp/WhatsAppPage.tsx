@@ -156,9 +156,9 @@ export default function WhatsAppPage() {
 
   return (
     <Layout fullHeight>
-      <div className="flex h-full min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+      <div className="relative flex h-full min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
         {/* ─── Left Sidebar: Chat List ──────────────────────────────────── */}
-        <div className="w-80 min-h-0 flex-shrink-0">
+        <div className={`${activePhone ? 'hidden md:block' : 'block'} w-full md:w-80 min-h-0 flex-shrink-0`}>
           <ChatSidebar
             chats={chats}
             stats={stats}
@@ -170,7 +170,7 @@ export default function WhatsAppPage() {
         </div>
 
         {/* ─── Center: Chat View ────────────────────────────────────────── */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden min-w-0">
+        <div className={`${activePhone ? 'flex' : 'hidden md:flex'} min-h-0 flex-1 flex-col overflow-hidden min-w-0`}>
           {!activePhone ? (
             <EmptyState />
           ) : (
@@ -200,16 +200,16 @@ export default function WhatsAppPage() {
           )}
         </div>
 
-        {/* ─── Right Sidebar: CRM Info Panel ──────────────────────────────
+        {/* Contact information */}
         {infoOpen && activeChat && activePhone && (
-          <div className="w-80 flex-shrink-0">
+          <div className="absolute inset-0 z-20 w-full lg:static lg:z-auto lg:w-80 flex-shrink-0">
             <CRMInfoPanel
               chat={activeChat}
               messages={messages}
               onClose={() => setInfoOpen(false)}
             />
           </div>
-        )} */}
+        )}
       </div>
     </Layout>
   );

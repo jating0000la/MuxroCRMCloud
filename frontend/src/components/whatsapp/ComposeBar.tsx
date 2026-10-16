@@ -133,7 +133,7 @@ export default function ComposeBar({
           <button
             onClick={() => { setShowAttach(!showAttach); }}
             aria-label="Attach file"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-gray-400 dark:hover:bg-gray-800"
+            className="flex shrink-0 h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-gray-400 dark:hover:bg-gray-800"
           >
             <Paperclip className="h-5 w-5" />
           </button>
@@ -141,7 +141,7 @@ export default function ComposeBar({
         </div>
 
         {/* Text input */}
-        <div className="flex flex-1 items-end rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 transition-colors focus-within:border-primary-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-500/10 dark:border-gray-600 dark:bg-gray-800 dark:focus-within:border-primary-500 dark:focus-within:bg-gray-800">
+        <div className="flex min-w-0 flex-1 items-end rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 transition-colors focus-within:border-primary-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-500/10 dark:border-gray-600 dark:bg-gray-800 dark:focus-within:border-primary-500 dark:focus-within:bg-gray-800">
           <textarea
             ref={textRef}
             value={text}
@@ -149,7 +149,7 @@ export default function ComposeBar({
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             aria-label="Message text"
-            className="max-h-[120px] min-h-[24px] flex-1 resize-none bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none dark:text-slate-100 dark:placeholder-gray-500"
+            className="min-w-0 w-full max-h-[120px] min-h-[24px] flex-1 resize-none bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none dark:text-slate-100 dark:placeholder-gray-500"
             rows={1}
           />
         </div>
@@ -158,7 +158,7 @@ export default function ComposeBar({
         <button
           onClick={handleSendText}
           disabled={sending || !text.trim()}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white shadow-lg shadow-green-500/30 transition-all hover:bg-green-600 hover:shadow-xl hover:shadow-green-500/40 disabled:opacity-50 disabled:shadow-none"
+          className="flex shrink-0 h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white shadow-lg shadow-green-500/30 transition-all hover:bg-green-600 hover:shadow-xl hover:shadow-green-500/40 disabled:opacity-50 disabled:shadow-none"
           aria-label="Send message"
         >
           {sending ? (

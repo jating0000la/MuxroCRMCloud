@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { eq, and, or, inArray, desc, asc, sql, ilike, count, lt, gte, between, not } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
 import {
@@ -20,6 +20,17 @@ const LEAD_LIST_COLUMNS = [
 @Injectable()
 export class DashboardService {
   constructor(private database: DatabaseService) {}
+
+  private validateDateRange(startDate?: string, endDate?: string) {
+    for (const value of [startDate, endDate]) {
+      if (value === undefined) continue;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(Date.parse(value)) ||
+          new Date(value).toISOString().slice(0, 10) !== value) {
+        throw new BadRequestException('Dates must be valid YYYY-MM-DD calendar dates');
+      }
+    }
+    if (startDate && endDate && startDate > endDate) throw new BadRequestException('Start date must not be after end date');
+  }
 
   async getOverview(userId: string, role: string) {
     let totalCampaigns = 0;
@@ -333,6 +344,7 @@ export class DashboardService {
   }
 
   async getUserConversion(userId: string, role: string, campaignId?: string, startDate?: string, endDate?: string) {
+    this.validateDateRange(startDate, endDate);
     const leadConditions: any[] = [eq(leads.isDeleted, false)];
     if (role === 'USER') leadConditions.push(eq(leads.doerId, userId));
     if (campaignId) leadConditions.push(eq(leads.campaignId, campaignId));
@@ -446,6 +458,7 @@ export class DashboardService {
   }
 
   async getKpiOverview(userId: string, role: string, campaignId?: string, startDate?: string, endDate?: string) {
+    this.validateDateRange(startDate, endDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
@@ -694,6 +707,7 @@ export class DashboardService {
   }
 
   async getCampaignWiseReport(userId: string, role: string, startDate?: string, endDate?: string) {
+    this.validateDateRange(startDate, endDate);
     const leadConditions: any[] = [eq(leads.isDeleted, false)];
     if (role === 'USER') leadConditions.push(eq(leads.doerId, userId));
 
@@ -812,12 +826,15 @@ export class DashboardService {
   }
 
   async getDailyTrend(userId: string, role: string, campaignId?: string, startDate?: string, endDate?: string) {
-    const start = startDate ? new Date(startDate) : new Date();
-    start.setDate(start.getDate() - 30);
-    start.setHours(0, 0, 0, 0);
-
+    this.validateDateRange(startDate, endDate);
     const end = endDate ? new Date(endDate) : new Date();
     end.setHours(23, 59, 59, 999);
+    const start = startDate ? new Date(startDate) : new Date(end);
+    if (!startDate) start.setDate(start.getDate() - 30);
+    start.setHours(0, 0, 0, 0);
+    if (start > end || end.getTime() - start.getTime() > 366 * 86400000) {
+      throw new BadRequestException('Trend range must be ordered and at most 366 days');
+    }
 
     // Fetch converted statuses ONCE (was re-fetched every day in the old loop)
     const convertedStatuses = await this.database.db

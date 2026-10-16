@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -25,5 +26,6 @@ export class UpdateStatusDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
+  @Transform(({ obj }) => obj.dnd)
   dnd?: boolean;
 }

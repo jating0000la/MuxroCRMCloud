@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, ConflictException } from '@nestjs/common';
 import { DatabaseService } from '../db/database.service';
 import {
   campaigns,
@@ -9,10 +9,11 @@ import {
   enquiries,
   followups,
   users,
+  whatsappMessages,
+  whatsappContacts,
 } from '../db/schema';
-import { eq, desc } from 'drizzle-orm';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const archiver = require('archiver');
+import { eq, desc, sql } from 'drizzle-orm';
+import { ZipArchive } from 'archiver';
 import { PassThrough } from 'stream';
 
 /**
@@ -217,7 +218,7 @@ export class DataExportService {
 
   /* ─── Public API ──────────────────────────────────────────────── */
 
-  async generateExportZip(): Promise<{ stream: PassThrough; size: number }> {
+  async generateExportZip(): Promise<{ stream: PassThrough }> {
     this.logger.log('Starting full campaign data export');
 
     // Fetch all data
@@ -296,7 +297,9 @@ export class DataExportService {
 
     // Create ZIP stream
     const passthrough = new PassThrough();
-    const archive = archiver('zip', { zlib: { level: 9 } });
+    const archive = new ZipArchive({ zlib: { level: 9 } });
+    archive.on('error', error => passthrough.destroy(error));
+    passthrough.on('close', () => { if (!archive.destroyed) archive.abort(); });
 
     archive.pipe(passthrough);
 
@@ -304,81 +307,32 @@ export class DataExportService {
       archive.append(file.content, { name: file.name });
     }
 
-    // Track size
-    let totalSize = 0;
-    archive.on('data', (chunk: Buffer) => {
-      totalSize += chunk.length;
-    });
-
-    await archive.finalize();
-
-    this.logger.log(`Export complete. Total files: ${csvFiles.length}`);
-    return { stream: passthrough, size: totalSize };
+    // Return before finalization so the HTTP consumer can drain the stream.
+    // Awaiting finalize here deadlocks when an archive fills the stream buffer.
+    void archive.finalize().catch(error => passthrough.destroy(error));
+    this.logger.log(`Export started. Total files: ${csvFiles.length}`);
+    return { stream: passthrough };
   }
 
-  async deleteAllCampaignData(): Promise<{
-    deletedFollowups: number;
-    deletedLeads: number;
-    deletedEnquiries: number;
-    deletedForms: number;
-    deletedStatuses: number;
-    deletedCampaignUsers: number;
-    deletedCampaigns: number;
-  }> {
-    this.logger.warn('Starting full campaign data deletion');
-
-    const result = await this.database.db.transaction(async (tx) => {
-      // Delete in reverse dependency order
-      // 1. Followups (depend on Leads)
-      const deletedFollowups = await tx
-        .delete(followups)
-        .returning();
-
-      // 2. Leads (depend on Campaigns, Enquiries, CampaignStatuses)
-      const deletedLeads = await tx
-        .delete(leads)
-        .returning();
-
-      // 3. Enquiries (depend on Forms)
-      const deletedEnquiries = await tx
-        .delete(enquiries)
-        .returning();
-
-      // 4. Forms (depend on Campaigns)
-      const deletedForms = await tx
-        .delete(forms)
-        .returning();
-
-      // 5. CampaignStatuses (depend on Campaigns)
-      const deletedStatuses = await tx
-        .delete(campaignStatuses)
-        .returning();
-
-      // 6. CampaignUsers (depend on Campaigns)
-      const deletedCampaignUsers = await tx
-        .delete(campaignUsers)
-        .returning();
-
-      // 7. Campaigns
-      const deletedCampaigns = await tx
-        .delete(campaigns)
-        .returning();
-
-      return {
-        deletedFollowups: deletedFollowups.length,
-        deletedLeads: deletedLeads.length,
-        deletedEnquiries: deletedEnquiries.length,
-        deletedForms: deletedForms.length,
-        deletedStatuses: deletedStatuses.length,
-        deletedCampaignUsers: deletedCampaignUsers.length,
-        deletedCampaigns: deletedCampaigns.length,
-      };
+  async deleteAllCampaignData(confirmation: string) {
+    if (confirmation !== 'DELETE ALL') throw new BadRequestException('Confirm deletion with DELETE ALL');
+    return this.database.db.transaction(async tx => {
+      // Same advisory key as BackupService: excludes backup, restore and deletion.
+      const result = await tx.execute(sql`SELECT pg_try_advisory_xact_lock(1465078355) AS acquired`);
+      if (!(result.rows[0] as { acquired: boolean }).acquired) {
+        throw new ConflictException('Another backup, restore, or deletion is already running');
+      }
+      const deletedMessages = (await tx.delete(whatsappMessages)).rowCount || 0;
+      const deletedContacts = (await tx.delete(whatsappContacts)).rowCount || 0;
+      const deletedFollowups = (await tx.delete(followups)).rowCount || 0;
+      const deletedLeads = (await tx.delete(leads)).rowCount || 0;
+      const deletedEnquiries = (await tx.delete(enquiries)).rowCount || 0;
+      const deletedForms = (await tx.delete(forms)).rowCount || 0;
+      const deletedStatuses = (await tx.delete(campaignStatuses)).rowCount || 0;
+      const deletedCampaignUsers = (await tx.delete(campaignUsers)).rowCount || 0;
+      const deletedCampaigns = (await tx.delete(campaigns)).rowCount || 0;
+      return { deletedMessages, deletedContacts, deletedFollowups, deletedLeads, deletedEnquiries,
+        deletedForms, deletedStatuses, deletedCampaignUsers, deletedCampaigns };
     });
-
-    this.logger.warn(
-      `Campaign data deletion complete: ${JSON.stringify(result)}`,
-    );
-
-    return result;
   }
 }

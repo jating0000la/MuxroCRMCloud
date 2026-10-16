@@ -44,8 +44,6 @@ async function bootstrap() {
   const processors = app.get(JobProcessors);
   await processors.registerAllProcessors();
 
-  logger.log('Worker started and processing jobs');
-
   const shutdown = async () => {
     logger.log('Worker shutting down...');
     await app.close();
@@ -54,6 +52,8 @@ async function bootstrap() {
 
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
+
+  logger.log('Worker started and processing jobs');
 
   // Prevent silent worker death — exit to let process manager restart
   process.on('uncaughtException', (err) => {

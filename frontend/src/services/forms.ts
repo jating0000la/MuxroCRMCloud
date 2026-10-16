@@ -37,8 +37,8 @@ export const formService = {
     return data;
   },
 
-  getSubmissions: async (campaignId: string, id: string): Promise<Enquiry[]> => {
-    const { data } = await api.get(`/campaigns/${campaignId}/forms/${id}/submissions`);
+  getSubmissions: async (campaignId: string, id: string, page = 1, limit = 50): Promise<{ data: Enquiry[]; pagination: { total: number; page: number; limit: number; totalPages: number } }> => {
+    const { data } = await api.get(`/campaigns/${campaignId}/forms/${id}/submissions`, { params: { page, limit } });
     return data;
   },
 

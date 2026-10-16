@@ -35,7 +35,7 @@ export default function DataManagementPage() {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      const result = await dataExportService.deleteAllData();
+      const result = await dataExportService.deleteAllData(deleteConfirmText);
       setLastDeleteResult(result);
       toast.success('All campaign data has been deleted');
       setConfirmDelete(false);
@@ -145,9 +145,9 @@ export default function DataManagementPage() {
                   Delete All Campaign Data
                 </h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Permanently delete <strong>all</strong> campaigns, leads, forms, form responses, statuses, and follow-ups. 
-                  This action is <span className="font-semibold text-red-600 dark:text-red-400">irreversible</span> and 
-                  will remove all CRM data from the system. User accounts and settings are preserved.
+                  Permanently delete <strong>all</strong> campaigns, leads, forms, form responses, statuses, follow-ups, and WhatsApp messages and contacts.
+                  This action is <span className="font-semibold text-red-600 dark:text-red-400">irreversible</span> and
+                  removes campaign data and WhatsApp conversation history. User accounts and settings are preserved.
                 </p>
               </div>
               <button
@@ -173,6 +173,8 @@ export default function DataManagementPage() {
               <span>Leads: {lastDeleteResult.deletedLeads}</span>
               <span>Forms: {lastDeleteResult.deletedForms}</span>
               <span>Follow-ups: {lastDeleteResult.deletedFollowups}</span>
+              <span>Messages: {lastDeleteResult.deletedMessages}</span>
+              <span>Contacts: {lastDeleteResult.deletedContacts}</span>
             </div>
           </div>
         )}
@@ -193,8 +195,8 @@ export default function DataManagementPage() {
               </div>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              This will <span className="font-semibold text-red-600 dark:text-red-400">permanently delete</span> all 
-              campaigns, leads, forms, form responses, statuses, and follow-ups. This action cannot be undone.
+              This will <span className="font-semibold text-red-600 dark:text-red-400">permanently delete</span> all
+              campaigns, leads, forms, form responses, statuses, follow-ups, and WhatsApp messages and contacts. This action cannot be undone.
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
               It is recommended to <strong>download a backup first</strong> before proceeding.

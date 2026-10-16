@@ -21,6 +21,9 @@ interface UpdateSettingRequest {
 }
 
 const settingsService = {
+  async getBranding(): Promise<SettingResponse[]> {
+    return (await axiosInstance.get('/branding')).data;
+  },
   async getAllSettings(masked: boolean = true): Promise<SettingResponse[]> {
     const response = await axiosInstance.get('/settings', {
       params: { masked: masked ? 'true' : 'false' },

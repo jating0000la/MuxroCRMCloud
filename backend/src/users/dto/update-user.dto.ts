@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import { OmitType, PartialType } from '@nestjs/swagger';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, ValidateIf } from 'class-validator';
@@ -12,5 +13,6 @@ export class UpdateUserDto extends PartialType(OmitType(CreateUserDto, ['passwor
 	@ApiPropertyOptional()
 	@ValidateIf((_object, value) => value !== undefined)
 	@IsBoolean()
+	@Transform(({ obj }) => obj.isActive)
 	isActive?: boolean;
 }

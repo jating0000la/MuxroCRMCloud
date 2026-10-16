@@ -6,6 +6,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
+import { inflateRawSync } from 'node:zlib';
+import { configureBodyLimits } from '../src/common/http-body-limits';
+import { NotificationsService } from '../src/notifications/notifications.service';
+import { SettingsService } from '../src/settings/settings.service';
 import { spawn } from 'node:child_process';
 import * as bcrypt from 'bcryptjs';
 import { NestFactory } from '@nestjs/core';
@@ -21,7 +25,7 @@ import { BulkImportService } from '../src/bulk-import/bulk-import.service';
 import { DataExportService } from '../src/data-export/data-export.service';
 import { parse } from 'csv-parse/sync';
 import { eq } from 'drizzle-orm';
-import { users, campaigns, campaignUsers, campaignStatuses, leads, followups, forms, enquiries, whatsappMessages, whatsappContacts, roundRobinCursors } from '../src/db/schema';
+import { users, campaigns, campaignUsers, campaignStatuses, leads, followups, forms, enquiries, whatsappMessages, whatsappContacts, roundRobinCursors, notifications } from '../src/db/schema';
 
 const base = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
 const name = `muxro_security_test_${randomUUID().replace(/-/g, '')}`;
@@ -58,6 +62,7 @@ before(async () => {
   app = await NestFactory.create(AppModule, { logger: false });
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1', prefix: 'v' });
+  configureBodyLimits(app);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true, transformOptions: { enableImplicitConversion: true } }));
   await app.listen(0, '127.0.0.1');
   api = `${await app.getUrl()}/api/v1`; database = app.get(DatabaseService);
@@ -359,4 +364,179 @@ test('merged service pagination caps inbox, history and contacts for internal ca
   assert.equal((await service.getChats(alice.id, 'USER', 1000000)).length, 500);
   assert.equal((await service.getContacts(alice.id, 'USER', 1000000)).length, 500);
   await assert.rejects(service.getChats(alice.id, 'USER', 50, -1), /Pagination requires/);
+});
+
+async function makePublicForm() {
+  const [form] = await database.db.insert(forms).values({ campaignId: campaign.id, title: 'Repair form',
+    publicSlug: randomUUID(), isPublished: true, fields: [
+      { name: 'name', label: 'Name', type: 'text', required: true },
+      { name: 'attachment', label: 'Attachment', type: 'file', required: false },
+    ],
+  }).returning();
+  return form;
+}
+
+test('repair F01/F14/F15: raw submissions are admin-only, paginated and accurately counted', async () => {
+  const form = await makePublicForm();
+  await database.db.insert(enquiries).values(Array.from({ length: 54 }, (_, index) => ({ formId: form.id, data: { name: `Response ${index}` } })));
+  const path = `/campaigns/${campaign.id}/forms/${form.id}/submissions`;
+  assert.equal((await request(path)).status, 403);
+  const first = await (await request(path + '?page=1&limit=50', adminToken)).json() as any;
+  const second = await (await request(path + '?page=2&limit=50', adminToken)).json() as any;
+  assert.equal(first.pagination.total, 54); assert.equal(first.pagination.totalPages, 2);
+  assert.equal(first.data.length, 50); assert.equal(second.data.length, 4);
+  assert.ok(second.data.every((row: any) => !first.data.some((old: any) => old.id === row.id)));
+  const list = await (await request(`/campaigns/${campaign.id}/forms`, adminToken)).json() as any[];
+  assert.equal(list[0]._count.submissions, 54);
+});
+
+test('repair F21: nested form routes reject the wrong campaign without changing the form', async () => {
+  const form = await makePublicForm(); const path = `/campaigns/${privateCampaign.id}/forms/${form.id}`;
+  for (const [url, method, body] of [[path, 'GET', undefined], [path, 'PUT', { title: 'Wrong' }],
+    [path + '/publish', 'POST', {}], [path + '/unpublish', 'POST', {}], [path, 'DELETE', undefined],
+    [path + '/submissions', 'GET', undefined]] as const) {
+    assert.equal((await request(url, adminToken, method, body)).status, 404);
+  }
+  assert.equal((await database.db.select().from(forms).where(eq(forms.id, form.id)))[0].title, 'Repair form');
+});
+
+test('repair F02: transfer removes old notifications and sync creates them for the new owner', async () => {
+  await app.get(LeadsService).updateStatus(own.id, { status: 'Scheduled', remarks: 'Sensitive fixture', nextCallDate: new Date(Date.now() + 300000).toISOString() }, alice.id, 'USER');
+  const service = app.get(NotificationsService);
+  assert.equal(await service.getPendingCount(alice.id), 1);
+  await app.get(LeadsService).update(own.id, { doerId: bob.id }, admin.id, 'ADMIN');
+  assert.deepEqual(await service.getNotifications(alice.id), []);
+  assert.equal(await service.getPendingCount(alice.id), 0);
+  assert.equal((await database.db.select().from(notifications)).length, 0);
+  await service.syncNotificationsForUser(alice.id);
+  assert.deepEqual(await service.getPendingNotifications(alice.id), []);
+  await service.syncNotificationsForUser(bob.id);
+  assert.equal(await service.getPendingCount(bob.id), 1);
+  assert.equal((await service.getPendingNotifications(bob.id))[0].followup.lead.id, own.id);
+});
+
+test('repair F02: stale rows cannot bypass current ownership, DND or deletion filters', async () => {
+  const service = app.get(NotificationsService);
+  const [followup] = await database.db.insert(followups).values({ leadId: other.id, userId: alice.id, status: 'Scheduled',
+    nextCallDate: new Date(Date.now() + 300000), remarks: 'Foreign lead secret' }).returning();
+  await database.db.insert(notifications).values({ userId: alice.id, followupId: followup.id, type: 'upcoming' });
+  assert.deepEqual(await service.getNotifications(alice.id), []);
+  assert.deepEqual(await service.getPendingNotifications(alice.id), []);
+  assert.equal(await service.getPendingCount(alice.id), 0);
+  await service.syncNotificationsForUser(alice.id);
+  assert.equal((await database.db.select().from(notifications)).length, 0);
+  await app.get(LeadsService).updateStatus(own.id, { status: 'Scheduled', nextCallDate: new Date(Date.now() + 300000).toISOString() }, alice.id, 'USER');
+  await database.db.update(leads).set({ dnd: true }).where(eq(leads.id, own.id));
+  assert.equal(await service.getPendingCount(alice.id), 0);
+  await database.db.update(leads).set({ dnd: false, isDeleted: true }).where(eq(leads.id, own.id));
+  assert.equal(await service.getPendingCount(alice.id), 0);
+});
+
+test('repair F02: round-robin reassignment clears the previous owners notifications', async () => {
+  await app.get(LeadsService).updateStatus(own.id, { status: 'Scheduled', nextCallDate: new Date(Date.now() + 300000).toISOString() }, alice.id, 'USER');
+  await app.get(RoundRobinService).allocateRoundRobin(campaign.id, [own.id]);
+  assert.equal((await database.db.select().from(leads).where(eq(leads.id, own.id)))[0].doerId, bob.id);
+  assert.equal((await database.db.select().from(notifications)).length, 0);
+});
+
+// Read the real ZIP central directory, decompress entries and validate CRCs without a test-only dependency.
+function readZip(bytes: Buffer) {
+  const end = bytes.lastIndexOf(Buffer.from('504b0506', 'hex')); assert.ok(end > 0, 'ZIP end record');
+  const files: Record<string, string> = {}; let at = bytes.readUInt32LE(end + 16);
+  for (let index = 0; index < bytes.readUInt16LE(end + 10); index++) {
+    assert.equal(bytes.readUInt32LE(at), 0x02014b50);
+    const method = bytes.readUInt16LE(at + 10), size = bytes.readUInt32LE(at + 20), length = bytes.readUInt16LE(at + 28);
+    const name = bytes.toString('utf8', at + 46, at + 46 + length), local = bytes.readUInt32LE(at + 42);
+    const start = local + 30 + bytes.readUInt16LE(local + 26) + bytes.readUInt16LE(local + 28);
+    const data = method === 8 ? inflateRawSync(bytes.subarray(start, start + size)) : bytes.subarray(start, start + size);
+    assert.equal(data.length, bytes.readUInt32LE(at + 24));
+    let crc = 0xffffffff;
+    for (const byte of data) { crc ^= byte; for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0); }
+    assert.equal((crc ^ 0xffffffff) >>> 0, bytes.readUInt32LE(at + 16), name + ' CRC');
+    files[name] = data.toString('utf8'); at += 46 + length + bytes.readUInt16LE(at + 30) + bytes.readUInt16LE(at + 32);
+  }
+  return files;
+}
+
+test('repair F03: real HTTP export produces a valid multi-buffer ZIP with all six CSVs', { timeout: 15000 }, async () => {
+  await database.db.insert(leads).values(Array.from({ length: 400 }, () => ({ campaignId: campaign.id, name: randomBytes(100).toString('hex'), doerId: alice.id })));
+  const response = await request('/admin/data-export/download', adminToken);
+  assert.equal(response.status, 200); assert.match(response.headers.get('content-type')!, /application\/zip/);
+  const bytes = Buffer.from(await response.arrayBuffer()); assert.ok(bytes.length > 16384);
+  const files = readZip(bytes);
+  assert.deepEqual(Object.keys(files).sort(), ['campaign_statuses.csv', 'campaigns.csv', 'followups.csv', 'form_responses.csv', 'forms.csv', 'leads.csv']);
+  assert.equal(parse(files['leads.csv'], { columns: true }).length, 402);
+});
+
+test('repair F05/F20: date filters honor explicit bounds and reject invalid ranges before SQL', async () => {
+  const response = await request('/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16');
+  assert.equal(response.status, 200); const days = await response.json() as any[];
+  assert.equal(days.length, 16); assert.equal(days[0].date, '2026-10-01'); assert.equal(days[15].date, '2026-10-16');
+  for (const path of ['/dashboard/daily-trend?startDate=invalid-date', '/dashboard/daily-trend?startDate=2026-02-30',
+    '/dashboard/daily-trend?startDate=2026-10-16&endDate=2026-10-01', '/dashboard/kpi?endDate=wrong',
+    '/dashboard/campaign-report?startDate=wrong', '/dashboard/user-conversion?startDate=wrong']) {
+    assert.equal((await request(path)).status, 400, path);
+  }
+});
+
+test('repair F11/F12: followup filters/cursors validate and JSON string booleans are rejected', async () => {
+  for (const path of [`/followups/my?campaignId=${campaign.id}`, `/followups/my?cursor=${new Date().toISOString()}`,
+    `/followups/upcoming?campaignId=${campaign.id}`]) assert.equal((await request(path)).status, 200);
+  const my = await (await request('/followups/my')).json() as any; assert.ok(Array.isArray(my.data)); assert.equal(my.cursor, null);
+  assert.equal((await request('/followups/my?cursor=bad')).status, 400);
+  assert.equal((await request(`/leads/${own.id}/status`, aliceToken, 'PUT', { status: 'Called', dnd: 'false' })).status, 400);
+  assert.equal((await request(`/users/${bob.id}`, adminToken, 'PUT', { isActive: 'false' })).status, 400);
+  assert.equal((await database.db.select().from(leads).where(eq(leads.id, own.id)))[0].dnd, false);
+});
+
+test('repair F08/F18: empty optional settings persist and USER branding excludes credentials', async () => {
+  assert.equal((await request('/settings', adminToken, 'POST', { key: 'companyPhone', value: '' })).status, 201);
+  assert.equal((await (await request('/settings/companyPhone', adminToken)).json() as any).value, '');
+  await app.get(SettingsService).createSetting({ key: 'companyName', value: 'Fixture Company' });
+  await app.get(SettingsService).createSetting({ key: 'gupshupApiKey', value: 'PrivateFixtureOnly' });
+  const response = await request('/branding'); assert.equal(response.status, 200);
+  const branding = await response.json() as any[];
+  assert.deepEqual(branding.map(row => row.key), ['companyName']); assert.equal(branding[0].value, 'Fixture Company');
+  assert.equal((await fetch(api + '/branding')).status, 401);
+  assert.equal((await request('/settings')).status, 403);
+});
+
+test('repair F09/F16: supported inline files submit, and inactive/unpublished intake is rejected', async () => {
+  const form = await makePublicForm(); const path = `/forms/public/${form.publicSlug}`;
+  const bytes = Buffer.alloc(1200 * 1024, 65);
+  const response = await fetch(api + path + '/submit', { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ data: { name: 'Attachment fixture', attachment: { name: 'file.txt', size: bytes.length, type: 'text/plain', dataUrl: 'data:text/plain;base64,' + bytes.toString('base64') } } }) });
+  assert.equal(response.status, 201);
+  await database.db.update(campaigns).set({ isActive: false }).where(eq(campaigns.id, campaign.id));
+  assert.equal((await fetch(api + path)).status, 404);
+  assert.equal((await request(path + '/submit', adminToken, 'POST', { data: { name: 'Stopped' } })).status, 404);
+  await database.db.update(campaigns).set({ isActive: true }).where(eq(campaigns.id, campaign.id));
+  await database.db.update(forms).set({ isPublished: false }).where(eq(forms.id, form.id));
+  assert.equal((await request(path + '/submit', adminToken, 'POST', { data: { name: 'Unpublished' } })).status, 404);
+  assert.equal((await database.db.select().from(enquiries)).length, 1);
+});
+
+test('repair F17: deletion requires confirmation and excludes concurrent backup/restore operations', async () => {
+  assert.equal((await request('/admin/data-export/all', adminToken, 'DELETE')).status, 400);
+  assert.equal((await request('/admin/data-export/all', adminToken, 'DELETE', { confirmation: 'wrong' })).status, 400);
+  assert.equal((await request('/admin/data-export/all', aliceToken, 'DELETE', { confirmation: 'DELETE ALL' })).status, 403);
+  const lock = await database.getPool().connect();
+  try {
+    await lock.query('SELECT pg_advisory_lock(1465078355)');
+    assert.equal((await request('/admin/data-export/all', adminToken, 'DELETE', { confirmation: 'DELETE ALL' })).status, 409);
+  } finally { await lock.query('SELECT pg_advisory_unlock(1465078355)'); lock.release(); }
+  assert.equal((await database.db.select().from(leads)).length, 2);
+});
+
+test('repair F17: confirmed deletion removes WhatsApp data but preserves users and settings', async () => {
+  await database.db.insert(whatsappMessages).values({ phone: own.phone!, leadId: own.id, direction: 'in', message: 'Delete fixture' });
+  await database.db.insert(whatsappContacts).values({ phone: own.phone!, leadId: own.id });
+  await app.get(SettingsService).createSetting({ key: 'companyName', value: 'Keep fixture' });
+  const response = await request('/admin/data-export/all', adminToken, 'DELETE', { confirmation: 'DELETE ALL' });
+  assert.equal(response.status, 200); const result = await response.json() as any;
+  assert.equal(result.deletedMessages, 1); assert.equal(result.deletedContacts, 1); assert.equal(result.deletedLeads, 2);
+  assert.equal((await database.db.select().from(whatsappMessages)).length, 0);
+  assert.equal((await database.db.select().from(whatsappContacts)).length, 0);
+  assert.equal((await database.db.select().from(users)).length, 3);
+  assert.equal((await app.get(SettingsService).getSetting('companyName')).value, 'Keep fixture');
 });

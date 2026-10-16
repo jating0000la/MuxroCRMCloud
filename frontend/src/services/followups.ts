@@ -17,8 +17,8 @@ export const followupService = {
     return data;
   },
 
-  getMyFollowups: async (campaignId?: string): Promise<Followup[]> => {
-    const params = campaignId ? { campaignId } : {};
+  getMyFollowups: async (campaignId?: string, cursor?: string): Promise<{ data: Followup[]; cursor: string | null }> => {
+    const params = { campaignId, cursor };
     const { data } = await api.get('/followups/my', { params });
     return data;
   },

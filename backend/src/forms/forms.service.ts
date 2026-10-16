@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { sql, eq, and, desc, asc, inArray } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
 import { forms, enquiries, leads, campaignStatuses, followups, campaigns } from '../db/schema';
-import { PaginationDto } from '../common/pagination.dto';
+import { PaginationDto, createPaginatedResponse } from '../common/pagination.dto';
 import { RoundRobinService } from '../common/services/round-robin.service';
 import { CreateFormDto } from './dto/create-form.dto';
 import { UpdateFormDto } from './dto/update-form.dto';
@@ -57,10 +57,11 @@ export class FormsService {
 
   async findByCampaign(campaignId: string) {
     return this.database.db
-      .select()
+      .select({ form: forms, submissions: sql<number>`(SELECT count(*)::int FROM "Enquiry" e WHERE e."formId" = "Form"."id")` })
       .from(forms)
       .where(eq(forms.campaignId, campaignId))
-      .orderBy(desc(forms.createdAt));
+      .orderBy(desc(forms.createdAt))
+      .then(rows => rows.map(row => ({ ...row.form, _count: { submissions: row.submissions } })));
   }
 
   async findOne(id: string) {
@@ -86,7 +87,7 @@ export class FormsService {
       })
       .from(forms)
       .innerJoin(campaigns, eq(forms.campaignId, campaigns.id))
-      .where(eq(forms.publicSlug, slug))
+      .where(and(eq(forms.publicSlug, slug), eq(campaigns.isActive, true)))
       .limit(1);
 
     if (!result || !result.form.isPublished) throw new NotFoundException('Form not found');
@@ -100,6 +101,12 @@ export class FormsService {
 
     // Wrap enquiry + lead + followup creation in a transaction
     const result = await this.database.db.transaction(async (tx) => {
+      const [available] = await tx.select({ fields: forms.fields }).from(forms)
+        .innerJoin(campaigns, eq(forms.campaignId, campaigns.id))
+        .where(and(eq(forms.id, form.id), eq(forms.isPublished, true), eq(campaigns.isActive, true)))
+        .for('share');
+      if (!available) throw new NotFoundException('Form not found');
+      this.validateSubmissionData((available.fields || []) as PublicFormField[], data);
       const [submission] = await tx
         .insert(enquiries)
         .values({
@@ -224,13 +231,12 @@ export class FormsService {
     const skip = pagination?.getSkip() || 0;
     const take = pagination?.getTake() || 50;
 
-    return this.database.db
-      .select()
-      .from(enquiries)
-      .where(eq(enquiries.formId, formId))
-      .orderBy(desc(enquiries.submittedAt))
-      .offset(skip)
-      .limit(take);
+    const [rows, [{ total }]] = await Promise.all([
+      this.database.db.select().from(enquiries).where(eq(enquiries.formId, formId))
+        .orderBy(desc(enquiries.submittedAt), desc(enquiries.id)).offset(skip).limit(take),
+      this.database.db.select({ total: sql<number>`count(*)::int` }).from(enquiries).where(eq(enquiries.formId, formId)),
+    ]);
+    return createPaginatedResponse(rows, total, pagination?.page || 1, take);
   }
 
   private async sendFormGreeting(
@@ -327,6 +333,14 @@ export class FormsService {
 
       if (type === 'phone' && (typeof value !== 'string' || !/^[\d\s\-+()]*$/.test(value))) {
         throw new BadRequestException(`${label} must be a valid phone number`);
+      }
+
+      if (type === 'file') {
+        const match = typeof value?.dataUrl === 'string' && value.dataUrl.match(/^data:[^,]*;base64,([A-Za-z0-9+/]*={0,2})$/);
+        if (!match || !Number.isInteger(value.size) || value.size < 0 || value.size > 4 * 1024 * 1024 ||
+            Buffer.from(match[1], 'base64').length !== value.size) {
+          throw new BadRequestException(`${label} must be a valid attachment up to 4 MB`);
+        }
       }
 
       if (type === 'number' && Number.isNaN(Number(value))) {

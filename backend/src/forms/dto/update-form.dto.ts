@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import { IsString, IsOptional, IsBoolean, IsArray } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PartialType } from '@nestjs/swagger';
@@ -7,5 +8,6 @@ export class UpdateFormDto extends PartialType(CreateFormDto) {
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
+  @Transform(({ obj }) => obj.isPublished)
   isPublished?: boolean;
 }

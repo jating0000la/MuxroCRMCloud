@@ -133,10 +133,11 @@ export default function FollowupDashboardPage() {
         });
         setAvailableStatuses(Array.from(unique.values()));
       }
-      setStatusFilter('');
     };
     loadStatuses();
   }, [selectedCampaign, leads]);
+
+  useEffect(() => { setStatusFilter(''); }, [selectedCampaign]);
 
   // Document title
   useEffect(() => {
