@@ -657,34 +657,37 @@ export class DashboardService {
       }
     }
 
-    const campaignStats = await this.database.db
-      .select({
-        campaignId: leads.campaignId,
-        campaignName: campaigns.name,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(leads)
-      .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
-      .where(and(...alertLeadConditions, sql`${leads.statusId} IS NOT NULL`))
-      .groupBy(leads.campaignId, campaigns.name)
-      .orderBy(desc(sql`count(*)::int`))
-      .limit(1);
+    // Organization-wide campaign/stale-lead alerts are admin-only.
+    if (role === 'ADMIN') {
+      const campaignStats = await this.database.db
+        .select({
+          campaignId: leads.campaignId,
+          campaignName: campaigns.name,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(leads)
+        .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
+        .where(and(...alertLeadConditions, sql`${leads.statusId} IS NOT NULL`))
+        .groupBy(leads.campaignId, campaigns.name)
+        .orderBy(desc(sql`count(*)::int`))
+        .limit(1);
 
-    if (campaignStats.length > 0) {
-      alerts.push(`Top campaign: ${campaignStats[0].campaignName} with ${campaignStats[0].count} leads`);
-    }
+      if (campaignStats.length > 0) {
+        alerts.push(`Top campaign: ${campaignStats[0].campaignName} with ${campaignStats[0].count} leads`);
+      }
 
-    const today = new Date();
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const today = new Date();
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const [{ staleLeads }] = await this.database.db
-      .select({ staleLeads: sql<number>`count(*)::int` })
-      .from(leads)
-      .where(and(...alertLeadConditions, sql`${leads.updatedAt} < ${sevenDaysAgo}`));
+      const [{ staleLeads }] = await this.database.db
+        .select({ staleLeads: sql<number>`count(*)::int` })
+        .from(leads)
+        .where(and(...alertLeadConditions, sql`${leads.updatedAt} < ${sevenDaysAgo}`));
 
-    if (staleLeads > 0) {
-      alerts.push(`${staleLeads} leads with no activity for 7+ days`);
+      if (staleLeads > 0) {
+        alerts.push(`${staleLeads} leads with no activity for 7+ days`);
+      }
     }
 
     return alerts;

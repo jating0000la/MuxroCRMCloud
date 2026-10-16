@@ -12,6 +12,8 @@ import { NestFactory } from '@nestjs/core';
 import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
 import { DatabaseService } from '../src/db/database.service';
 import { AuthService } from '../src/auth/auth.service';
+import { WhatsAppService } from '../src/whatsapp/whatsapp.service';
+import { FollowupsService } from '../src/followups/followups.service';
 import { FormsService } from '../src/forms/forms.service';
 import { LeadsService } from '../src/leads/leads.service';
 import { RoundRobinService } from '../src/common/services/round-robin.service';
@@ -329,4 +331,32 @@ test('the standalone worker resolves modules, registers all processors and shuts
       else reject(new Error(`Worker startup/shutdown failed (exit ${code}, signal ${signal}): ${output}`));
     });
   });
+});
+
+test('merged dashboard changes keep campaign and stale-lead alerts admin-only', async () => {
+  await database.db.update(leads).set({ updatedAt: new Date('2020-01-01') }).where(eq(leads.id, own.id));
+  const personal = await (await request('/dashboard/alerts')).json() as string[];
+  assert.ok(personal.every(alert => !alert.startsWith('Top campaign:') && !alert.includes('7+ days')));
+  const global = await (await request('/dashboard/alerts', adminToken)).json() as string[];
+  assert.ok(global.some(alert => alert.startsWith('Top campaign:')));
+  assert.ok(global.some(alert => alert.includes('7+ days')));
+});
+
+test('merged followup user validation rejects a missing caller without inserting', async () => {
+  await assert.rejects(app.get(FollowupsService).create({ leadId: own.id, status: 'Called' }, randomUUID(), 'ADMIN'), /User not found/);
+  assert.equal((await database.db.select().from(followups)).length, 0);
+});
+
+test('merged service pagination caps inbox, history and contacts for internal callers', async () => {
+  const service = app.get(WhatsAppService);
+  await database.db.insert(whatsappMessages).values(Array.from({ length: 505 }, () => ({
+    phone: own.phone!, leadId: own.id, direction: 'in', message: 'History fixture',
+  })));
+  assert.equal((await service.getChatMessages(own.phone!, alice.id, 'USER', 1000000)).length, 500);
+  const contacts = Array.from({ length: 505 }, (_, index) => ({ phone: `9195555${String(index).padStart(4, '0')}`, leadId: own.id }));
+  await database.db.insert(whatsappContacts).values(contacts);
+  await database.db.insert(whatsappMessages).values(contacts.map(contact => ({ ...contact, direction: 'in', message: 'Inbox fixture' })));
+  assert.equal((await service.getChats(alice.id, 'USER', 1000000)).length, 500);
+  assert.equal((await service.getContacts(alice.id, 'USER', 1000000)).length, 500);
+  await assert.rejects(service.getChats(alice.id, 'USER', 50, -1), /Pagination requires/);
 });

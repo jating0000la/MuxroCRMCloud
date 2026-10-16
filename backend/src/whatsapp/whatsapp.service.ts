@@ -40,6 +40,13 @@ export class WhatsAppService {
 
   // ─── Chat Inbox ───────────────────────────────────────────────────────────
 
+  private paginationBounds(limit: number, offset: number) {
+    if (!Number.isInteger(limit) || limit < 1 || !Number.isInteger(offset) || offset < 0 || offset > 2147483647) {
+      throw new BadRequestException('Pagination requires a positive integer limit and a nonnegative integer offset');
+    }
+    return { limit: Math.min(limit, 500), offset };
+  }
+
   private rowScope(leadId: SQLWrapper, phone: SQLWrapper, userId: string, role: string) {
     if (role === 'ADMIN') return sql`true`;
     if (role !== 'USER' || !userId) return sql`false`;
@@ -57,6 +64,7 @@ export class WhatsAppService {
   }
 
   async getChats(userId: string, role: string, limit = 50, offset = 0) {
+    ({ limit, offset } = this.paginationBounds(limit, offset));
     const chats = await this.database.db.execute(sql`
       WITH visible AS (
         SELECT wm.* FROM "WhatsappMessage" wm
@@ -85,6 +93,7 @@ export class WhatsAppService {
   }
 
   async getChatMessages(phone: string, userId: string, role: string, limit = 50, offset = 0) {
+    ({ limit, offset } = this.paginationBounds(limit, offset));
     const messages = await this.database.db.select().from(whatsappMessages)
       .where(and(eq(whatsappMessages.phone, this.normalizePhone(phone)),
         this.rowScope(whatsappMessages.leadId, whatsappMessages.phone, userId, role)))
@@ -477,6 +486,7 @@ export class WhatsAppService {
   // ─── Contacts ─────────────────────────────────────────────────────────────
 
   async getContacts(userId: string, role: string, limit = 100, offset = 0) {
+    ({ limit, offset } = this.paginationBounds(limit, offset));
     return this.database.db
       .select()
       .from(whatsappContacts)

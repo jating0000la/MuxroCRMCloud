@@ -122,21 +122,20 @@ export class FollowupsService {
   }
 
   async create(dto: CreateFollowupDto, userId: string, role: string) {
-    const followup = await this.database.db.transaction(async tx => {
+    const { followup, user } = await this.database.db.transaction(async tx => {
       const [lead] = await tx.select({ id: leads.id }).from(leads)
         .where(and(eq(leads.id, dto.leadId), eq(leads.isDeleted, false))).limit(1).for('update');
       if (!lead) throw new NotFoundException('Lead not found');
       await this.authorization.ensureLeadWriteAccess(dto.leadId, userId, role, tx);
+      const [user] = await tx.select({ id: users.id, name: users.name }).from(users)
+        .where(eq(users.id, userId)).limit(1);
+      if (!user) throw new NotFoundException('User not found');
       const [created] = await tx.insert(followups).values({
         leadId: dto.leadId, userId, status: dto.status, remarks: dto.remarks,
         nextCallDate: dto.nextCallDate ? new Date(dto.nextCallDate) : null,
       }).returning();
-      return created;
+      return { followup: created, user };
     });
-
-    const [user] = await this.database.db
-      .select({ id: users.id, name: users.name })
-      .from(users).where(eq(users.id, userId)).limit(1);
 
     this.notificationsService
       .createNotificationForFollowup(userId, followup.id, followup.nextCallDate)
