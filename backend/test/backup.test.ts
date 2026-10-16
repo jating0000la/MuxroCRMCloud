@@ -17,7 +17,7 @@ import { DatabaseService } from '../src/db/database.service';
 import { AuthService } from '../src/auth/auth.service';
 import { JobService } from '../src/jobs/job.service';
 import { JOB_TYPES } from '../src/jobs/job.types';
-import { users, campaigns, outboxEvents, jobLogs } from '../src/db/schema';
+import { users, campaigns, outboxEvents, jobLogs, ivrWebhookEvents } from '../src/db/schema';
 
 // All destructive operations target a database and directory owned by this test run.
 const baseUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
@@ -54,7 +54,7 @@ before(async () => {
   delete process.env.CRM_PROCESS_ROLE;
   const init = new Pool({ connectionString: url.toString() });
   try {
-    for (const file of ['0000_acoustic_tarot.sql', '0001_whatsapp_tables.sql', '0003_round_robin_cursor.sql']) {
+    for (const file of ['0000_acoustic_tarot.sql', '0001_whatsapp_tables.sql', '0003_round_robin_cursor.sql', '0004_open_titanium_man.sql', '0005_clumsy_sunspot.sql']) {
       await init.query(fs.readFileSync(path.join(__dirname, '../drizzle', file), 'utf8'));
     }
     // A common production extension must not break an otherwise valid restore.
@@ -247,8 +247,16 @@ test('corrupt archives fail before creating recovery or changing data', async ()
 });
 
 test('real HTTP restore creates recovery, restores records, clears sessions and queued work', async () => {
-  await database.db.insert(campaigns).values({ name: 'Snapshot campaign' });
+  const [snapshotCampaign] = await database.db.insert(campaigns).values({ name: 'Snapshot campaign' }).returning();
   await database.db.insert(outboxEvents).values({ aggregateType: 'fixture', aggregateId: '1', eventType: 'fixture', payload: {} });
+  await database.db.insert(ivrWebhookEvents).values([
+    { eventKey: 'restore-pending', tenantId: 'restore-fixture', externalCallId: 'call-1', crmCampaignId: snapshotCampaign.id,
+      payload: {}, status: 'pending' },
+    { eventKey: 'restore-failed', tenantId: 'restore-fixture', externalCallId: 'call-2', crmCampaignId: snapshotCampaign.id,
+      payload: {}, status: 'failed', error: 'Previous failure' },
+    { eventKey: 'restore-processed', tenantId: 'restore-fixture', externalCallId: 'call-3', crmCampaignId: snapshotCampaign.id,
+      payload: {}, status: 'processed', processedAt: new Date('2026-01-01T00:00:00Z') },
+  ]);
   const snapshot = await backups.createBackup();
   await database.getPool().query('UPDATE "Campaign" SET name = $1', ['Current campaign']);
   await app.get(JobService).addJob(JOB_TYPES.BACKUP_DATABASE, { fixture: true });
@@ -270,6 +278,15 @@ test('real HTTP restore creates recovery, restores records, clears sessions and 
   assert.equal((await auth.login({ username: 'admin', password })).user.role, 'ADMIN');
   assert.equal(Number((await database.getPool().query('SELECT count(*) FROM pgboss.job')).rows[0].count), 0);
   assert.equal((await database.getPool().query('SELECT published FROM "OutboxEvent"')).rows[0].published, true);
+  const restoredEvents = (await database.getPool().query('SELECT "eventKey", status, error, "processedAt" FROM "IvrWebhookEvent" ORDER BY "eventKey"')).rows;
+  assert.deepEqual(restoredEvents.map(row => [row.eventKey, row.status]), [
+    ['restore-failed', 'failed'], ['restore-pending', 'failed'], ['restore-processed', 'processed'],
+  ]);
+  for (const row of restoredEvents.filter(row => row.status === 'failed')) {
+    assert.equal(row.error, 'Restored event: review and retry explicitly');
+    assert.ok(row.processedAt);
+  }
+  assert.equal(restoredEvents.find(row => row.eventKey === 'restore-processed')!.processedAt.toISOString(), '2026-01-01T00:00:00.000Z');
   const cookies = response.headers.get('set-cookie') || '';
   assert.match(cookies, /auth_token=;/);
   assert.match(cookies, /refresh_token=;/);

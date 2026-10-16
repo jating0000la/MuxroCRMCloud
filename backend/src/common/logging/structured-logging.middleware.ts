@@ -27,7 +27,7 @@ export class StructuredLoggingMiddleware implements NestMiddleware {
       const logEntry = {
         timestamp: new Date().toISOString(),
         method,
-        url: originalUrl,
+        url: /^\/api\/v1\/integrations\/cloudconnect\/webhook\/?$/i.test(originalUrl.split('?')[0]) ? originalUrl.split('?')[0] : originalUrl,
         status: statusCode,
         duration: `${duration}ms`,
         ip: ip || req.socket.remoteAddress,

@@ -7,6 +7,7 @@ import integrationService from '../../services/integrations';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import LeadHistoryTimeline from './timeline/LeadHistoryTimeline';
+import IvrCallHistory from './IvrCallHistory';
 import {
   TimelineEvent,
   whatsappMessageToEvent,
@@ -27,7 +28,7 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
   const [lead, setLead] = useState<Lead | null>(null);
   const [followups, setFollowups] = useState<Followup[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'details' | 'history' | 'update'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'history' | 'calls' | 'update'>('details');
 
   // Status update form
   const [statusId, setStatusId] = useState('');
@@ -299,6 +300,7 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
           {[
             { key: 'details' as const, label: 'Form Data' },
             { key: 'history' as const, label: `History (${followups.length})` },
+            { key: 'calls' as const, label: 'IVR Calls' },
             { key: 'update' as const, label: 'Update Status' },
           ].map((tab) => (
             <button
@@ -317,6 +319,7 @@ export default function LeadDetailDialog({ leadId, statuses, onClose, onUpdate }
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
+          {activeTab === 'calls' && <IvrCallHistory key={leadId} leadId={leadId} />}
           {/* Form Data Tab */}
           {activeTab === 'details' && (
             <div className="p-5">

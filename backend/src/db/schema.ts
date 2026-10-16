@@ -229,7 +229,7 @@ export const settings = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     key: varchar('key', { length: 255 }).notNull().unique(),
-    encryptedValue: varchar('encryptedValue', { length: 2000 }).notNull(),
+    encryptedValue: text('encryptedValue').notNull(),
     isEncrypted: boolean('isEncrypted').notNull().default(true),
     lastTestedAt: timestamp('lastTestedAt', { withTimezone: true }),
     createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
@@ -418,3 +418,38 @@ export type WhatsappMessage = typeof whatsappMessages.$inferSelect;
 export type NewWhatsappMessage = typeof whatsappMessages.$inferInsert;
 export type WhatsappContact = typeof whatsappContacts.$inferSelect;
 export type NewWhatsappContact = typeof whatsappContacts.$inferInsert;
+
+// CloudConnect inbound calls are separate from CRM lead ownership.
+export const ivrCalls = pgTable('IvrCall', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: varchar('tenantId', { length: 30 }).notNull(),
+  externalCallId: varchar('externalCallId', { length: 128 }).notNull(),
+  providerCallId: varchar('providerCallId', { length: 128 }).notNull(),
+  crmCampaignId: uuid('crmCampaignId').notNull().references(() => campaigns.id, { onDelete: 'cascade' }),
+  leadId: uuid('leadId').notNull().references(() => leads.id, { onDelete: 'cascade' }),
+  phone: varchar('phone', { length: 20 }).notNull(),
+  status: varchar('status', { length: 20 }).notNull(),
+  answered: boolean('answered').notNull().default(false),
+  callbackNeeded: boolean('callbackNeeded').notNull().default(false),
+  agentId: varchar('agentId', { length: 30 }),
+  operatorName: varchar('operatorName', { length: 100 }),
+  receivedAt: timestamp('receivedAt', { withTimezone: true }).notNull().defaultNow(),
+  lastEventAt: timestamp('lastEventAt', { withTimezone: true }).notNull().defaultNow(),
+  endedAt: timestamp('endedAt', { withTimezone: true }),
+}, table => [uniqueIndex('IvrCall_tenant_external_key').on(table.tenantId, table.externalCallId),
+  index('IvrCall_lead_received_idx').on(table.leadId, table.receivedAt)]);
+
+export const ivrWebhookEvents = pgTable('IvrWebhookEvent', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  eventKey: varchar('eventKey', { length: 64 }).notNull().unique(),
+  tenantId: varchar('tenantId', { length: 30 }).notNull(),
+  externalCallId: varchar('externalCallId', { length: 128 }).notNull(),
+  crmCampaignId: uuid('crmCampaignId').notNull().references(() => campaigns.id, { onDelete: 'cascade' }),
+  payload: json('payload').notNull().$type<Record<string, any>>(),
+  status: varchar('status', { length: 20 }).notNull().default('pending'),
+  attempts: integer('attempts').notNull().default(0),
+  error: varchar('error', { length: 255 }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  processedAt: timestamp('processedAt', { withTimezone: true }),
+  nextAttemptAt: timestamp('nextAttemptAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('IvrWebhookEvent_pending_idx').on(table.status, table.nextAttemptAt)]);

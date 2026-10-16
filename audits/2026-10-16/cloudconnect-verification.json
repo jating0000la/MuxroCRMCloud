@@ -1,0 +1,42 @@
+{
+  "backendTests": {
+    "passed": 87,
+    "failed": 0,
+    "newIntegrationTests": 21
+  },
+  "builds": {
+    "backend": "passed",
+    "frontend": "passed"
+  },
+  "realBackendBrowser": {
+    "checks": [
+      "Admin creates dedicated IVR campaign and saves configuration",
+      "Token never reappears after reload",
+      "Synthetic local incoming Ringing/Answered/Hangup produces one enquiry and one call",
+      "Receiving operator is separate from round-robin sales owner",
+      "Assigned salesperson sees call history in lead details",
+      "Admin event activity displays three processed events"
+    ],
+    "browserErrors": []
+  },
+  "mockedFrontendBrowser": {
+    "passed": true,
+    "checks": [
+      "campaign creation",
+      "inbound ID deduplication",
+      "operator mapping",
+      "token generation",
+      "atomic config request without secret",
+      "save failure surfaced",
+      "token rotation confirmation",
+      "event retry",
+      "token not returned on reload",
+      "config load failure prevents overwrite and retries",
+      "mobile settings no horizontal overflow",
+      "lead call history"
+    ],
+    "pageErrors": [],
+    "unexpected": []
+  },
+  "providerCallsSent": false
+}
