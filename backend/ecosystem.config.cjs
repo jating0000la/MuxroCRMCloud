@@ -6,23 +6,22 @@ module.exports = {
   apps: [
     // ──────────────────────────────────────────────────────
     // Backend API (NestJS)
-    // Max 1.5GB heap → stays within 2GB total PM2 budget
+    // 512MB heap leaves capacity for the background worker
     // ──────────────────────────────────────────────────────
     {
       name: "muxro-crm-backend",
       cwd: "/root/MuxroCRMCloud/backend",
-      script: "npm",
-      args: "run start:prod",
+      script: "dist/main.js",
 
       // 1 instance = 1 CPU core (fork mode)
       instances: 1,
       exec_mode: "fork",
 
-      // Cap Node.js heap at 1.5GB (leaves ~500MB for OS overhead within 2GB limit)
-      node_args: "--max-old-space-size=1536",
+      // Share the VPS memory budget with worker and frontend
+      node_args: "--max-old-space-size=512",
 
-      // PM2 auto-restart if process RSS exceeds 2GB
-      max_memory_restart: "2048M",
+      // Restart API before it exhausts the shared memory budget
+      max_memory_restart: "896M",
 
       // Stability
       autorestart: true,
@@ -39,6 +38,28 @@ module.exports = {
 
       error_file: "/var/log/pm2/muxro-crm-backend-error.log",
       out_file: "/var/log/pm2/muxro-crm-backend-out.log",
+      merge_logs: true,
+      log_date_format: "YYYY-MM-DD HH:mm:ss Z",
+      time: true,
+    },
+
+    {
+      name: "muxro-crm-worker",
+      cwd: "/root/MuxroCRMCloud/backend",
+      script: "dist/worker.js",
+      instances: 1,
+      exec_mode: "fork",
+      node_args: "--max-old-space-size=384",
+      max_memory_restart: "640M",
+      autorestart: true,
+      watch: false,
+      min_uptime: "5s",
+      max_restarts: 10,
+      restart_delay: 3000,
+      exp_backoff_restart_delay: 200,
+      env: { NODE_ENV: "production" },
+      error_file: "/var/log/pm2/muxro-crm-worker-error.log",
+      out_file: "/var/log/pm2/muxro-crm-worker-out.log",
       merge_logs: true,
       log_date_format: "YYYY-MM-DD HH:mm:ss Z",
       time: true,

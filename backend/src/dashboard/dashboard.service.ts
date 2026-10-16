@@ -75,11 +75,12 @@ export class DashboardService {
     return { totalCampaigns, totalLeads, todayFollowups, totalUsers };
   }
 
-  async getCampaignStats(campaignId: string) {
+  async getCampaignStats(campaignId: string, userId: string, role: string) {
+    const leadScope = role === 'USER' ? eq(leads.doerId, userId) : undefined;
     const [{ totalLeads }] = await this.database.db
       .select({ totalLeads: sql<number>`count(*)::int` })
       .from(leads)
-      .where(and(eq(leads.campaignId, campaignId), eq(leads.isDeleted, false)));
+      .where(and(eq(leads.campaignId, campaignId), eq(leads.isDeleted, false), leadScope));
 
     const byStatusResults = await this.database.db
       .select({
@@ -88,7 +89,7 @@ export class DashboardService {
         count: sql<number>`count(${leads.id})::int`,
       })
       .from(campaignStatuses)
-      .leftJoin(leads, eq(campaignStatuses.id, leads.statusId))
+      .leftJoin(leads, and(eq(campaignStatuses.id, leads.statusId), eq(leads.isDeleted, false), leadScope))
       .where(eq(campaignStatuses.campaignId, campaignId))
       .groupBy(campaignStatuses.id, campaignStatuses.label, campaignStatuses.color)
       .orderBy(asc(campaignStatuses.order));
@@ -99,7 +100,7 @@ export class DashboardService {
         count: sql<number>`count(*)::int`,
       })
       .from(leads)
-      .where(and(eq(leads.campaignId, campaignId), eq(leads.isDeleted, false)))
+      .where(and(eq(leads.campaignId, campaignId), eq(leads.isDeleted, false), leadScope))
       .groupBy(leads.source);
 
     return {
@@ -284,6 +285,9 @@ export class DashboardService {
 
     const statusConditions: any[] = [];
     if (campaignId) statusConditions.push(eq(campaignStatuses.campaignId, campaignId));
+    if (role === 'USER') statusConditions.push(inArray(campaignStatuses.campaignId, this.database.db
+      .select({ campaignId: campaignUsers.campaignId }).from(campaignUsers)
+      .where(and(eq(campaignUsers.userId, userId), eq(campaignUsers.isActive, true)))));
 
     const statuses = await this.database.db
       .select({
@@ -292,7 +296,7 @@ export class DashboardService {
         count: sql<number>`count(${leads.id})::int`,
       })
       .from(campaignStatuses)
-      .leftJoin(leads, eq(campaignStatuses.id, leads.statusId))
+      .leftJoin(leads, and(eq(campaignStatuses.id, leads.statusId), ...leadConditions))
       .where(statusConditions.length > 0 ? and(...statusConditions) : undefined)
       .groupBy(campaignStatuses.id, campaignStatuses.label, campaignStatuses.color)
       .orderBy(asc(campaignStatuses.order));
@@ -330,9 +334,7 @@ export class DashboardService {
 
   async getUserConversion(userId: string, role: string, campaignId?: string, startDate?: string, endDate?: string) {
     const leadConditions: any[] = [eq(leads.isDeleted, false)];
-    if (role === 'MANAGER') {
-      // MANAGER role filter (simplified)
-    }
+    if (role === 'USER') leadConditions.push(eq(leads.doerId, userId));
     if (campaignId) leadConditions.push(eq(leads.campaignId, campaignId));
 
     if (startDate || endDate) {
@@ -354,7 +356,7 @@ export class DashboardService {
     const activeUsers = await this.database.db
       .select({ id: users.id, name: users.name, username: users.username })
       .from(users)
-      .where(and(eq(users.isActive, true), eq(users.role, 'USER')));
+      .where(and(eq(users.isActive, true), eq(users.role, 'USER'), role === 'USER' ? eq(users.id, userId) : undefined));
 
     // Get total leads per user
     const leadStats = await this.database.db
@@ -663,7 +665,7 @@ export class DashboardService {
       })
       .from(leads)
       .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
-      .where(and(eq(leads.isDeleted, false), sql`${leads.statusId} IS NOT NULL`))
+      .where(and(...alertLeadConditions, sql`${leads.statusId} IS NOT NULL`))
       .groupBy(leads.campaignId, campaigns.name)
       .orderBy(desc(sql`count(*)::int`))
       .limit(1);
@@ -679,7 +681,7 @@ export class DashboardService {
     const [{ staleLeads }] = await this.database.db
       .select({ staleLeads: sql<number>`count(*)::int` })
       .from(leads)
-      .where(and(eq(leads.isDeleted, false), sql`${leads.updatedAt} < ${sevenDaysAgo}`));
+      .where(and(...alertLeadConditions, sql`${leads.updatedAt} < ${sevenDaysAgo}`));
 
     if (staleLeads > 0) {
       alerts.push(`${staleLeads} leads with no activity for 7+ days`);

@@ -47,7 +47,7 @@ before(async () => {
   config = new ConfigService({ DATABASE_URL: url.toString(), JWT_SECRET: randomBytes(32).toString('hex') });
   database = new DatabaseService(config);
   await database.onModuleInit();
-  for (const file of ['0000_acoustic_tarot.sql', '0001_whatsapp_tables.sql']) {
+  for (const file of ['0000_acoustic_tarot.sql', '0001_whatsapp_tables.sql', '0003_round_robin_cursor.sql']) {
     await database.getPool().query(readFileSync(`${__dirname}/../drizzle/${file}`, 'utf8'));
   }
   passwordHash = await bcrypt.hash(fixturePassword, 10);

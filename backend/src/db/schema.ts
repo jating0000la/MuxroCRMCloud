@@ -72,6 +72,12 @@ export const campaignUsers = pgTable(
   ],
 );
 
+// Allocation cursor is independent of lead timestamps and status edits.
+export const roundRobinCursors = pgTable('RoundRobinCursor', {
+  campaignId: uuid('campaignId').primaryKey().references(() => campaigns.id, { onDelete: 'cascade' }),
+  userId: uuid('userId').references(() => users.id, { onDelete: 'set null' }),
+});
+
 export const campaignStatuses = pgTable(
   'CampaignStatus',
   {

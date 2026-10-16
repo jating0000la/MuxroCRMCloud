@@ -128,10 +128,15 @@ export class LeadsService {
     };
   }
 
+  private async ensureStatusCampaign(statusId: string, campaignId: string, db = this.database.db as Pick<DatabaseService['db'], 'select'>) {
+    const [status] = await db.select({ id: campaignStatuses.id }).from(campaignStatuses)
+      .where(and(eq(campaignStatuses.id, statusId), eq(campaignStatuses.campaignId, campaignId))).limit(1);
+    if (!status) throw new BadRequestException('Status does not belong to this campaign');
+  }
+
   async create(dto: CreateLeadDto, userId?: string, role?: string) {
     await this.ensureCampaignAccess(dto.campaignId, userId, role);
 
-    const doerId = dto.doerId || await this.roundRobinService.getNextRoundRobinUser(dto.campaignId);
 
     let statusId = dto.statusId;
     if (!statusId) {
@@ -145,6 +150,8 @@ export class LeadsService {
     }
 
     const lead = await this.database.db.transaction(async (tx) => {
+      const doerId = dto.doerId || await this.roundRobinService.getNextRoundRobinUser(dto.campaignId, tx);
+      if (statusId) await this.ensureStatusCampaign(statusId, dto.campaignId, tx);
       const [newLead] = await tx
         .insert(leads)
         .values({
@@ -155,6 +162,7 @@ export class LeadsService {
           doerId,
           statusId,
           source: dto.source || 'manual',
+          updatedAt: sql`clock_timestamp()`,
           customData: dto.customData,
         })
         .returning();
@@ -245,6 +253,15 @@ export class LeadsService {
       }
     }
     
+    if (dto.statusId) {
+      await this.ensureStatusCampaign(dto.statusId, allowedFields.campaignId || lead.campaignId);
+      allowedFields.statusId = dto.statusId;
+    } else if (allowedFields.campaignId && allowedFields.statusId) {
+      // A target campaign with no statuses must not retain a foreign status.
+      const [targetStatus] = await this.database.db.select({ id: campaignStatuses.id }).from(campaignStatuses)
+        .where(and(eq(campaignStatuses.id, allowedFields.statusId), eq(campaignStatuses.campaignId, allowedFields.campaignId))).limit(1);
+      if (!targetStatus) allowedFields.statusId = null;
+    }
     allowedFields.updatedAt = new Date();
     
     try {
@@ -279,6 +296,7 @@ export class LeadsService {
 
     // Wrap followup insert + lead status update in a transaction for atomicity
     const [followup] = await this.database.db.transaction(async (tx) => {
+      if (dto.statusId) await this.ensureStatusCampaign(dto.statusId, lead.campaignId, tx);
       const [newFollowup] = await tx
         .insert(followups)
         .values({
@@ -290,7 +308,7 @@ export class LeadsService {
         })
         .returning();
 
-      const leadUpdate: any = {};
+      const leadUpdate: any = { updatedAt: new Date() };
       if (dto.statusId) leadUpdate.statusId = dto.statusId;
       if (dto.dnd !== undefined) leadUpdate.dnd = dto.dnd;
 

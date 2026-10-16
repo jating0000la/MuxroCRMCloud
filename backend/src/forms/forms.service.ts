@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { eq, and, desc, asc, inArray } from 'drizzle-orm';
+import { sql, eq, and, desc, asc, inArray } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
 import { forms, enquiries, leads, campaignStatuses, followups, campaigns } from '../db/schema';
 import { PaginationDto } from '../common/pagination.dto';
@@ -113,7 +113,7 @@ export class FormsService {
       const email = data.email || data.Email || null;
       const phone = data.phone || data.Phone || null;
 
-      const doerId = await this.roundRobinService.getNextRoundRobinUser(form.campaignId);
+      const doerId = await this.roundRobinService.getNextRoundRobinUser(form.campaignId, tx);
 
       const [firstStatus] = await tx
         .select()
@@ -131,6 +131,7 @@ export class FormsService {
           email,
           phone,
           source: 'form',
+          updatedAt: sql`clock_timestamp()`,
           customData: data,
           doerId,
           statusId: firstStatus?.id || null,

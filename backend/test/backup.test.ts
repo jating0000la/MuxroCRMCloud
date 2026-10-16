@@ -54,7 +54,7 @@ before(async () => {
   delete process.env.CRM_PROCESS_ROLE;
   const init = new Pool({ connectionString: url.toString() });
   try {
-    for (const file of ['0000_acoustic_tarot.sql', '0001_whatsapp_tables.sql']) {
+    for (const file of ['0000_acoustic_tarot.sql', '0001_whatsapp_tables.sql', '0003_round_robin_cursor.sql']) {
       await init.query(fs.readFileSync(path.join(__dirname, '../drizzle', file), 'utf8'));
     }
     // A common production extension must not break an otherwise valid restore.

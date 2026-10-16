@@ -2,6 +2,7 @@ import {
   Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { AllocateLeadsDto } from './dto/allocate-leads.dto';
 import { LeadsService } from './leads.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
@@ -79,7 +80,7 @@ export class LeadsController {
   @ApiOperation({ summary: 'Allocate leads round-robin' })
   allocateRoundRobin(
     @Param('campaignId') campaignId: string,
-    @Body() body: { leadIds: string[] },
+    @Body() body: AllocateLeadsDto,
     @Request() req,
   ) {
     return this.leadsService.allocateRoundRobin(campaignId, body.leadIds, req.user.id, req.user.role);

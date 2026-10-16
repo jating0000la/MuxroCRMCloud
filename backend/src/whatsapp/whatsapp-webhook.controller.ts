@@ -1,13 +1,15 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Logger } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Logger, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
+import { WebhookTokenGuard } from './webhook-token.guard';
 import { WhatsAppService } from './whatsapp.service';
 import { DatabaseService } from '../db/database.service';
 import { followups, leads, campaigns } from '../db/schema';
 import { eq, and, desc, like } from 'drizzle-orm';
 
 @ApiTags('WhatsApp Webhook')
-@Controller('whatsapp')
+@UseGuards(WebhookTokenGuard)
+@Controller(['whatsapp', 'integrations/gupshup'])
 export class WhatsAppWebhookController {
   private readonly logger = new Logger(WhatsAppWebhookController.name);
 
@@ -19,7 +21,7 @@ export class WhatsAppWebhookController {
   @Post('webhook')
   @Public()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Receive inbound WhatsApp messages (no auth — called by Gupshup)' })
+  @ApiOperation({ summary: 'Receive token-authenticated inbound WhatsApp messages' })
   async handleWebhook(@Body() payload: any) {
     this.logger.log('Received WhatsApp webhook');
 

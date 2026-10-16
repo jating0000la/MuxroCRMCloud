@@ -2,6 +2,7 @@ import { Controller, Get, Post, Param, Body, Req, OnModuleInit, ServiceUnavailab
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
+import { SubmitFormDto } from './dto/submit-form.dto';
 import { FormsService } from './forms.service';
 
 @ApiTags('Public Forms')
@@ -30,7 +31,7 @@ export class PublicFormsController implements OnModuleInit {
   @Post(':slug/submit')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: 'Submit public form' })
-  submitForm(@Param('slug') slug: string, @Body() body: { data: Record<string, any> }, @Req() req) {
+  submitForm(@Param('slug') slug: string, @Body() body: SubmitFormDto, @Req() req) {
     if (!this.enabled) {
       throw new ServiceUnavailableException('Public forms are disabled');
     }

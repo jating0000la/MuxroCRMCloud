@@ -19,9 +19,10 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { mkdir, writeFile } from 'fs/promises';
-import { extname, join } from 'path';
+import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { Request } from 'express';
+import { MAX_LOGO_BYTES, validateLogo } from './logo-file';
 import { SettingsService } from './settings.service';
 import { CreateSettingDto, UpdateSettingDto, SettingResponseDto } from './dto/setting.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -88,14 +89,7 @@ export class SettingsController {
 
   @Post('logo/upload')
   @UseInterceptors(FileInterceptor('file', {
-    fileFilter: (_req, file, cb) => {
-      const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
-      if (allowed.includes(file.mimetype)) {
-        cb(null, true);
-        return;
-      }
-      cb(new BadRequestException('Only PNG, JPG, JPEG, WebP, and SVG files are allowed'), false);
-    },
+    limits: { fileSize: MAX_LOGO_BYTES },
   }))
   @ApiOperation({ summary: 'Upload a company logo to the repository' })
   async uploadLogo(@UploadedFile() file: Express.Multer.File, @Req() req: Request) {
@@ -103,10 +97,10 @@ export class SettingsController {
       throw new BadRequestException('No file uploaded');
     }
 
+    const extension = validateLogo(file);
     const uploadDir = join(process.cwd(), 'uploads', 'logos');
     await mkdir(uploadDir, { recursive: true });
 
-    const extension = extname(file.originalname) || '.png';
     const fileName = `${Date.now()}-${randomUUID()}${extension}`;
     const filePath = join(uploadDir, fileName);
     await writeFile(filePath, file.buffer);

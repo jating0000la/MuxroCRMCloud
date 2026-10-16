@@ -61,10 +61,10 @@ export class AuthorizationService {
     }
   }
 
-  async ensureLeadWriteAccess(leadId: string, userId: string, userRole: string): Promise<void> {
+  async ensureLeadWriteAccess(leadId: string, userId: string, userRole: string, db: Pick<DatabaseService['db'], 'select'> = this.database.db): Promise<void> {
     if (userRole === 'ADMIN') return;
 
-    const [lead] = await this.database.db
+    const [lead] = await db
       .select({ doerId: leads.doerId })
       .from(leads)
       .where(eq(leads.id, leadId))

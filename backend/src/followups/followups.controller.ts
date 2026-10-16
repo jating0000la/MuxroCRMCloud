@@ -37,7 +37,7 @@ export class FollowupsController {
   @Post()
   @ApiOperation({ summary: 'Create a follow-up' })
   create(@Body() dto: CreateFollowupDto, @Request() req) {
-    return this.followupsService.create(dto, req.user.id);
+    return this.followupsService.create(dto, req.user.id, req.user.role);
   }
 
   @Get('my')

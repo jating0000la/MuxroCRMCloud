@@ -26,7 +26,7 @@ export class DashboardController {
   @ApiOperation({ summary: 'Get campaign-specific stats' })
   async getCampaignStats(@Param('campaignId') campaignId: string, @Request() req) {
     await this.authService.ensureCampaignAccess(campaignId, req.user.id, req.user.role);
-    return this.dashboardService.getCampaignStats(campaignId);
+    return this.dashboardService.getCampaignStats(campaignId, req.user.id, req.user.role);
   }
 
   @Get('followups')

@@ -1,87 +1,67 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { eq, and, asc, desc, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../db/database.service';
-import { leads, campaignUsers, users } from '../../db/schema';
+import { leads, campaignUsers, users, roundRobinCursors } from '../../db/schema';
+
+export type AllocationTransaction = Parameters<Parameters<DatabaseService['db']['transaction']>[0]>[0];
 
 @Injectable()
 export class RoundRobinService {
-  private logger = new Logger('RoundRobinService');
-
   constructor(private database: DatabaseService) {}
 
-  private async getEligibleUsers(campaignId: string) {
-    const activeUsers = await this.database.db
-      .select({
-        userId: campaignUsers.userId,
-        role: users.role,
-      })
-      .from(campaignUsers)
+  private async getEligibleUsers(campaignId: string, tx: AllocationTransaction) {
+    const eligible = await tx.select({ userId: users.id }).from(campaignUsers)
       .innerJoin(users, eq(campaignUsers.userId, users.id))
-      .where(and(eq(campaignUsers.campaignId, campaignId), eq(campaignUsers.isActive, true)))
-      .orderBy(asc(campaignUsers.assignedAt));
-
-    const eligibleUsers = activeUsers.filter((au) => au.role === 'USER');
-
-    if (eligibleUsers.length === 0) {
-      throw new BadRequestException('No telecaller users assigned to this campaign. Please assign USER role users before creating leads.');
-    }
-
-    return eligibleUsers;
+      .where(and(eq(campaignUsers.campaignId, campaignId), eq(campaignUsers.isActive, true),
+        eq(users.isActive, true), eq(users.role, 'USER')))
+      .orderBy(asc(campaignUsers.assignedAt), asc(campaignUsers.id))
+      .for('share');
+    if (!eligible.length) throw new BadRequestException('No telecaller users assigned to this campaign. Please assign active USER role users before creating leads.');
+    return eligible;
   }
 
-  async getNextRoundRobinUser(campaignId: string): Promise<string> {
-    const eligibleUsers = await this.getEligibleUsers(campaignId);
-
-    const [lastAssignedLead] = await this.database.db
-      .select({ doerId: leads.doerId })
-      .from(leads)
-      .where(and(eq(leads.campaignId, campaignId), sql`${leads.doerId} IS NOT NULL`))
-      .orderBy(desc(leads.createdAt))
-      .limit(1);
-
-    if (!lastAssignedLead?.doerId) {
-      return eligibleUsers[0].userId;
+  // Selection and insertion must share a transaction so the campaign lock lasts
+  // through the write. Never open a second pool connection inside that transaction.
+  async getNextRoundRobinUser(campaignId: string, tx: AllocationTransaction): Promise<string> {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${campaignId}))`);
+    const eligible = await this.getEligibleUsers(campaignId, tx);
+    const [cursor] = await tx.select().from(roundRobinCursors)
+      .where(eq(roundRobinCursors.campaignId, campaignId)).limit(1);
+    let previous = cursor?.userId;
+    if (!cursor) {
+      const [last] = await tx.select({ doerId: leads.doerId }).from(leads)
+        .where(and(eq(leads.campaignId, campaignId), eq(leads.isDeleted, false), sql`${leads.doerId} IS NOT NULL`))
+        .orderBy(desc(leads.createdAt), desc(leads.id)).limit(1);
+      previous = last?.doerId;
     }
-
-    const lastIndex = eligibleUsers.findIndex((u) => u.userId === lastAssignedLead.doerId);
-    const nextIndex = (lastIndex + 1) % eligibleUsers.length;
-    return eligibleUsers[nextIndex].userId;
+    const next = (eligible.findIndex(user => user.userId === previous) + 1) % eligible.length;
+    await tx.insert(roundRobinCursors).values({ campaignId, userId: eligible[next].userId })
+      .onConflictDoUpdate({ target: roundRobinCursors.campaignId, set: { userId: eligible[next].userId } });
+    return eligible[next].userId;
   }
 
-  async allocateRoundRobin(campaignId: string, leadIds: string[]): Promise<any[]> {
-    const eligibleUsers = await this.getEligibleUsers(campaignId);
-
-    const [lastAssignedLead] = await this.database.db
-      .select({ doerId: leads.doerId })
-      .from(leads)
-      .where(and(eq(leads.campaignId, campaignId), sql`${leads.doerId} IS NOT NULL`))
-      .orderBy(desc(leads.createdAt))
-      .limit(1);
-
-    let startIndex = 0;
-    if (lastAssignedLead?.doerId) {
-      const lastIndex = eligibleUsers.findIndex((u) => u.userId === lastAssignedLead.doerId);
-      if (lastIndex !== -1) {
-        startIndex = (lastIndex + 1) % eligibleUsers.length;
-      }
+  async allocateRoundRobin(campaignId: string, leadIds: string[], transaction?: AllocationTransaction) {
+    if (!leadIds.length || leadIds.length > 5000 || new Set(leadIds).size !== leadIds.length) {
+      throw new BadRequestException('Allocate between 1 and 5000 distinct leads');
     }
-
-    return await this.database.db.transaction(async (tx) => {
-      // Advisory lock on campaign (hash campaignId to bigint) — prevents concurrent allocations
+    const allocate = async (tx: AllocationTransaction) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${campaignId}))`);
-
-      const allocations: any[] = [];
-      for (let i = 0; i < leadIds.length; i++) {
-        const userIndex = (startIndex + i) % eligibleUsers.length;
-        const [updated] = await tx
-          .update(leads)
-          .set({ doerId: eligibleUsers[userIndex].userId })
-          .where(eq(leads.id, leadIds[i]))
+      const nextUserId = await this.getNextRoundRobinUser(campaignId, tx);
+      const eligible = await this.getEligibleUsers(campaignId, tx);
+      const start = eligible.findIndex(user => user.userId === nextUserId);
+      const allocations: (typeof leads.$inferSelect)[] = [];
+      for (const [index, id] of leadIds.entries()) {
+        const [updated] = await tx.update(leads)
+          .set({ doerId: eligible[(start + index) % eligible.length].userId, updatedAt: sql`clock_timestamp()` })
+          .where(and(eq(leads.id, id), eq(leads.campaignId, campaignId), eq(leads.isDeleted, false)))
           .returning();
+        if (!updated) throw new BadRequestException('Every lead must be an existing, non-deleted lead in this campaign');
         allocations.push(updated);
       }
-
+      await tx.update(roundRobinCursors).set({ userId: allocations[allocations.length - 1].doerId })
+        .where(eq(roundRobinCursors.campaignId, campaignId));
       return allocations;
-    });
+    };
+    return transaction ? allocate(transaction) : this.database.db.transaction(allocate);
   }
 }

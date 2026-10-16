@@ -5,6 +5,7 @@ import { followups, leads, users, campaigns, campaignStatuses } from '../db/sche
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaginationDto } from '../common/pagination.dto';
 import { CreateFollowupDto } from './dto/create-followup.dto';
+import { AuthorizationService } from '../common/authorization/authorization.service';
 import { UpdateFollowupDto } from './dto/update-followup.dto';
 
 /**
@@ -77,6 +78,7 @@ export class FollowupsService {
   constructor(
     private database: DatabaseService,
     private notificationsService: NotificationsService,
+    private authorization: AuthorizationService,
   ) {}
 
   private buildFollowupListConditions(userId: string, campaignId?: string, cursor?: string) {
@@ -119,23 +121,18 @@ export class FollowupsService {
     }));
   }
 
-  async create(dto: CreateFollowupDto, userId: string) {
-    // Verify lead exists BEFORE inserting the followup (avoids race condition)
-    const [lead] = await this.database.db
-      .select({ id: leads.id, doerId: leads.doerId })
-      .from(leads).where(eq(leads.id, dto.leadId)).limit(1);
-    if (!lead) {
-      throw new NotFoundException('Lead not found');
-    }
-
-    const [followup] = await this.database.db
-      .insert(followups)
-      .values({
-        leadId: dto.leadId, userId, status: dto.status,
-        remarks: dto.remarks,
+  async create(dto: CreateFollowupDto, userId: string, role: string) {
+    const followup = await this.database.db.transaction(async tx => {
+      const [lead] = await tx.select({ id: leads.id }).from(leads)
+        .where(and(eq(leads.id, dto.leadId), eq(leads.isDeleted, false))).limit(1).for('update');
+      if (!lead) throw new NotFoundException('Lead not found');
+      await this.authorization.ensureLeadWriteAccess(dto.leadId, userId, role, tx);
+      const [created] = await tx.insert(followups).values({
+        leadId: dto.leadId, userId, status: dto.status, remarks: dto.remarks,
         nextCallDate: dto.nextCallDate ? new Date(dto.nextCallDate) : null,
-      })
-      .returning();
+      }).returning();
+      return created;
+    });
 
     const [user] = await this.database.db
       .select({ id: users.id, name: users.name })

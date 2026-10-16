@@ -37,18 +37,21 @@ export class CampaignStatusesService {
     return created;
   }
 
-  async update(id: string, data: { label?: string; color?: string; order?: number; whatsappMessage?: string }) {
-    await this.findOne(id);
+  async update(campaignId: string, id: string, data: { label?: string; color?: string; order?: number; whatsappMessage?: string }) {
+    const current = await this.findOne(campaignId, id);
+    if (Object.values(data).every(value => value === undefined)) return current;
     const [updated] = await this.database.db
       .update(campaignStatuses)
-      .set(data)
-      .where(eq(campaignStatuses.id, id))
+      .set({
+        label: data.label, color: data.color, order: data.order, whatsappMessage: data.whatsappMessage,
+      })
+      .where(and(eq(campaignStatuses.id, id), eq(campaignStatuses.campaignId, campaignId)))
       .returning();
     return updated;
   }
 
-  async remove(id: string) {
-    const status = await this.findOne(id);
+  async remove(campaignId: string, id: string) {
+    const status = await this.findOne(campaignId, id);
 
     // Check if any leads are using this status
     const [{ count }] = await this.database.db
@@ -62,14 +65,14 @@ export class CampaignStatusesService {
       );
     }
 
-    await this.database.db.delete(campaignStatuses).where(eq(campaignStatuses.id, id));
+    await this.database.db.delete(campaignStatuses).where(and(eq(campaignStatuses.id, id), eq(campaignStatuses.campaignId, campaignId)));
   }
 
-  private async findOne(id: string) {
+  private async findOne(campaignId: string, id: string) {
     const [status] = await this.database.db
       .select()
       .from(campaignStatuses)
-      .where(eq(campaignStatuses.id, id))
+      .where(and(eq(campaignStatuses.id, id), eq(campaignStatuses.campaignId, campaignId)))
       .limit(1);
     if (!status) throw new NotFoundException('Status not found');
     return status;

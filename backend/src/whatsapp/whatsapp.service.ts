@@ -1,8 +1,8 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { AxiosResponse } from 'axios';
 import { firstValueFrom } from 'rxjs';
-import { eq, and, desc, asc, like, sql, isNull, or } from 'drizzle-orm';
+import { SQLWrapper, eq, and, desc, asc, like, sql, isNull, or } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
 import { SettingsService } from '../settings/settings.service';
 import { RoundRobinService } from '../common/services/round-robin.service';
@@ -40,73 +40,81 @@ export class WhatsAppService {
 
   // ─── Chat Inbox ───────────────────────────────────────────────────────────
 
-  async getChats(limit = 50, offset = 0) {
-    // Get distinct phones with their last message, ordered by most recent chat at top
+  private rowScope(leadId: SQLWrapper, phone: SQLWrapper, userId: string, role: string) {
+    if (role === 'ADMIN') return sql`true`;
+    if (role !== 'USER' || !userId) return sql`false`;
+    // Linked records follow their lead, never another lead sharing the phone.
+    // Legacy unlinked records are visible only when the phone has no other owner.
+    return sql`EXISTS (
+      SELECT 1 FROM "Lead" owned
+      WHERE owned."isDeleted" = false AND owned."doerId" = ${userId}
+        AND (owned.id = ${leadId} OR (${leadId} IS NULL
+          AND regexp_replace(owned.phone, '[^0-9]', '', 'g') = ${phone}
+          AND NOT EXISTS (SELECT 1 FROM "Lead" other
+            WHERE regexp_replace(other.phone, '[^0-9]', '', 'g') = ${phone}
+              AND other."doerId" IS DISTINCT FROM ${userId})))
+    )`;
+  }
+
+  async getChats(userId: string, role: string, limit = 50, offset = 0) {
     const chats = await this.database.db.execute(sql`
-      SELECT wm.phone,
-        COALESCE(wm.name, wc.name, '') as name,
-        wm.message as "lastMessage",
-        wm."createdAt" as "lastMessageAt",
-        wm.direction as "lastDirection",
-        wm.type as "lastType",
-        (SELECT COUNT(*) FROM "WhatsappMessage" wm2 WHERE wm2.phone = wm.phone AND direction = 'in' AND wm2.status IS NULL) as "unreadCount"
-      FROM "WhatsappMessage" wm
-      LEFT JOIN "WhatsappContact" wc ON wc.phone = wm.phone
-      WHERE wm."createdAt" = (
-        SELECT MAX(wm2."createdAt") FROM "WhatsappMessage" wm2 WHERE wm2.phone = wm.phone
+      WITH visible AS (
+        SELECT wm.* FROM "WhatsappMessage" wm
+        WHERE ${this.rowScope(sql`wm."leadId"`, sql`wm.phone`, userId, role)}
+      ), latest AS (
+        SELECT DISTINCT ON (phone) * FROM visible
+        ORDER BY phone, "createdAt" DESC, id DESC
       )
-      ORDER BY wm."createdAt" DESC
+      SELECT wm.phone, COALESCE(wm.name, wc.name, '') as name,
+        wm.message as "lastMessage", wm."createdAt" as "lastMessageAt",
+        wm.direction as "lastDirection", wm.type as "lastType",
+        (SELECT COUNT(*) FROM visible unread
+          WHERE unread.phone = wm.phone AND unread.direction = 'in'
+            AND unread.status = 'received') as "unreadCount"
+      FROM latest wm
+      LEFT JOIN "WhatsappContact" wc ON wc.phone = wm.phone
+        AND ${this.rowScope(sql`wc."leadId"`, sql`wc.phone`, userId, role)}
+      ORDER BY wm."createdAt" DESC, wm.id DESC
       LIMIT ${limit} OFFSET ${offset}
     `);
-
-    return (chats.rows || []).map((row: any) => ({
-      phone: row.phone,
-      name: row.name || row.phone,
-      lastMessage: row.lastMessage || '',
-      lastMessageAt: row.lastMessageAt,
-      lastDirection: row.lastDirection,
-      lastType: row.lastType,
-      unreadCount: Number(row.unreadCount) || 0,
+    return chats.rows.map((row: any) => ({
+      phone: row.phone, name: row.name || row.phone, lastMessage: row.lastMessage || '',
+      lastMessageAt: row.lastMessageAt, lastDirection: row.lastDirection,
+      lastType: row.lastType, unreadCount: Number(row.unreadCount) || 0,
     }));
   }
 
-  async getChatMessages(phone: string, limit = 50, offset = 0) {
-    const messages = await this.database.db
-      .select()
-      .from(whatsappMessages)
-      .where(eq(whatsappMessages.phone, phone))
-      .orderBy(desc(whatsappMessages.createdAt))
-      .limit(limit)
-      .offset(offset);
-
-    return messages.reverse(); // chronological order for display
+  async getChatMessages(phone: string, userId: string, role: string, limit = 50, offset = 0) {
+    const messages = await this.database.db.select().from(whatsappMessages)
+      .where(and(eq(whatsappMessages.phone, this.normalizePhone(phone)),
+        this.rowScope(whatsappMessages.leadId, whatsappMessages.phone, userId, role)))
+      .orderBy(desc(whatsappMessages.createdAt), desc(whatsappMessages.id))
+      .limit(limit).offset(offset);
+    return messages.reverse();
   }
 
-  async getChatStats() {
-    const [total] = await this.database.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(whatsappMessages);
+  async getChatStats(userId: string, role: string) {
+    const [stats] = await this.database.db.select({
+      totalMessages: sql<number>`count(*)::int`,
+      incoming: sql<number>`count(*) FILTER (WHERE ${whatsappMessages.direction} = 'in')::int`,
+      outgoing: sql<number>`count(*) FILTER (WHERE ${whatsappMessages.direction} = 'out')::int`,
+      uniqueChats: sql<number>`count(DISTINCT ${whatsappMessages.phone})::int`,
+    }).from(whatsappMessages)
+      .where(this.rowScope(whatsappMessages.leadId, whatsappMessages.phone, userId, role));
+    return stats;
+  }
 
-    const [incoming] = await this.database.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(whatsappMessages)
-      .where(eq(whatsappMessages.direction, 'in'));
-
-    const [outgoing] = await this.database.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(whatsappMessages)
-      .where(eq(whatsappMessages.direction, 'out'));
-
-    const [uniqueChats] = await this.database.db
-      .select({ count: sql<number>`count(DISTINCT phone)::int` })
-      .from(whatsappMessages);
-
-    return {
-      totalMessages: total?.count || 0,
-      incoming: incoming?.count || 0,
-      outgoing: outgoing?.count || 0,
-      uniqueChats: uniqueChats?.count || 0,
-    };
+  async ensureSendAccess(dto: { phone: string; leadId?: string; campaignId?: string }, user: { id: string; role: string }) {
+    if (user.role === 'ADMIN' && !dto.leadId) return { leadId: dto.leadId, campaignId: dto.campaignId };
+    const [lead] = await this.database.db.select({ id: leads.id, campaignId: leads.campaignId }).from(leads)
+      .where(and(eq(leads.isDeleted, false),
+        sql`regexp_replace(${leads.phone}, '[^0-9]', '', 'g') = ${this.normalizePhone(dto.phone)}`,
+        dto.leadId ? eq(leads.id, dto.leadId) : undefined,
+        dto.campaignId ? eq(leads.campaignId, dto.campaignId) : undefined,
+        user.role === 'ADMIN' ? undefined : eq(leads.doerId, user.id)))
+      .orderBy(desc(leads.createdAt), desc(leads.id)).limit(1);
+    if (!lead || !['ADMIN', 'USER'].includes(user.role)) throw new ForbiddenException('You can only message leads assigned to you');
+    return { leadId: lead.id, campaignId: lead.campaignId };
   }
 
   // ─── Message Sending ──────────────────────────────────────────────────────
@@ -468,10 +476,11 @@ export class WhatsAppService {
 
   // ─── Contacts ─────────────────────────────────────────────────────────────
 
-  async getContacts(limit = 100, offset = 0) {
+  async getContacts(userId: string, role: string, limit = 100, offset = 0) {
     return this.database.db
       .select()
       .from(whatsappContacts)
+      .where(this.rowScope(whatsappContacts.leadId, whatsappContacts.phone, userId, role))
       .orderBy(desc(whatsappContacts.lastSeen))
       .limit(limit)
       .offset(offset);
@@ -604,18 +613,17 @@ export class WhatsAppService {
       .orderBy(asc(campaignStatuses.order))
       .limit(1);
 
-    // Get round-robin user, fallback to campaign manager
-    let doerId: string | undefined = campaign.managerId || undefined;
-    try {
-      doerId = await this.roundRobinService.getNextRoundRobinUser(campaignId);
-    } catch {
-      // Fallback to campaign manager if round-robin has no users
-    }
-
     const leadName = (name || phone || 'Unknown').substring(0, 255);
 
     // Create lead and initial followup in a transaction
     const [newLead] = await this.database.db.transaction(async (tx) => {
+      let doerId: string | undefined;
+      try {
+        doerId = await this.roundRobinService.getNextRoundRobinUser(campaignId, tx);
+      } catch (error) {
+        if (!(error instanceof BadRequestException)) throw error;
+        // Leave unassigned when no active telecaller exists; do not assign an inactive manager.
+      }
       const [lead] = await tx
         .insert(leads)
         .values({
@@ -623,13 +631,14 @@ export class WhatsAppService {
           name: leadName,
           phone,
           source: 'whatsapp',
+          updatedAt: sql`clock_timestamp()`,
           doerId: doerId || null,
           statusId: firstStatus?.id,
         })
         .returning();
 
       // Create initial followup if we have a valid userId
-      const followupUserId = doerId || campaign.managerId;
+      const followupUserId = doerId;
       if (followupUserId) {
         await tx.insert(followups).values({
           leadId: lead.id,

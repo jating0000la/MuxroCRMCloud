@@ -9,7 +9,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
-const MAX_IMPORT_ROWS = 5000;
+import { ImportLeadsDto, ImportOptionsDto } from './dto/import-leads.dto';
 
 @ApiTags('Bulk Import')
 @ApiBearerAuth()
@@ -35,12 +35,12 @@ export class BulkImportController {
   async importCSV(
     @Param('campaignId') campaignId: string,
     @UploadedFile() file: Express.Multer.File,
-    @Body('allocateRoundRobin') allocateRoundRobin?: string,
+    @Body() options: ImportOptionsDto,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
-    const shouldAllocate = allocateRoundRobin !== 'false';
+    const shouldAllocate = options.allocateRoundRobin !== false;
     return this.bulkImportService.importFromCSV(campaignId, file.buffer, shouldAllocate);
   }
 
@@ -49,14 +49,8 @@ export class BulkImportController {
   @ApiOperation({ summary: 'Import leads from JSON data' })
   async importJSON(
     @Param('campaignId') campaignId: string,
-    @Body() body: { data: any[]; allocateRoundRobin?: boolean },
+    @Body() body: ImportLeadsDto,
   ) {
-    if (!Array.isArray(body.data)) {
-      throw new BadRequestException('data must be an array');
-    }
-    if (body.data.length > MAX_IMPORT_ROWS) {
-      throw new BadRequestException(`Maximum ${MAX_IMPORT_ROWS} rows allowed per import. Received ${body.data.length}.`);
-    }
     return this.bulkImportService.importFromJSON(
       campaignId,
       body.data,

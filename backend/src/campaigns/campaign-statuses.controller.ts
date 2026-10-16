@@ -2,6 +2,7 @@ import {
   Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { CreateCampaignStatusDto, UpdateCampaignStatusDto } from './dto/campaign-status.dto';
 import { CampaignStatusesService } from './campaign-statuses.service';
 import { AuthorizationService } from '../common/authorization/authorization.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -30,38 +31,26 @@ export class CampaignStatusesController {
   @ApiOperation({ summary: 'Create a new status' })
   async create(
     @Param('campaignId') campaignId: string,
-    @Body() body: { label: string; color?: string; whatsappMessage?: string },
+    @Body() body: CreateCampaignStatusDto,
   ) {
-    if (!body.label || typeof body.label !== 'string' || body.label.trim().length === 0) {
-      throw new (await import('@nestjs/common')).BadRequestException('label is required');
-    }
-    if (body.label.length > 50) {
-      throw new (await import('@nestjs/common')).BadRequestException('label must be 50 characters or less');
-    }
-    return this.statusesService.create(campaignId, { ...body, label: body.label.trim() });
+    return this.statusesService.create(campaignId, body);
   }
 
   @Put(':id')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Update a status' })
   async update(
+    @Param('campaignId') campaignId: string,
     @Param('id') id: string,
-    @Body() body: { label?: string; color?: string; order?: number; whatsappMessage?: string },
+    @Body() body: UpdateCampaignStatusDto,
   ) {
-    if (body.label !== undefined && (typeof body.label !== 'string' || body.label.trim().length === 0)) {
-      throw new (await import('@nestjs/common')).BadRequestException('label cannot be empty');
-    }
-    if (body.label && body.label.length > 50) {
-      throw new (await import('@nestjs/common')).BadRequestException('label must be 50 characters or less');
-    }
-    const sanitized = body.label ? { ...body, label: body.label.trim() } : body;
-    return this.statusesService.update(id, sanitized);
+    return this.statusesService.update(campaignId, id, body);
   }
 
   @Delete(':id')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Delete a status' })
-  remove(@Param('id') id: string) {
-    return this.statusesService.remove(id);
+  remove(@Param('campaignId') campaignId: string, @Param('id') id: string) {
+    return this.statusesService.remove(campaignId, id);
   }
 }

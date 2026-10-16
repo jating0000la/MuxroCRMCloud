@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ChatQueryDto } from './dto/chat-query.dto';
 import { WhatsAppService } from './whatsapp.service';
 import {
   SendTextDto,
@@ -35,10 +36,10 @@ export class WhatsAppController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
   async getChats(
-    @Query('limit') limit?: number,
-    @Query('offset') offset?: number,
+    @Query() query: ChatQueryDto,
+    @CurrentUser() user: any,
   ) {
-    return this.whatsapp.getChats(limit || 50, offset || 0);
+    return this.whatsapp.getChats(user.id, user.role, query.limit, query.offset);
   }
 
   @Get('chats/:phone/messages')
@@ -47,16 +48,16 @@ export class WhatsAppController {
   @ApiQuery({ name: 'offset', required: false, type: Number })
   async getChatMessages(
     @Param('phone') phone: string,
-    @Query('limit') limit?: number,
-    @Query('offset') offset?: number,
+    @Query() query: ChatQueryDto,
+    @CurrentUser() user: any,
   ) {
-    return this.whatsapp.getChatMessages(phone, limit || 50, offset || 0);
+    return this.whatsapp.getChatMessages(phone, user.id, user.role, query.limit, query.offset);
   }
 
   @Get('stats')
   @ApiOperation({ summary: 'Get WhatsApp message statistics' })
-  async getStats() {
-    return this.whatsapp.getChatStats();
+  async getStats(@CurrentUser() user: any) {
+    return this.whatsapp.getChatStats(user.id, user.role);
   }
 
   // ─── Send Messages (All Types) ────────────────────────────────────────────
@@ -66,9 +67,9 @@ export class WhatsAppController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send a text message' })
   async sendText(@Body() dto: SendTextDto, @CurrentUser() user: any) {
+    const target = await this.whatsapp.ensureSendAccess(dto, user);
     return this.whatsapp.sendText(dto.phone, dto.text, dto.previewUrl, {
-      leadId: dto.leadId,
-      campaignId: dto.campaignId,
+      ...target,
       userId: user.id,
     });
   }
@@ -78,9 +79,9 @@ export class WhatsAppController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send an image message' })
   async sendImage(@Body() dto: SendImageDto, @CurrentUser() user: any) {
+    const target = await this.whatsapp.ensureSendAccess(dto, user);
     return this.whatsapp.sendImage(dto.phone, dto.url, dto.caption, {
-      leadId: dto.leadId,
-      campaignId: dto.campaignId,
+      ...target,
       userId: user.id,
     });
   }
@@ -90,9 +91,9 @@ export class WhatsAppController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send a video message' })
   async sendVideo(@Body() dto: SendVideoDto, @CurrentUser() user: any) {
+    const target = await this.whatsapp.ensureSendAccess(dto, user);
     return this.whatsapp.sendVideo(dto.phone, dto.url, dto.caption, {
-      leadId: dto.leadId,
-      campaignId: dto.campaignId,
+      ...target,
       userId: user.id,
     });
   }
@@ -102,9 +103,9 @@ export class WhatsAppController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send an audio message' })
   async sendAudio(@Body() dto: SendAudioDto, @CurrentUser() user: any) {
+    const target = await this.whatsapp.ensureSendAccess(dto, user);
     return this.whatsapp.sendAudio(dto.phone, dto.url, {
-      leadId: dto.leadId,
-      campaignId: dto.campaignId,
+      ...target,
       userId: user.id,
     });
   }
@@ -114,9 +115,9 @@ export class WhatsAppController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send a file/document message' })
   async sendFile(@Body() dto: SendFileDto, @CurrentUser() user: any) {
+    const target = await this.whatsapp.ensureSendAccess(dto, user);
     return this.whatsapp.sendFile(dto.phone, dto.url, dto.filename, dto.caption, {
-      leadId: dto.leadId,
-      campaignId: dto.campaignId,
+      ...target,
       userId: user.id,
     });
   }
@@ -126,9 +127,9 @@ export class WhatsAppController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send a location message' })
   async sendLocation(@Body() dto: SendLocationDto, @CurrentUser() user: any) {
+    const target = await this.whatsapp.ensureSendAccess(dto, user);
     return this.whatsapp.sendLocation(dto.phone, dto.latitude, dto.longitude, dto.name, dto.address, {
-      leadId: dto.leadId,
-      campaignId: dto.campaignId,
+      ...target,
       userId: user.id,
     });
   }
@@ -138,9 +139,9 @@ export class WhatsAppController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send a contact card message' })
   async sendContact(@Body() dto: SendContactDto, @CurrentUser() user: any) {
+    const target = await this.whatsapp.ensureSendAccess(dto, user);
     return this.whatsapp.sendContact(dto.phone, dto.firstName, dto.lastName, dto.contactPhone, dto.email, dto.company, {
-      leadId: dto.leadId,
-      campaignId: dto.campaignId,
+      ...target,
       userId: user.id,
     });
   }
@@ -150,9 +151,9 @@ export class WhatsAppController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send a quick-reply button message (max 3 buttons)' })
   async sendQuickReply(@Body() dto: SendQuickReplyDto, @CurrentUser() user: any) {
+    const target = await this.whatsapp.ensureSendAccess(dto, user);
     return this.whatsapp.sendQuickReply(dto.phone, dto.text, dto.buttons, dto.header, dto.footer, {
-      leadId: dto.leadId,
-      campaignId: dto.campaignId,
+      ...target,
       userId: user.id,
     });
   }
@@ -162,9 +163,9 @@ export class WhatsAppController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send a list/menu message' })
   async sendList(@Body() dto: SendListDto, @CurrentUser() user: any) {
+    const target = await this.whatsapp.ensureSendAccess(dto, user);
     return this.whatsapp.sendList(dto.phone, dto.header, dto.text, dto.items, dto.footer, dto.buttonLabel, {
-      leadId: dto.leadId,
-      campaignId: dto.campaignId,
+      ...target,
       userId: user.id,
     });
   }
@@ -174,9 +175,9 @@ export class WhatsAppController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send a template (HSM) message' })
   async sendTemplate(@Body() dto: SendWhatsAppTemplateDto, @CurrentUser() user: any) {
+    const target = await this.whatsapp.ensureSendAccess(dto, user);
     return this.whatsapp.sendTemplate(dto.phone, dto.templateId, dto.templateParams, dto.mediaType, dto.mediaUrl, {
-      leadId: dto.leadId,
-      campaignId: dto.campaignId,
+      ...target,
       userId: user.id,
     });
   }
@@ -196,10 +197,10 @@ export class WhatsAppController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
   async getContacts(
-    @Query('limit') limit?: number,
-    @Query('offset') offset?: number,
+    @Query() query: ChatQueryDto,
+    @CurrentUser() user: any,
   ) {
-    return this.whatsapp.getContacts(limit || 100, offset || 0);
+    return this.whatsapp.getContacts(user.id, user.role, query.limit, query.offset);
   }
 
   // ─── Templates ────────────────────────────────────────────────────────────

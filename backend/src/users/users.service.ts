@@ -2,7 +2,7 @@ import { Injectable, ConflictException, ForbiddenException, NotFoundException } 
 import * as bcrypt from 'bcryptjs';
 import { eq, and, ne, isNull, sql } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
-import { users, campaigns, leads, refreshSessions, User } from '../db/schema';
+import { users, campaigns, leads, refreshSessions, campaignUsers, User } from '../db/schema';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -107,6 +107,7 @@ export class UsersService {
         username: dto.username, name: dto.name, email: dto.email,
         role: dto.role, isActive: dto.isActive, updatedAt: new Date(),
       }).where(eq(users.id, id)).returning(publicUser);
+      if (!updated.isActive) await tx.update(campaignUsers).set({ isActive: false }).where(eq(campaignUsers.userId, id));
       if (updated.role !== user.role || updated.isActive !== user.isActive || updated.username !== user.username) {
         await this.revokeSessions(tx, id);
       }
@@ -120,6 +121,7 @@ export class UsersService {
       const user = await this.getUser(tx, id);
       await this.protectAdmin(tx, user, actorId, user.role, false);
       await tx.update(users).set({ isActive: false, updatedAt: new Date() }).where(eq(users.id, id));
+      await tx.update(campaignUsers).set({ isActive: false }).where(eq(campaignUsers.userId, id));
       await this.revokeSessions(tx, id);
       return { message: 'User deactivated successfully' };
     });
@@ -131,6 +133,7 @@ export class UsersService {
       await this.lockManagement(tx, actorId);
       await this.getUser(tx, id);
       await tx.update(users).set({ password, updatedAt: new Date() }).where(eq(users.id, id));
+      await tx.update(campaignUsers).set({ isActive: false }).where(eq(campaignUsers.userId, id));
       await this.revokeSessions(tx, id);
       return { message: 'Password reset successfully' };
     });
