@@ -120,7 +120,7 @@ export class FollowupsService {
   }
 
   async create(dto: CreateFollowupDto, userId: string) {
-    // Verify lead exists BEFORE inserting the followup (avoids race condition)
+      // Verify lead exists
     const [lead] = await this.database.db
       .select({ id: leads.id, doerId: leads.doerId })
       .from(leads).where(eq(leads.id, dto.leadId)).limit(1);
@@ -128,24 +128,31 @@ export class FollowupsService {
       throw new NotFoundException('Lead not found');
     }
 
-    const [followup] = await this.database.db
-      .insert(followups)
-      .values({
-        leadId: dto.leadId, userId, status: dto.status,
-        remarks: dto.remarks,
-        nextCallDate: dto.nextCallDate ? new Date(dto.nextCallDate) : null,
-      })
-      .returning();
+      // CRITICAL FIX: Verify the requesting user is the doer of the lead to prevent IDOR
+      const [user] = await this.database.db
+        .select({ id: users.id, name: users.name })
+        .from(users).where(eq(users.id, userId)).limit(1);
+      if (!user) {
+        throw new NotFoundException(`User ${userId} not found`);
+      }
+      if (lead.doerId !== userId) {
+        throw new UnauthorizedException(`Cannot create followup: user ${userId} is not the doer of lead ${lead.id}`);
+      }
 
-    const [user] = await this.database.db
-      .select({ id: users.id, name: users.name })
-      .from(users).where(eq(users.id, userId)).limit(1);
+      const [followup] = await this.database.db
+        .insert(followups)
+        .values({
+          leadId: dto.leadId, userId, status: dto.status,
+          remarks: dto.remarks,
+          nextCallDate: dto.nextCallDate ? new Date(dto.nextCallDate) : null,
+        })
+        .returning();
 
-    this.notificationsService
-      .createNotificationForFollowup(userId, followup.id, followup.nextCallDate)
-      .catch((err) => console.error('Failed to create notification:', err));
+      this.notificationsService
+        .createNotificationForFollowup(userId, followup.id, followup.nextCallDate)
+        .catch((err) => console.error('Failed to create notification:', err));
 
-    return { ...followup, user };
+      return { ...followup, user };
   }
 
   async getMyFollowups(userId: string, campaignId?: string, pagination?: PaginationDto, cursor?: string) {

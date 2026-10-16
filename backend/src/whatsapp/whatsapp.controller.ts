@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Query, UseGuards, HttpCode, HttpStatus, Logger, Param } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query, UseGuards, HttpCode, HttpStatus, Logger, Param, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -37,8 +37,9 @@ export class WhatsAppController {
   async getChats(
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
+    @Request() req
   ) {
-    return this.whatsapp.getChats(limit || 50, offset || 0);
+    return this.whatsapp.getChats(limit || 50, offset || 0, req.user.id, req.user.role);
   }
 
   @Get('chats/:phone/messages')
@@ -49,14 +50,16 @@ export class WhatsAppController {
     @Param('phone') phone: string,
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
+    @Request() req
   ) {
-    return this.whatsapp.getChatMessages(phone, limit || 50, offset || 0);
+    return this.whatsapp.getChatMessages(phone, limit || 50, offset || 0, req.user.id, req.user.role);
   }
 
   @Get('stats')
   @ApiOperation({ summary: 'Get WhatsApp message statistics' })
-  async getStats() {
-    return this.whatsapp.getChatStats();
+  async getStats(@Request() req) {
+    // Stats can be accessed by any authenticated user for their own data
+    return this.whatsapp.getChatStats(req.user.id, req.user.role);
   }
 
   // ─── Send Messages (All Types) ────────────────────────────────────────────
@@ -198,8 +201,9 @@ export class WhatsAppController {
   async getContacts(
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
+    @Request() req
   ) {
-    return this.whatsapp.getContacts(limit || 100, offset || 0);
+    return this.whatsapp.getContacts(limit || 100, offset || 0, req.user.id, req.user.role);
   }
 
   // ─── Templates ────────────────────────────────────────────────────────────

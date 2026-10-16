@@ -330,118 +330,129 @@ export class DashboardService {
 
   async getUserConversion(userId: string, role: string, campaignId?: string, startDate?: string, endDate?: string) {
     const leadConditions: any[] = [eq(leads.isDeleted, false)];
-    if (role === 'MANAGER') {
-      // MANAGER role filter (simplified)
-    }
-    if (campaignId) leadConditions.push(eq(leads.campaignId, campaignId));
 
-    if (startDate || endDate) {
-      if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        leadConditions.push(sql`${leads.createdAt} >= ${start}`);
+      // RBAC: For USER role, only show their own data
+      if (role === 'USER') {
+        leadConditions.push(eq(leads.doerId, userId));
       }
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        leadConditions.push(sql`${leads.createdAt} <= ${end}`);
+
+      if (campaignId) leadConditions.push(eq(leads.campaignId, campaignId));
+
+      if (startDate || endDate) {
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          leadConditions.push(sql`${leads.createdAt} >= ${start}`);
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          leadConditions.push(sql`${leads.createdAt} <= ${end}`);
+        }
       }
+
+      const whereClause = leadConditions.length > 0 ? and(...leadConditions) : undefined;
+
+      // Get active users - for USER role, only return their own data
+      let activeUsers;
+      if (role === 'USER') {
+        activeUsers = await this.database.db
+          .select({ id: users.id, name: users.name, username: users.username })
+          .from(users)
+          .where(and(eq(users.isActive, true), eq(users.role, 'USER'), eq(users.id, userId)));
+      } else {
+        activeUsers = await this.database.db
+          .select({ id: users.id, name: users.name, username: users.username })
+          .from(users)
+          .where(and(eq(users.isActive, true), eq(users.role, 'USER')));
+      }
+
+      // Get total leads per user
+      const leadStats = await this.database.db
+        .select({
+          doerId: leads.doerId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(leads)
+        .where(whereClause)
+        .groupBy(leads.doerId);
+
+      const leadStatsMap = new Map(leadStats.map((s) => [s.doerId, s.count]));
+
+      // Get contacted leads (has followups)
+      const contactedLeads = await this.database.db
+        .select({
+          doerId: leads.doerId,
+          count: sql<number>`count(distinct ${leads.id})::int`,
+        })
+        .from(leads)
+        .innerJoin(followups, eq(leads.id, followups.leadId))
+        .where(whereClause)
+        .groupBy(leads.doerId);
+
+      const contactedLeadsMap = new Map(contactedLeads.map((s) => [s.doerId, s.count]));
+
+      // Get qualified leads (has status)
+      const qualifiedLeads = await this.database.db
+        .select({
+          doerId: leads.doerId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(leads)
+        .where(and(...leadConditions, sql`${leads.statusId} IS NOT NULL`))
+        .groupBy(leads.doerId);
+
+      const qualifiedLeadsMap = new Map(qualifiedLeads.map((s) => [s.doerId, s.count]));
+
+      // Get converted leads (status label contains 'convert')
+      const convertedLeads = await this.database.db
+        .select({
+          doerId: leads.doerId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(leads)
+        .innerJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
+        .where(and(...leadConditions, ilike(campaignStatuses.label, '%convert%')))
+        .groupBy(leads.doerId);
+
+      const convertedLeadsMap = new Map(convertedLeads.map((s) => [s.doerId, s.count]));
+
+      // Get DND leads
+      const dndLeads = await this.database.db
+        .select({
+          doerId: leads.doerId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(leads)
+        .where(and(...leadConditions, eq(leads.dnd, true)))
+        .groupBy(leads.doerId);
+
+      const dndLeadsMap = new Map(dndLeads.map((s) => [s.doerId, s.count]));
+
+      const userStats = activeUsers.map((user) => {
+        const totalLeads = leadStatsMap.get(user.id) || 0;
+        const contacted = contactedLeadsMap.get(user.id) || 0;
+        const qualified = qualifiedLeadsMap.get(user.id) || 0;
+        const converted = convertedLeadsMap.get(user.id) || 0;
+        const dnd = dndLeadsMap.get(user.id) || 0;
+
+        return {
+          userId: user.id,
+          name: user.name,
+          username: user.username,
+          totalLeads,
+          contactedLeads: contacted,
+          contactRate: totalLeads > 0 ? Math.round((contacted / totalLeads) * 100) : 0,
+          leadsWithStatus: qualified,
+          qualifiedRate: totalLeads > 0 ? Math.round((qualified / totalLeads) * 100) : 0,
+          convertedLeads: converted,
+          conversionRate: totalLeads > 0 ? Math.round((converted / totalLeads) * 100) : 0,
+          dndLeads: dnd,
+        };
+      });
+
+      return userStats.sort((a, b) => b.conversionRate - a.conversionRate);
     }
-
-    const whereClause = leadConditions.length > 0 ? and(...leadConditions) : undefined;
-
-    // Get all active users
-    const activeUsers = await this.database.db
-      .select({ id: users.id, name: users.name, username: users.username })
-      .from(users)
-      .where(and(eq(users.isActive, true), eq(users.role, 'USER')));
-
-    // Get total leads per user
-    const leadStats = await this.database.db
-      .select({
-        doerId: leads.doerId,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(leads)
-      .where(whereClause)
-      .groupBy(leads.doerId);
-
-    const leadStatsMap = new Map(leadStats.map((s) => [s.doerId, s.count]));
-
-    // Get contacted leads (has followups)
-    const contactedLeads = await this.database.db
-      .select({
-        doerId: leads.doerId,
-        count: sql<number>`count(distinct ${leads.id})::int`,
-      })
-      .from(leads)
-      .innerJoin(followups, eq(leads.id, followups.leadId))
-      .where(whereClause)
-      .groupBy(leads.doerId);
-
-    const contactedLeadsMap = new Map(contactedLeads.map((s) => [s.doerId, s.count]));
-
-    // Get qualified leads (has status)
-    const qualifiedLeads = await this.database.db
-      .select({
-        doerId: leads.doerId,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(leads)
-      .where(and(...leadConditions, sql`${leads.statusId} IS NOT NULL`))
-      .groupBy(leads.doerId);
-
-    const qualifiedLeadsMap = new Map(qualifiedLeads.map((s) => [s.doerId, s.count]));
-
-    // Get converted leads (status label contains 'convert')
-    const convertedLeads = await this.database.db
-      .select({
-        doerId: leads.doerId,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(leads)
-      .innerJoin(campaignStatuses, eq(leads.statusId, campaignStatuses.id))
-      .where(and(...leadConditions, ilike(campaignStatuses.label, '%convert%')))
-      .groupBy(leads.doerId);
-
-    const convertedLeadsMap = new Map(convertedLeads.map((s) => [s.doerId, s.count]));
-
-    // Get DND leads
-    const dndLeads = await this.database.db
-      .select({
-        doerId: leads.doerId,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(leads)
-      .where(and(...leadConditions, eq(leads.dnd, true)))
-      .groupBy(leads.doerId);
-
-    const dndLeadsMap = new Map(dndLeads.map((s) => [s.doerId, s.count]));
-
-    const userStats = activeUsers.map((user) => {
-      const totalLeads = leadStatsMap.get(user.id) || 0;
-      const contacted = contactedLeadsMap.get(user.id) || 0;
-      const qualified = qualifiedLeadsMap.get(user.id) || 0;
-      const converted = convertedLeadsMap.get(user.id) || 0;
-      const dnd = dndLeadsMap.get(user.id) || 0;
-
-      return {
-        userId: user.id,
-        name: user.name,
-        username: user.username,
-        totalLeads,
-        contactedLeads: contacted,
-        contactRate: totalLeads > 0 ? Math.round((contacted / totalLeads) * 100) : 0,
-        leadsWithStatus: qualified,
-        qualifiedRate: totalLeads > 0 ? Math.round((qualified / totalLeads) * 100) : 0,
-        convertedLeads: converted,
-        conversionRate: totalLeads > 0 ? Math.round((converted / totalLeads) * 100) : 0,
-        dndLeads: dnd,
-      };
-    });
-
-    return userStats.sort((a, b) => b.conversionRate - a.conversionRate);
-  }
 
   async getKpiOverview(userId: string, role: string, campaignId?: string, startDate?: string, endDate?: string) {
     const today = new Date();
@@ -655,38 +666,41 @@ export class DashboardService {
       }
     }
 
-    const campaignStats = await this.database.db
-      .select({
-        campaignId: leads.campaignId,
-        campaignName: campaigns.name,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(leads)
-      .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
-      .where(and(eq(leads.isDeleted, false), sql`${leads.statusId} IS NOT NULL`))
-      .groupBy(leads.campaignId, campaigns.name)
-      .orderBy(desc(sql`count(*)::int`))
-      .limit(1);
+        // RBAC: Only ADMIN can see global campaign stats
+        if (role === 'ADMIN') {
+          const campaignStats = await this.database.db
+            .select({
+              campaignId: leads.campaignId,
+              campaignName: campaigns.name,
+              count: sql<number>`count(*)::int`,
+            })
+            .from(leads)
+            .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
+            .where(and(eq(leads.isDeleted, false), sql`${leads.statusId} IS NOT NULL`))
+            .groupBy(leads.campaignId, campaigns.name)
+            .orderBy(desc(sql`count(*)::int`))
+            .limit(1);
 
-    if (campaignStats.length > 0) {
-      alerts.push(`Top campaign: ${campaignStats[0].campaignName} with ${campaignStats[0].count} leads`);
-    }
+          if (campaignStats.length > 0) {
+            alerts.push(`Top campaign: ${campaignStats[0].campaignName} with ${campaignStats[0].count} leads`);
+          }
 
-    const today = new Date();
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          const today = new Date();
+          const sevenDaysAgo = new Date(today);
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const [{ staleLeads }] = await this.database.db
-      .select({ staleLeads: sql<number>`count(*)::int` })
-      .from(leads)
-      .where(and(eq(leads.isDeleted, false), sql`${leads.updatedAt} < ${sevenDaysAgo}`));
+          const [{ staleLeads }] = await this.database.db
+            .select({ staleLeads: sql<number>`count(*)::int` })
+            .from(leads)
+            .where(and(eq(leads.isDeleted, false), sql`${leads.updatedAt} < ${sevenDaysAgo}`));
 
-    if (staleLeads > 0) {
-      alerts.push(`${staleLeads} leads with no activity for 7+ days`);
-    }
+          if (staleLeads > 0) {
+            alerts.push(`${staleLeads} leads with no activity for 7+ days`);
+          }
+        }
 
-    return alerts;
-  }
+        return alerts;
+      }
 
   async getCampaignWiseReport(userId: string, role: string, startDate?: string, endDate?: string) {
     const leadConditions: any[] = [eq(leads.isDeleted, false)];

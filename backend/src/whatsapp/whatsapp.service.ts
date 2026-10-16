@@ -40,8 +40,17 @@ export class WhatsAppService {
 
   // ─── Chat Inbox ───────────────────────────────────────────────────────────
 
-  async getChats(limit = 50, offset = 0) {
-    // Get distinct phones with their last message, ordered by most recent chat at top
+  async getChats(limit = 50, offset = 0, userId?: string, role?: string) {
+    // Enforce maximum limits to prevent dumping
+    const safeLimit = Math.min(limit || 50, 500);
+    const safeOffset = Math.max(offset || 0, 0);
+
+    // For USER role, only return chats related to their leads
+    let userFilter = '';
+    if (role === 'USER' && userId) {
+      userFilter = sql`AND EXISTS (SELECT 1 FROM "Lead" l WHERE l."phone" = wm.phone AND l."doerId" = ${userId})`;
+    }
+
     const chats = await this.database.db.execute(sql`
       SELECT wm.phone,
         COALESCE(wm.name, wc.name, '') as name,
@@ -55,8 +64,9 @@ export class WhatsAppService {
       WHERE wm."createdAt" = (
         SELECT MAX(wm2."createdAt") FROM "WhatsappMessage" wm2 WHERE wm2.phone = wm.phone
       )
+      ${userFilter}
       ORDER BY wm."createdAt" DESC
-      LIMIT ${limit} OFFSET ${offset}
+      LIMIT ${safeLimit} OFFSET ${safeOffset}
     `);
 
     return (chats.rows || []).map((row: any) => ({
@@ -70,14 +80,25 @@ export class WhatsAppService {
     }));
   }
 
-  async getChatMessages(phone: string, limit = 50, offset = 0) {
+  async getChatMessages(phone: string, limit = 50, offset = 0, userId?: string, role?: string) {
+    // Enforce maximum limits to prevent dumping
+    const safeLimit = Math.min(limit || 50, 500);
+    const safeOffset = Math.max(offset || 0, 0);
+
+    // For USER role, only return messages related to their leads
+    let userFilter = '';
+    if (role === 'USER' && userId) {
+      userFilter = sql`AND EXISTS (SELECT 1 FROM "Lead" l WHERE l."phone" = wm.phone AND l."doerId" = ${userId})`;
+    }
+
     const messages = await this.database.db
       .select()
       .from(whatsappMessages)
       .where(eq(whatsappMessages.phone, phone))
+      .where(userFilter)
       .orderBy(desc(whatsappMessages.createdAt))
-      .limit(limit)
-      .offset(offset);
+      .limit(safeLimit)
+      .offset(safeOffset);
 
     return messages.reverse(); // chronological order for display
   }
