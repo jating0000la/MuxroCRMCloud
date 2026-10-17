@@ -29,6 +29,20 @@
       "when": 1784441777095,
       "tag": "0003_round_robin_cursor",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792144131327,
+      "tag": "0004_open_titanium_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792144328402,
+      "tag": "0005_clumsy_sunspot",
+      "breakpoints": true
     }
   ]
 }

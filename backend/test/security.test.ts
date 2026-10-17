@@ -28,7 +28,7 @@ import { BulkImportService } from '../src/bulk-import/bulk-import.service';
 import { DataExportService } from '../src/data-export/data-export.service';
 import { parse } from 'csv-parse/sync';
 import { eq } from 'drizzle-orm';
-import { users, campaigns, campaignUsers, campaignStatuses, leads, followups, forms, enquiries, whatsappMessages, whatsappContacts, roundRobinCursors, notifications } from '../src/db/schema';
+import { users, campaigns, campaignUsers, campaignStatuses, leads, followups, forms, enquiries, whatsappMessages, whatsappContacts, roundRobinCursors, notifications, ivrCalls, ivrWebhookEvents } from '../src/db/schema';
 
 const base = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
 const name = `muxro_security_test_${randomUUID().replace(/-/g, '')}`;
@@ -56,7 +56,7 @@ before(async () => {
   delete process.env.CRM_PROCESS_ROLE;
   const init = new Pool({ connectionString: url.toString() });
   try {
-    for (const file of ['0000_acoustic_tarot.sql', '0001_whatsapp_tables.sql', '0002_performance_indexes.sql', '0003_round_robin_cursor.sql']) {
+    for (const file of ['0000_acoustic_tarot.sql', '0001_whatsapp_tables.sql', '0002_performance_indexes.sql', '0003_round_robin_cursor.sql', '0004_open_titanium_man.sql', '0005_clumsy_sunspot.sql']) {
       await init.query(readFileSync(join(__dirname, '../drizzle', file), 'utf8'));
     }
   } finally { await init.end(); }
@@ -531,15 +531,22 @@ test('repair F17: deletion requires confirmation and excludes concurrent backup/
   assert.equal((await database.db.select().from(leads)).length, 2);
 });
 
-test('repair F17: confirmed deletion removes WhatsApp data but preserves users and settings', async () => {
+test('repair F17: confirmed deletion removes WhatsApp and IVR data but preserves users and settings', async () => {
   await database.db.insert(whatsappMessages).values({ phone: own.phone!, leadId: own.id, direction: 'in', message: 'Delete fixture' });
   await database.db.insert(whatsappContacts).values({ phone: own.phone!, leadId: own.id });
+  await database.db.insert(ivrCalls).values({ tenantId: 'deletion-fixture', externalCallId: 'delete-call', providerCallId: 'delete-call',
+    crmCampaignId: campaign.id, leadId: own.id, phone: own.phone!, status: 'ringing' });
+  await database.db.insert(ivrWebhookEvents).values({ eventKey: 'delete-event', tenantId: 'deletion-fixture', externalCallId: 'delete-call',
+    crmCampaignId: campaign.id, payload: { callernumber: own.phone }, status: 'pending' });
   await app.get(SettingsService).createSetting({ key: 'companyName', value: 'Keep fixture' });
   const response = await request('/admin/data-export/all', adminToken, 'DELETE', { confirmation: 'DELETE ALL' });
   assert.equal(response.status, 200); const result = await response.json() as any;
   assert.equal(result.deletedMessages, 1); assert.equal(result.deletedContacts, 1); assert.equal(result.deletedLeads, 2);
+  assert.equal(result.deletedIvrCalls, 1); assert.equal(result.deletedIvrEvents, 1);
   assert.equal((await database.db.select().from(whatsappMessages)).length, 0);
   assert.equal((await database.db.select().from(whatsappContacts)).length, 0);
+  assert.equal((await database.db.select().from(ivrCalls)).length, 0);
+  assert.equal((await database.db.select().from(ivrWebhookEvents)).length, 0);
   assert.equal((await database.db.select().from(users)).length, 3);
   assert.equal((await app.get(SettingsService).getSetting('companyName')).value, 'Keep fixture');
 });

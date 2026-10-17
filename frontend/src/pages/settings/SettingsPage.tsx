@@ -7,8 +7,9 @@ import settingsService from '../../services/settings';
 import { campaignService } from '../../services/campaigns';
 import { readBranding, saveBranding } from '../../utils/branding';
 import toast from 'react-hot-toast';
+import CloudConnectSettings from '../../components/settings/CloudConnectSettings';
 
-type Tab = 'profile' | 'api-webhook' | 'communication';
+type Tab = 'profile' | 'api-webhook' | 'communication' | 'ivr';
 
 interface Campaign {
   id: string;
@@ -329,6 +330,7 @@ export default function SettingsPage() {
     { key: 'profile', label: 'Profile', icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg> },
     { key: 'api-webhook', label: 'API & Webhook', icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg> },
     { key: 'communication', label: 'Communication Setup', icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg> },
+    { key: 'ivr', label: 'IVR Incoming', icon: <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h2l2 5-2 2a14 14 0 007 7l2-2 5 2v2a2 2 0 01-2 2C10.163 21 3 13.837 3 5zm12-2v6m0 0h6m-6 0l6-6" /></svg> },
   ];
 
   if (loading) {
@@ -354,12 +356,12 @@ export default function SettingsPage() {
       <div className="sleek-page p-6 max-w-5xl mx-auto space-y-6">
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-sm border dark:bg-gray-800 dark:border-gray-700">
-          <div className="flex border-b dark:border-gray-700">
+          <div className="flex flex-wrap border-b dark:border-gray-700">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-medium border-b-2 transition-colors ${
+                className={`min-w-[140px] flex-1 flex items-center justify-center gap-2 px-2 py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === tab.key
                     ? 'border-primary-600 text-primary-600'
                     : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
@@ -372,6 +374,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="p-6">
+            {activeTab === 'ivr' && <CloudConnectSettings />}
             {/* ====== PROFILE TAB ====== */}
             {activeTab === 'profile' && (
               <div className="space-y-6">
@@ -623,11 +626,11 @@ export default function SettingsPage() {
           </div>
 
           {/* Save Button */}
-          <div className="flex justify-end p-6 border-t dark:border-gray-700">
+          {activeTab !== 'ivr' && <div className="flex justify-end p-6 border-t dark:border-gray-700">
             <button onClick={handleSave} disabled={saving} className="px-6 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium">
               {saving ? 'Saving...' : 'Save Settings'}
             </button>
-          </div>
+          </div>}
         </div>
       </div>
     </Layout>

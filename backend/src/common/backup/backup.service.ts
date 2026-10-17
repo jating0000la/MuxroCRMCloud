@@ -312,6 +312,8 @@ DO $restore$ BEGIN
 END $restore$;
 DELETE FROM public."RefreshSession";
 UPDATE public."OutboxEvent" SET published = true, "publishedAt" = now(), "lastError" = 'Not replayed after restore' WHERE published = false;
+UPDATE public."IvrWebhookEvent" SET status = 'failed', error = 'Restored event: review and retry explicitly', "processedAt" = now()
+  WHERE status IN ('pending', 'processing', 'failed');
 DO $restore$ BEGIN
   IF to_regclass('pgboss.job') IS NOT NULL THEN EXECUTE 'TRUNCATE pgboss.job CASCADE'; END IF;
   IF to_regclass('pgboss.schedule') IS NOT NULL THEN EXECUTE 'DELETE FROM pgboss.schedule'; END IF;

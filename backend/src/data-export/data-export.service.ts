@@ -11,6 +11,8 @@ import {
   users,
   whatsappMessages,
   whatsappContacts,
+  ivrCalls,
+  ivrWebhookEvents,
 } from '../db/schema';
 import { eq, desc, sql } from 'drizzle-orm';
 import { ZipArchive } from 'archiver';
@@ -322,6 +324,10 @@ export class DataExportService {
       if (!(result.rows[0] as { acquired: boolean }).acquired) {
         throw new ConflictException('Another backup, restore, or deletion is already running');
       }
+      // Remove durable callbacks before their leads so no queued intake remains
+      // to recreate data after this deletion commits.
+      const deletedIvrEvents = (await tx.delete(ivrWebhookEvents)).rowCount || 0;
+      const deletedIvrCalls = (await tx.delete(ivrCalls)).rowCount || 0;
       const deletedMessages = (await tx.delete(whatsappMessages)).rowCount || 0;
       const deletedContacts = (await tx.delete(whatsappContacts)).rowCount || 0;
       const deletedFollowups = (await tx.delete(followups)).rowCount || 0;
@@ -331,7 +337,7 @@ export class DataExportService {
       const deletedStatuses = (await tx.delete(campaignStatuses)).rowCount || 0;
       const deletedCampaignUsers = (await tx.delete(campaignUsers)).rowCount || 0;
       const deletedCampaigns = (await tx.delete(campaigns)).rowCount || 0;
-      return { deletedMessages, deletedContacts, deletedFollowups, deletedLeads, deletedEnquiries,
+      return { deletedIvrEvents, deletedIvrCalls, deletedMessages, deletedContacts, deletedFollowups, deletedLeads, deletedEnquiries,
         deletedForms, deletedStatuses, deletedCampaignUsers, deletedCampaigns };
     });
   }

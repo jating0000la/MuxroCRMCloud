@@ -1,3 +1,6 @@
+import { CloudConnectController, CloudConnectWebhookController } from './cloudconnect/cloudconnect.controller';
+import { CloudConnectService } from './cloudconnect/cloudconnect.service';
+import { RoundRobinModule } from '../common/common.module';
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { IntegrationsController } from './integrations.controller';
@@ -10,9 +13,9 @@ import { SettingsModule } from '../settings/settings.module';
 import { WhatsAppModule } from '../whatsapp/whatsapp.module';
 
 @Module({
-  imports: [HttpModule, DatabaseModule, SettingsModule, WhatsAppModule],
-  controllers: [IntegrationsController, GupshupController],
-  providers: [ProcessSutraService, IndiamartService, GupshupService],
-  exports: [ProcessSutraService, IndiamartService, GupshupService],
+  imports: [HttpModule, DatabaseModule, SettingsModule, WhatsAppModule, RoundRobinModule],
+  controllers: [IntegrationsController, GupshupController, CloudConnectController, CloudConnectWebhookController],
+  providers: [ProcessSutraService, IndiamartService, GupshupService, CloudConnectService],
+  exports: [ProcessSutraService, IndiamartService, GupshupService, CloudConnectService],
 })
 export class IntegrationsModule {}
