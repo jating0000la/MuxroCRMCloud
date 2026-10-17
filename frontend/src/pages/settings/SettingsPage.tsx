@@ -1,3 +1,4 @@
+import WhatsAppWebhookSetup from '../../components/settings/WhatsAppWebhookSetup';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import Layout from '../../components/layout/Layout';
@@ -589,14 +590,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
                   <p className={hintCls}>API key, source number, and app name are required for sending. App ID is only needed for template sync APIs.</p>
-                  <div>
-                    <label className={labelCls}>Gupshup Webhook URL (for inbound messages)</label>
-                    <div className="flex gap-2">
-                      <input type="text" readOnly value={`${window.location.origin}/api/v1/integrations/gupshup/webhook`} className={inputCls + ' bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm'} />
-                      <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/v1/integrations/gupshup/webhook`); toast.success('Copied!'); }} className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 whitespace-nowrap">Copy</button>
-                    </div>
-                    <p className={hintCls}>Paste this in Gupshup Console &gt; Settings &gt; Webhooks</p>
-                  </div>
+                  <WhatsAppWebhookSetup />
                   <button onClick={handleTestGupshup} disabled={testingGupshup || !gupshupApiKey || !gupshupSource || !gupshupAppName || !gupshupTestPhone} className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium">
                     {testingGupshup ? <><svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Testing...</> : 'Test Connection'}
                   </button>

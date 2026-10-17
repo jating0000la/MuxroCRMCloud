@@ -1,3 +1,6 @@
+import { settings as settingsTable } from '../src/db/schema';
+import { StructuredLoggingMiddleware } from '../src/common/logging/structured-logging.middleware';
+import { EventEmitter } from 'node:events';
 import 'reflect-metadata';
 import { before, beforeEach, after, test } from 'node:test';
 import { strict as assert } from 'node:assert';
@@ -539,4 +542,130 @@ test('repair F17: confirmed deletion removes WhatsApp data but preserves users a
   assert.equal((await database.db.select().from(whatsappContacts)).length, 0);
   assert.equal((await database.db.select().from(users)).length, 3);
   assert.equal((await app.get(SettingsService).getSetting('companyName')).value, 'Keep fixture');
+});
+
+
+const inboundReply = (phone: string, text = 'Customer reply') => ({ type: 'message', payload: {
+  id: randomUUID(), sender: { phone, name: 'Customer' }, type: 'text', payload: { text },
+} });
+const postReply = (payload: unknown, token = webhookToken) => fetch(api + '/integrations/gupshup/webhook?token=' + encodeURIComponent(token), {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload),
+});
+
+test('incoming replies accept authenticated URL callbacks and prefer explicit header credentials', async () => {
+  const reply = inboundReply(own.phone!);
+  assert.equal((await postReply(reply)).status, 200);
+  const [saved] = await database.db.select().from(whatsappMessages).where(eq(whatsappMessages.messageId, reply.payload.id));
+  assert.equal(saved.leadId, own.id); assert.equal(saved.message, 'Customer reply');
+  assert.equal((await fetch(api + '/whatsapp/webhook?token=' + webhookToken, { method: 'POST', headers: {
+    'content-type': 'application/json', 'x-webhook-token': 'wrong',
+  }, body: JSON.stringify(inboundReply(own.phone!)) })).status, 401);
+  assert.equal((await fetch(api + '/whatsapp/webhook?token=' + webhookToken + '&token=other', { method: 'POST', headers: {
+    'content-type': 'application/json',
+  }, body: '{}' })).status, 401);
+});
+
+test('incoming replies link local/formatted Indian lead numbers and stay visible only to their owner', async () => {
+  for (const formatted of ['9000000001', '09000000001', '+91 90000 00001']) {
+    await database.db.update(leads).set({ phone: formatted }).where(eq(leads.id, own.id));
+    const reply = inboundReply('+91 90000 00001', 'Reply for ' + formatted);
+    assert.equal((await postReply(reply)).status, 200);
+    const rows = await (await request('/whatsapp/chats')).json() as any[];
+    assert.equal(rows.length, 1); assert.equal(rows[0].phone, '919000000001');
+    const [saved] = await database.db.select().from(whatsappMessages).where(eq(whatsappMessages.messageId, reply.payload.id));
+    assert.equal(saved.leadId, own.id);
+  }
+  const bobToken = (await app.get(AuthService).login({ username: 'bob', password: 'SecurityFixture123' })).access_token;
+  assert.deepEqual(await (await request('/whatsapp/chats', bobToken)).json(), []);
+  assert.equal((await database.db.select().from(followups)).length, 3);
+});
+
+test('concurrent provider retries produce one message and one CRM followup', async () => {
+  const reply = inboundReply(own.phone!);
+  const results = await Promise.all(Array.from({ length: 8 }, () => postReply(reply)));
+  assert.ok(results.every(r => r.status === 200));
+  assert.equal((await database.db.select().from(whatsappMessages)).length, 1);
+  assert.equal((await database.db.select().from(followups)).length, 1);
+  assert.equal((await database.db.select().from(whatsappContacts)).length, 1);
+});
+
+test('delivery events posted to the main Gupshup callback update status without creating inbound chats', async () => {
+  const id = randomUUID();
+  await database.db.insert(whatsappMessages).values({ phone: own.phone!, messageId: id, direction: 'out', message: 'Sent', status: 'submitted', leadId: own.id });
+  assert.equal((await postReply({ type: 'message-event', payload: { id, type: 'delivered' } })).status, 200);
+  const [saved] = await database.db.select().from(whatsappMessages);
+  assert.equal(saved.status, 'delivered');
+  assert.equal((await database.db.select().from(whatsappMessages)).length, 1);
+  assert.equal((await database.db.select().from(followups)).length, 0);
+});
+
+test('admin callback setup generates a masked secret, rotates credentials, and exposes no secret on reload', async () => {
+  const path = '/whatsapp/webhook-config';
+  await database.db.delete(settingsTable).where(eq(settingsTable.key, 'gupshupWebhookToken'));
+  try {
+    assert.equal((await request(path)).status, 403);
+    assert.equal((await request(path + '/token', aliceToken, 'POST')).status, 403);
+    assert.equal((await fetch(api + path)).status, 401);
+    const initial = await (await request(path, adminToken)).json() as any;
+    assert.equal(initial.configured, true); // Environment fallback.
+    const generated = await request(path + '/token', adminToken, 'POST');
+    assert.equal(generated.status, 201);
+    const { token } = await generated.json() as any;
+    assert.equal(typeof token, 'string'); assert.equal(token.length, 64);
+    assert.equal((await postReply(inboundReply(own.phone!), webhookToken)).status, 401);
+    assert.equal((await postReply(inboundReply(own.phone!), token)).status, 200);
+    const config = await (await request(path, adminToken)).json() as any;
+    assert.equal(config.configured, true); assert.ok(config.lastReceivedAt); assert.ok(!JSON.stringify(config).includes(token));
+    const all = await (await request('/settings', adminToken)).json() as any[];
+    const saved = all.find(s => s.key === 'gupshupWebhookToken');
+    assert.equal(saved.isMasked, true); assert.notEqual(saved.value, token);
+    const rotated = await (await request(path + '/token', adminToken, 'POST')).json() as any;
+    assert.equal((await postReply(inboundReply(own.phone!), token)).status, 401);
+    assert.equal((await postReply(inboundReply(own.phone!), rotated.token)).status, 200);
+  } finally { await database.db.delete(settingsTable).where(eq(settingsTable.key, 'gupshupWebhookToken')); }
+});
+
+test('database failure returns a retryable error and rolls back inbound contact/message/followup writes', async () => {
+  await database.getPool().query(`CREATE FUNCTION reject_inbound_fixture() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'Fixture storage failure'; END $$;
+    CREATE TRIGGER reject_inbound_fixture BEFORE INSERT ON "WhatsappMessage" FOR EACH ROW EXECUTE FUNCTION reject_inbound_fixture()`);
+  const reply = inboundReply(own.phone!);
+  try {
+    assert.equal((await postReply(reply)).status, 500);
+    assert.equal((await database.db.select().from(whatsappContacts)).length, 0);
+    assert.equal((await database.db.select().from(followups)).length, 0);
+    assert.equal((await database.db.select().from(whatsappMessages)).length, 0);
+  } finally { await database.getPool().query('DROP TRIGGER reject_inbound_fixture ON "WhatsappMessage"; DROP FUNCTION reject_inbound_fixture()'); }
+  assert.equal((await postReply(reply)).status, 200);
+  assert.equal((await database.db.select().from(whatsappMessages)).length, 1);
+});
+
+test('URL callback logging never exposes secrets or phone numbers on either webhook alias', () => {
+  for (const path of ['/api/v1/whatsapp/webhook', '/api/v1/integrations/gupshup/webhook/status', '/API/V1/WHATSAPP/WEBHOOK/']) {
+    const middleware = new StructuredLoggingMiddleware(); const logs: string[] = [];
+    (middleware as any).logger = { log: (value: string) => logs.push(value) };
+    const response = Object.assign(new EventEmitter(), { statusCode: 200, json: (body: any) => body });
+    middleware.use({ method: 'POST', originalUrl: path + '?token=private-secret&phone=919000000001', headers: {}, socket: {} } as any, response as any, () => {});
+    response.emit('finish');
+    assert.equal(JSON.parse(logs[0]).url, path);
+    assert.ok(!logs[0].includes('private-secret')); assert.ok(!logs[0].includes('919000000001'));
+  }
+});
+
+test('legacy local-number history and new country-code replies remain in one owned conversation', async () => {
+  await database.db.insert(whatsappMessages).values({ phone: '9000000001', leadId: own.id, direction: 'out', message: 'Old local history', status: 'sent' });
+  const reply = inboundReply(own.phone!);
+  assert.equal((await postReply(reply)).status, 200);
+  const chats = await (await request('/whatsapp/chats')).json() as any[];
+  assert.equal(chats.length, 1); assert.equal(chats[0].totalMessages, 2);
+  const messages = await (await request('/whatsapp/chats/919000000001/messages')).json() as any[];
+  assert.deepEqual(new Set(messages.map(m => m.message)), new Set(['Old local history', 'Customer reply']));
+  const stats = await (await request('/whatsapp/stats')).json() as any;
+  assert.equal(stats.uniqueChats, 1);
+});
+
+test('normalizing legacy unlinked history does not expose shared-number messages to another owner', async () => {
+  await database.db.update(leads).set({ phone: '9000000001' }).where(eq(leads.id, other.id));
+  await database.db.insert(whatsappMessages).values({ phone: '9000000001', direction: 'in', message: 'Ambiguous shared history', status: 'received' });
+  assert.deepEqual(await (await request('/whatsapp/chats')).json(), []);
+  assert.deepEqual(await (await request('/whatsapp/chats/919000000001/messages')).json(), []);
 });

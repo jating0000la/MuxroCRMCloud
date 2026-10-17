@@ -1,3 +1,5 @@
+import { normalizeWhatsAppPhone, whatsappPhoneSql } from './phone';
+import { AllocationTransaction } from '../common/services/round-robin.service';
 import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { AxiosResponse } from 'axios';
@@ -56,9 +58,9 @@ export class WhatsAppService {
       SELECT 1 FROM "Lead" owned
       WHERE owned."isDeleted" = false AND owned."doerId" = ${userId}
         AND (owned.id = ${leadId} OR (${leadId} IS NULL
-          AND regexp_replace(owned.phone, '[^0-9]', '', 'g') = ${phone}
+          AND ${whatsappPhoneSql(sql`owned.phone`)} = ${whatsappPhoneSql(phone)}
           AND NOT EXISTS (SELECT 1 FROM "Lead" other
-            WHERE regexp_replace(other.phone, '[^0-9]', '', 'g') = ${phone}
+            WHERE ${whatsappPhoneSql(sql`other.phone`)} = ${whatsappPhoneSql(phone)}
               AND other."doerId" IS DISTINCT FROM ${userId})))
     )`;
   }
@@ -67,21 +69,21 @@ export class WhatsAppService {
     ({ limit, offset } = this.paginationBounds(limit, offset));
     const chats = await this.database.db.execute(sql`
       WITH visible AS (
-        SELECT wm.* FROM "WhatsappMessage" wm
+        SELECT wm.*, ${whatsappPhoneSql(sql`wm.phone`)} AS "canonicalPhone" FROM "WhatsappMessage" wm
         WHERE ${this.rowScope(sql`wm."leadId"`, sql`wm.phone`, userId, role)}
       ), latest AS (
-        SELECT DISTINCT ON (phone) * FROM visible
-        ORDER BY phone, "createdAt" DESC, id DESC
+        SELECT DISTINCT ON ("canonicalPhone") * FROM visible
+        ORDER BY "canonicalPhone", "createdAt" DESC, id DESC
       )
-      SELECT wm.phone, COALESCE(wm.name, wc.name, '') as name,
+      SELECT wm."canonicalPhone" AS phone, COALESCE(wm.name, wc.name, '') as name,
         wm.message as "lastMessage", wm."createdAt" as "lastMessageAt",
         wm.direction as "lastDirection", wm.type as "lastType",
         (SELECT COUNT(*) FROM visible unread
-          WHERE unread.phone = wm.phone AND unread.direction = 'in'
+          WHERE unread."canonicalPhone" = wm."canonicalPhone" AND unread.direction = 'in'
             AND unread.status = 'received') as "unreadCount",
-        (SELECT COUNT(*) FROM visible all_messages WHERE all_messages.phone = wm.phone) as "totalMessages"
+        (SELECT COUNT(*) FROM visible all_messages WHERE all_messages."canonicalPhone" = wm."canonicalPhone") as "totalMessages"
       FROM latest wm
-      LEFT JOIN "WhatsappContact" wc ON wc.phone = wm.phone
+      LEFT JOIN "WhatsappContact" wc ON wc.phone = wm."canonicalPhone"
         AND ${this.rowScope(sql`wc."leadId"`, sql`wc.phone`, userId, role)}
       ORDER BY wm."createdAt" DESC, wm.id DESC
       LIMIT ${limit} OFFSET ${offset}
@@ -97,7 +99,7 @@ export class WhatsAppService {
   async getChatMessages(phone: string, userId: string, role: string, limit = 50, offset = 0) {
     ({ limit, offset } = this.paginationBounds(limit, offset));
     const messages = await this.database.db.select().from(whatsappMessages)
-      .where(and(eq(whatsappMessages.phone, this.normalizePhone(phone)),
+      .where(and(sql`${whatsappPhoneSql(whatsappMessages.phone)} = ${this.normalizePhone(phone)}`,
         this.rowScope(whatsappMessages.leadId, whatsappMessages.phone, userId, role)))
       .orderBy(desc(whatsappMessages.createdAt), desc(whatsappMessages.id))
       .limit(limit).offset(offset);
@@ -109,7 +111,7 @@ export class WhatsAppService {
       totalMessages: sql<number>`count(*)::int`,
       incoming: sql<number>`count(*) FILTER (WHERE ${whatsappMessages.direction} = 'in')::int`,
       outgoing: sql<number>`count(*) FILTER (WHERE ${whatsappMessages.direction} = 'out')::int`,
-      uniqueChats: sql<number>`count(DISTINCT ${whatsappMessages.phone})::int`,
+      uniqueChats: sql<number>`count(DISTINCT ${whatsappPhoneSql(whatsappMessages.phone)})::int`,
     }).from(whatsappMessages)
       .where(this.rowScope(whatsappMessages.leadId, whatsappMessages.phone, userId, role));
     return { ...stats, incomingMessages: stats.incoming, outgoingMessages: stats.outgoing };
@@ -119,7 +121,7 @@ export class WhatsAppService {
     if (user.role === 'ADMIN' && !dto.leadId) return { leadId: dto.leadId, campaignId: dto.campaignId };
     const [lead] = await this.database.db.select({ id: leads.id, campaignId: leads.campaignId }).from(leads)
       .where(and(eq(leads.isDeleted, false),
-        sql`regexp_replace(${leads.phone}, '[^0-9]', '', 'g') = ${this.normalizePhone(dto.phone)}`,
+        sql`${whatsappPhoneSql(leads.phone)} = ${this.normalizePhone(dto.phone)}`,
         dto.leadId ? eq(leads.id, dto.leadId) : undefined,
         dto.campaignId ? eq(leads.campaignId, dto.campaignId) : undefined,
         user.role === 'ADMIN' ? undefined : eq(leads.doerId, user.id)))
@@ -382,58 +384,40 @@ export class WhatsAppService {
   async processInbound(payload: any): Promise<{ status: string; messageId?: string }> {
     const inbound = this.parseInboundPayload(payload);
     if (!inbound) return { status: 'ignored' };
-
     const phone = this.normalizePhone(inbound.source);
-    if (!phone) return { status: 'ignored' };
-
-    // Find matching lead
-    let leadId: string | undefined;
-    let campaignId: string | undefined;
-    try {
-      const [lead] = await this.database.db
-        .select()
-        .from(leads)
-        .where(and(eq(leads.phone, phone), eq(leads.isDeleted, false)))
-        .orderBy(desc(leads.createdAt))
-        .limit(1);
+    if (!/^\d{8,15}$/.test(phone)) throw new BadRequestException('Invalid WhatsApp sender phone');
+    const autoCampaignId = await this.settingsService.getSettingForUse('whatsappAutoCampaignId').catch(error => {
+      if (error?.getStatus?.() === 404) return '';
+      throw error;
+    });
+    return this.database.db.transaction(async tx => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'whatsapp:' + phone}))`);
+      if (inbound.messageId) {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'whatsapp-message:' + inbound.messageId}))`);
+        const [duplicate] = await tx.select({ id: whatsappMessages.id }).from(whatsappMessages)
+          .where(and(eq(whatsappMessages.messageId, inbound.messageId), eq(whatsappMessages.direction, 'in'))).limit(1);
+        if (duplicate) return { status: 'duplicate', messageId: inbound.messageId };
+      }
+      let [lead] = await tx.select().from(leads)
+        .where(and(sql`${whatsappPhoneSql(leads.phone)} = ${phone}`, eq(leads.isDeleted, false)))
+        .orderBy(desc(leads.createdAt), desc(leads.id)).limit(1);
+      if (!lead && autoCampaignId) lead = await this.createLeadFromWhatsApp(phone, inbound.name, autoCampaignId, tx);
+      await tx.insert(whatsappContacts).values({ phone, name: inbound.name || '', leadId: lead?.id, lastSeen: new Date() })
+        .onConflictDoUpdate({ target: whatsappContacts.phone, set: {
+          name: inbound.name || sql`${whatsappContacts.name}`, lastSeen: new Date(), leadId: lead?.id || sql`${whatsappContacts.leadId}`,
+        } });
+      const text = typeof inbound.message === 'string' ? inbound.message : inbound.message?.text || inbound.message?.title || '';
+      await tx.insert(whatsappMessages).values({ phone, name: (inbound.name || '').slice(0, 255), direction: 'in',
+        message: String(text).slice(0, 2000), type: String(inbound.msgType || 'text').slice(0, 50),
+        messageId: inbound.messageId || null, status: 'received', leadId: lead?.id, campaignId: lead?.campaignId });
       if (lead) {
-        leadId = lead.id;
-        campaignId = lead.campaignId;
+        const [campaign] = await tx.select({ managerId: campaigns.managerId }).from(campaigns).where(eq(campaigns.id, lead.campaignId)).limit(1);
+        const userId = lead.doerId || campaign?.managerId;
+        if (userId) await tx.insert(followups).values({ leadId: lead.id, userId, status: 'WhatsApp Received',
+          remarks: `${inbound.messageId ? '[msg:' + inbound.messageId + '] ' : ''}Inbound WhatsApp: ${String(text).slice(0, 500)}` });
       }
-    } catch {
-      // No lead found — that's fine
-    }
-
-    // Auto-create lead if no existing lead and auto-campaign is configured
-    if (!leadId) {
-      try {
-        const autoCampaignId = await this.settingsService
-          .getSettingForUse('whatsappAutoCampaignId')
-          .catch(() => '');
-        if (autoCampaignId) {
-          const newLead = await this.createLeadFromWhatsApp(phone, inbound.name, autoCampaignId);
-          leadId = newLead.id;
-          campaignId = newLead.campaignId;
-        }
-      } catch (error: any) {
-        this.logger.error(`Failed to auto-create lead from WhatsApp: ${error.message}`);
-      }
-    }
-
-    // Upsert contact
-    await this.upsertContact(phone, inbound.name, leadId);
-
-    // Log inbound message
-    const text = typeof inbound.message === 'string'
-      ? inbound.message
-      : inbound.message?.text || inbound.message?.title || '';
-
-    await this.logMessage(phone, text, 'in', inbound.msgType || 'text', undefined, {
-      status: 'received',
-      messageId: inbound.messageId,
-    }, { leadId, campaignId, name: inbound.name });
-
-    return { status: 'ok', messageId: inbound.messageId };
+      return { status: 'ok', messageId: inbound.messageId };
+    });
   }
 
   parseInboundPayload(payload: any): { source: string; name: string; message: any; msgType: string; messageId: string } | null {
@@ -445,7 +429,7 @@ export class WhatsAppService {
         return {
           source: p.sender?.phone || p.source || p.phone || '',
           name: p.sender?.name || '',
-          message: this.extractText(innerPayload),
+          message: this.extractText({ ...innerPayload, type: p.type || innerPayload.type || 'text' }),
           msgType: p.type || innerPayload.type || 'text',
           messageId: p.id || p.context?.gsId || '',
         };
@@ -607,18 +591,18 @@ export class WhatsAppService {
 
   // ─── Auto-Create Lead from WhatsApp ──────────────────────────────────────
 
-  private async createLeadFromWhatsApp(phone: string, name: string, campaignId: string) {
+  private async createLeadFromWhatsApp(phone: string, name: string, campaignId: string, transaction: AllocationTransaction) {
     // Get campaign details
-    const [campaign] = await this.database.db
+    const [campaign] = await transaction
       .select()
       .from(campaigns)
       .where(eq(campaigns.id, campaignId))
       .limit(1);
 
-    if (!campaign) throw new Error('Auto-campaign not found');
+    if (!campaign || !campaign.isActive) throw new Error('Auto-campaign not found');
 
     // Get first status in the campaign
-    const [firstStatus] = await this.database.db
+    const [firstStatus] = await transaction
       .select()
       .from(campaignStatuses)
       .where(eq(campaignStatuses.campaignId, campaignId))
@@ -628,7 +612,7 @@ export class WhatsAppService {
     const leadName = (name || phone || 'Unknown').substring(0, 255);
 
     // Create lead and initial followup in a transaction
-    const [newLead] = await this.database.db.transaction(async (tx) => {
+    const create = async (tx: AllocationTransaction) => {
       let doerId: string | undefined;
       try {
         doerId = await this.roundRobinService.getNextRoundRobinUser(campaignId, tx);
@@ -661,7 +645,8 @@ export class WhatsAppService {
       }
 
       return [lead];
-    });
+    };
+    const [newLead] = await create(transaction);
 
     this.logger.log(`Auto-created lead ${newLead.id} from WhatsApp (${phone}) in campaign ${campaignId}`);
     return newLead;
@@ -762,6 +747,6 @@ export class WhatsAppService {
   }
 
   private normalizePhone(phone: string): string {
-    return String(phone || '').replace(/\D/g, '');
+    return normalizeWhatsAppPhone(phone);
   }
 }

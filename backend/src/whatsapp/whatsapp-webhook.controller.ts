@@ -3,9 +3,6 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import { WebhookTokenGuard } from './webhook-token.guard';
 import { WhatsAppService } from './whatsapp.service';
-import { DatabaseService } from '../db/database.service';
-import { followups, leads, campaigns } from '../db/schema';
-import { eq, and, desc, like } from 'drizzle-orm';
 
 @ApiTags('WhatsApp Webhook')
 @UseGuards(WebhookTokenGuard)
@@ -15,7 +12,6 @@ export class WhatsAppWebhookController {
 
   constructor(
     private whatsapp: WhatsAppService,
-    private database: DatabaseService,
   ) {}
 
   @Post('webhook')
@@ -25,17 +21,9 @@ export class WhatsAppWebhookController {
   async handleWebhook(@Body() payload: any) {
     this.logger.log('Received WhatsApp webhook');
 
-    // Process inbound message and store in DB
-    const result = await this.whatsapp.processInbound(payload);
-
-    if (result.status === 'ok' && result.messageId) {
-      // Also create a followup record (backward-compatible with existing CRM flow)
-      try {
-        await this.createFollowupFromInbound(payload, result.messageId);
-      } catch (err: any) {
-        this.logger.error(`Followup creation failed: ${err.message}`);
-      }
-    }
+    // Gupshup posts incoming messages AND delivery events to its configured callback.
+    if (payload?.type === 'message-event' || payload?.eventType) return this.handleStatusWebhook(payload);
+    await this.whatsapp.processInbound(payload);
 
     return { status: 'ok' };
   }
@@ -54,7 +42,7 @@ export class WhatsAppWebhookController {
       const eventType = payload.type || payload.event || '';
       const eventPayload = payload.payload || payload;
 
-      if (eventType === 'message-event' || eventPayload.type) {
+      if (eventType === 'message-event' || eventPayload.type || eventPayload.eventType) {
         const gsId = eventPayload.id || eventPayload.gsId || eventPayload.messageId || eventPayload.externalId || '';
         const rawStatus = eventPayload.type || eventPayload.status || eventPayload.eventType || '';
         const mappedStatus = this.mapGupshupStatus(rawStatus);
@@ -88,53 +76,6 @@ export class WhatsAppWebhookController {
     }
 
     return { status: 'ok' };
-  }
-
-  private async createFollowupFromInbound(payload: any, messageId: string) {
-    const inbound = this.whatsapp.parseInboundPayload(payload);
-    if (!inbound) return;
-
-    const phone = String(inbound.source).replace(/\D/g, '');
-    if (!phone) return;
-
-    // Idempotency check
-    const [existing] = await this.database.db
-      .select()
-      .from(followups)
-      .where(like(followups.remarks, `%[msg:${messageId}]%`))
-      .limit(1);
-    if (existing) return;
-
-    // Find matching lead
-    const [lead] = await this.database.db
-      .select({ lead: leads, campaign: { managerId: campaigns.managerId } })
-      .from(leads)
-      .innerJoin(campaigns, eq(leads.campaignId, campaigns.id))
-      .where(and(eq(leads.phone, phone), eq(leads.isDeleted, false)))
-      .orderBy(desc(leads.createdAt))
-      .limit(1);
-
-    if (!lead) return;
-
-    const text = typeof inbound.message === 'string'
-      ? inbound.message
-      : inbound.message?.text || '';
-
-    const userId = lead.lead.doerId || lead.campaign?.managerId;
-    if (!userId) return;
-
-    // Include sender name in remarks if available
-    const senderName = inbound.name || '';
-    const namePrefix = senderName ? `[${senderName}] ` : '';
-
-    await this.database.db.insert(followups).values({
-      leadId: lead.lead.id,
-      userId,
-      status: 'WhatsApp Received',
-      remarks: `[msg:${messageId}] ${namePrefix}Inbound WhatsApp: ${text.substring(0, 500)}`,
-    });
-
-    this.logger.log(`Created followup for lead ${lead.lead.id} from inbound WhatsApp`);
   }
 
   private mapGupshupStatus(status: string): string {
