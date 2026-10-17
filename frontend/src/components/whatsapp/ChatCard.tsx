@@ -20,7 +20,7 @@ function getLastMessagePreview(msg: string | null, type: string): string {
   if (type === 'image') return `🖼️ Image${msg ? ': ' + msg : ''}`;
   if (type === 'video') return `🎬 Video${msg ? ': ' + msg : ''}`;
   if (type === 'audio') return '🎵 Audio';
-  if (type === 'file') return `📄 File${msg ? ': ' + msg : ''}`;
+  if (type === 'file' || type === 'document') return `📄 File${msg ? ': ' + msg : ''}`;
   if (type === 'location') return '📍 Location';
   if (type === 'contact') return '👤 Contact';
   if (type === 'template') return '📋 Template';

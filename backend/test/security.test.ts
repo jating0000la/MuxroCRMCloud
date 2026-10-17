@@ -676,3 +676,57 @@ test('normalizing legacy unlinked history does not expose shared-number messages
   assert.deepEqual(await (await request('/whatsapp/chats')).json(), []);
   assert.deepEqual(await (await request('/whatsapp/chats/919000000001/messages')).json(), []);
 });
+
+test('incoming Gupshup images retain their attachment URL and caption for the chat UI', async () => {
+  const id = randomUUID();
+  const payload = { type: 'message', payload: { id, source: own.phone, type: 'image', payload: { url: 'https://media.example.test/customer.jpg', caption: 'Customer photo' } } };
+  assert.equal((await postReply(payload)).status, 200);
+  const rows = await (await request(`/whatsapp/chats/${own.phone}/messages`)).json() as any[];
+  assert.equal(rows.length, 1); assert.equal(rows[0].type, 'image');
+  assert.equal(rows[0].mediaUrl, 'https://media.example.test/customer.jpg'); assert.equal(rows[0].message, 'Customer photo');
+});
+
+test('WhatsApp nested image and document fields retain captions and direct file links', async () => {
+  for (const [type, media, expected] of [
+    ['image', { url: 'https://media.example.test/image.png', caption: 'Image caption' }, 'Image caption'],
+    ['document', { url: 'https://media.example.test/quotation.pdf', caption: 'Your quotation', filename: 'quotation.pdf' }, 'Your quotation'],
+    ['document', { url: 'https://media.example.test/manual.pdf', filename: 'manual.pdf' }, 'manual.pdf'],
+  ] as const) {
+    const id = randomUUID();
+    const payload = { entry: [{ changes: [{ value: { messages: [{ id, from: own.phone, type, [type]: media }] } }] }] };
+    assert.equal((await postReply(payload)).status, 200);
+    const [saved] = await database.db.select().from(whatsappMessages).where(eq(whatsappMessages.messageId, id));
+    assert.equal(saved.mediaUrl, media.url); assert.equal(saved.message, expected);
+  }
+});
+
+test('simple WhatsApp file and native audio callbacks preserve direct links', async () => {
+  const id = randomUUID();
+  assert.equal((await postReply({ user: { phone: own.phone }, message: { id, type: 'file', url: 'https://media.example.test/file.zip', caption: 'Project files' } })).status, 200);
+  let [saved] = await database.db.select().from(whatsappMessages).where(eq(whatsappMessages.messageId, id));
+  assert.equal(saved.mediaUrl, 'https://media.example.test/file.zip'); assert.equal(saved.message, 'Project files');
+  const audioId = randomUUID();
+  assert.equal((await postReply({ type: 'message', payload: { id: audioId, source: own.phone, type: 'audio', payload: { url: 'https://media.example.test/voice.ogg' } } })).status, 200);
+  [saved] = await database.db.select().from(whatsappMessages).where(eq(whatsappMessages.messageId, audioId));
+  assert.equal(saved.mediaUrl, 'https://media.example.test/voice.ogg');
+});
+
+test('replaying a previously saved image recovers the missing URL without duplicating messages or followups', async () => {
+  const id = randomUUID();
+  await database.db.insert(whatsappMessages).values({ phone: own.phone!, direction: 'in', leadId: own.id, messageId: id, type: 'image', message: '[Image]' });
+  const payload = { type: 'message', payload: { id, source: own.phone, type: 'image', payload: { url: 'https://media.example.test/recovered.jpg', caption: 'Recovered caption' } } };
+  assert.equal((await postReply(payload)).status, 200);
+  assert.equal((await postReply(payload)).status, 200);
+  const rows = await database.db.select().from(whatsappMessages);
+  assert.equal(rows.length, 1); assert.equal(rows[0].mediaUrl, 'https://media.example.test/recovered.jpg'); assert.equal(rows[0].message, 'Recovered caption');
+  assert.equal((await database.db.select().from(followups)).length, 0);
+});
+
+test('non-web attachment URLs are not exposed as clickable links', async () => {
+  for (const url of ['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>', 'file:///etc/passwd']) {
+    const id = randomUUID();
+    assert.equal((await postReply({ type: 'message', payload: { id, source: own.phone, type: 'document', payload: { url, caption: 'File' } } })).status, 200);
+    const [saved] = await database.db.select().from(whatsappMessages).where(eq(whatsappMessages.messageId, id));
+    assert.equal(saved.mediaUrl, null); assert.equal(saved.message, 'File');
+  }
+});

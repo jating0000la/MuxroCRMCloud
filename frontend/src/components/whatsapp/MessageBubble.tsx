@@ -38,6 +38,14 @@ export default function MessageBubble({ msg }: MessageBubbleProps) {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const isOut = msg.direction === 'out';
+  const [imageFailed, setImageFailed] = useState(false);
+  const attachmentUrl = (() => {
+    if (!msg.mediaUrl) return null;
+    try { return ['http:', 'https:'].includes(new URL(msg.mediaUrl).protocol) ? msg.mediaUrl : null; } catch { return null; }
+  })();
+  const isImage = msg.type === 'image' || msg.type === 'sticker';
+  const attachmentTypes = ['image', 'sticker', 'document', 'file', 'audio', 'video'];
+  useEffect(() => { setImageFailed(false); }, [attachmentUrl]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -74,44 +82,21 @@ export default function MessageBubble({ msg }: MessageBubbleProps) {
 
           {/* Media content */}
           <div className="text-sm">
-            {msg.type === 'image' && msg.mediaUrl && (
-              <div className="mb-2 overflow-hidden rounded-xl">
-                <img
-                  src={msg.mediaUrl}
-                  alt="Image"
-                  className="max-h-64 w-full object-cover transition-transform hover:scale-[1.02]"
-                  loading="lazy"
-                />
+            {isImage && attachmentUrl && (
+              <div className="mb-2 space-y-1 overflow-hidden rounded-xl">
+                {!imageFailed && <a href={attachmentUrl} target="_blank" rel="noopener noreferrer">
+                  <img src={attachmentUrl} alt="Image attachment" className="max-h-80 max-w-full rounded-xl object-contain" loading="lazy" onError={() => setImageFailed(true)} />
+                </a>}
+                {imageFailed && <p className="text-xs text-slate-500 dark:text-gray-400">Image preview unavailable.</p>}
+                <a href={attachmentUrl} target="_blank" rel="noopener noreferrer" className="block text-xs font-medium text-blue-600 underline dark:text-blue-400">Open image</a>
               </div>
             )}
-            {msg.type === 'video' && msg.mediaUrl && (
-              <div className="mb-2 overflow-hidden rounded-xl">
-                <video
-                  src={msg.mediaUrl}
-                  controls
-                  className="max-h-64 w-full rounded-xl"
-                  preload="metadata"
-                />
-              </div>
-            )}
-            {msg.type === 'audio' && msg.mediaUrl && (
-              <div className="mb-1">
-                <audio src={msg.mediaUrl} controls className="h-9 w-full" preload="metadata" />
-              </div>
-            )}
-            {msg.type === 'file' && msg.mediaUrl && (
-              <a
-                href={msg.mediaUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mb-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-sm text-blue-600 transition-colors hover:bg-blue-50 dark:border-gray-600 dark:bg-gray-700 dark:text-blue-400 dark:hover:bg-gray-600"
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/40">
-                  📄
-                </div>
-                <span className="truncate font-medium">{msg.message || 'Download'}</span>
+            {!isImage && attachmentUrl && (
+              <a href={attachmentUrl} target="_blank" rel="noopener noreferrer" className="mb-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-medium text-blue-600 underline dark:border-gray-600 dark:bg-gray-700 dark:text-blue-400">
+                <span aria-hidden="true">📎</span> Open file
               </a>
             )}
+            {attachmentTypes.includes(msg.type) && !attachmentUrl && <p className="mb-1 text-xs text-slate-500 dark:text-gray-400">Attachment link unavailable. Ask the sender to resend this file.</p>}
             {msg.type === 'location' && (
               <div className="flex items-center gap-2">
                 <span className="text-lg">📍</span>
@@ -124,7 +109,7 @@ export default function MessageBubble({ msg }: MessageBubbleProps) {
                 <span className="italic text-purple-600 dark:text-purple-400">{msg.message}</span>
               </div>
             )}
-            {msg.type === 'text' && (
+            {!['location', 'template'].includes(msg.type) && msg.message && (
               <span className="whitespace-pre-wrap break-words">{msg.message}</span>
             )}
           </div>

@@ -394,9 +394,15 @@ export class WhatsAppService {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'whatsapp:' + phone}))`);
       if (inbound.messageId) {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'whatsapp-message:' + inbound.messageId}))`);
-        const [duplicate] = await tx.select({ id: whatsappMessages.id }).from(whatsappMessages)
+        const [duplicate] = await tx.select({ id: whatsappMessages.id, mediaUrl: whatsappMessages.mediaUrl }).from(whatsappMessages)
           .where(and(eq(whatsappMessages.messageId, inbound.messageId), eq(whatsappMessages.direction, 'in'))).limit(1);
-        if (duplicate) return { status: 'duplicate', messageId: inbound.messageId };
+        if (duplicate) {
+          // Provider retries can recover a URL dropped by an older application version.
+          if (!duplicate.mediaUrl && inbound.mediaUrl) await tx.update(whatsappMessages)
+            .set({ mediaUrl: inbound.mediaUrl, message: String(inbound.message || '').slice(0, 2000) })
+            .where(eq(whatsappMessages.id, duplicate.id));
+          return { status: 'duplicate', messageId: inbound.messageId };
+        }
       }
       let [lead] = await tx.select().from(leads)
         .where(and(sql`${whatsappPhoneSql(leads.phone)} = ${phone}`, eq(leads.isDeleted, false)))
@@ -409,7 +415,7 @@ export class WhatsAppService {
       const text = typeof inbound.message === 'string' ? inbound.message : inbound.message?.text || inbound.message?.title || '';
       await tx.insert(whatsappMessages).values({ phone, name: (inbound.name || '').slice(0, 255), direction: 'in',
         message: String(text).slice(0, 2000), type: String(inbound.msgType || 'text').slice(0, 50),
-        messageId: inbound.messageId || null, status: 'received', leadId: lead?.id, campaignId: lead?.campaignId });
+        mediaUrl: inbound.mediaUrl, messageId: inbound.messageId || null, status: 'received', leadId: lead?.id, campaignId: lead?.campaignId });
       if (lead) {
         const [campaign] = await tx.select({ managerId: campaigns.managerId }).from(campaigns).where(eq(campaigns.id, lead.campaignId)).limit(1);
         const userId = lead.doerId || campaign?.managerId;
@@ -420,17 +426,18 @@ export class WhatsAppService {
     });
   }
 
-  parseInboundPayload(payload: any): { source: string; name: string; message: any; msgType: string; messageId: string } | null {
+  parseInboundPayload(payload: any): { source: string; name: string; message: any; msgType: string; messageId: string; mediaUrl?: string } | null {
     try {
       // Format 1: Gupshup native format { type: 'message', payload: { ... } }
       if (payload.type === 'message' && payload.payload) {
         const p = payload.payload;
-        const innerPayload = p.payload || {};
+        const innerPayload = p.payload || p.message || {};
         return {
           source: p.sender?.phone || p.source || p.phone || '',
           name: p.sender?.name || '',
           message: this.extractText({ ...innerPayload, type: p.type || innerPayload.type || 'text' }),
           msgType: p.type || innerPayload.type || 'text',
+          mediaUrl: this.extractMediaUrl(innerPayload),
           messageId: p.id || p.context?.gsId || '',
         };
       }
@@ -448,6 +455,7 @@ export class WhatsAppService {
           name: contact.profile?.name || '',
           message: this.extractText(msg),
           msgType: msg.type || 'text',
+          mediaUrl: this.extractMediaUrl(msg),
           messageId: msg.id || '',
         };
       }
@@ -457,7 +465,8 @@ export class WhatsAppService {
         return {
           source: payload.user.phone || payload.user.id || '',
           name: payload.user.name || '',
-          message: payload.message.text || payload.message.caption || '',
+          message: this.extractText(payload.message),
+          mediaUrl: this.extractMediaUrl(payload.message),
           msgType: payload.message.type || 'text',
           messageId: payload.message.id || '',
         };
@@ -729,6 +738,15 @@ export class WhatsAppService {
     }
   }
 
+  private extractMediaUrl(message: any): string | undefined {
+    if (!message || typeof message !== 'object') return undefined;
+    const media = message.image || message.document || message.file || message.video || message.audio || message.sticker || message;
+    const url = media.url || media.link || media.originalUrl || message.url || message.originalUrl;
+    if (typeof url !== 'string' || url.length > 2000) return undefined;
+    try { if (['http:', 'https:'].includes(new URL(url).protocol)) return url; } catch {}
+    return undefined;
+  }
+
   private extractText(message: any): string {
     if (!message) return '';
     const type = message.type || '';
@@ -738,10 +756,10 @@ export class WhatsAppService {
       if (message.interactive?.button_reply) return message.interactive.button_reply.title || '';
       if (message.interactive?.list_reply) return message.interactive.list_reply.title || '';
     }
-    if (type === 'image') return message.caption || '[Image]';
-    if (type === 'document') return message.document?.filename || '[Document]';
+    if (type === 'image') return message.image?.caption || message.caption || '[Image]';
+    if (type === 'document' || type === 'file') return message.document?.caption || message.caption || message.document?.filename || message.filename || '[Document]';
     if (type === 'audio') return '[Audio]';
-    if (type === 'video') return message.caption || '[Video]';
+    if (type === 'video') return message.video?.caption || message.caption || '[Video]';
     if (type === 'location') return `[Location] ${message.location?.latitude || ''},${message.location?.longitude || ''}`;
     return message.text || message.caption || '';
   }
