@@ -26,6 +26,7 @@ export interface ChatMessage {
   leadId: string | null;
   campaignId: string | null;
   userId: string | null;
+  raw?: { templateMediaType?: string; templateButtons?: { text: string; type: string; url?: string }[] };
   createdAt: string;
 }
 

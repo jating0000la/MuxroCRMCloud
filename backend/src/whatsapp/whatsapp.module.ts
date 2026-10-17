@@ -1,3 +1,4 @@
+import { GupshupTemplatesModule } from '../integrations/templates/gupshup-templates.module';
 import { WebhookConfigController } from './webhook-config.controller';
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
@@ -10,7 +11,7 @@ import { SettingsModule } from '../settings/settings.module';
 import { RoundRobinModule } from '../common/common.module';
 
 @Module({
-  imports: [HttpModule, DatabaseModule, SettingsModule, RoundRobinModule],
+  imports: [HttpModule, DatabaseModule, SettingsModule, RoundRobinModule, GupshupTemplatesModule],
   controllers: [WhatsAppController, WhatsAppWebhookController, WebhookConfigController],
   providers: [WhatsAppService, WebhookTokenGuard],
   exports: [WhatsAppService],

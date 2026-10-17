@@ -1,3 +1,4 @@
+import type { ApprovedTemplate, TemplateMessageConfig } from '../integrations/templates/template.types';
 import {
   pgTable,
   uuid,
@@ -89,6 +90,7 @@ export const campaignStatuses = pgTable(
     color: varchar('color', { length: 50 }).notNull().default('#3B82F6'),
     order: integer('order').notNull().default(0),
     whatsappMessage: varchar('whatsappMessage', { length: 1000 }),
+    whatsappTemplate: json('whatsappTemplate').$type<TemplateMessageConfig | null>(),
   },
   (table) => [
     index('CampaignStatus_campaignId_idx').on(table.campaignId),
@@ -371,6 +373,7 @@ export const whatsappMessages = pgTable(
     type: varchar('type', { length: 50 }).notNull().default('text'), // text, image, video, audio, file, location, contact, quick_reply, list, template
     mediaUrl: varchar('mediaUrl', { length: 2000 }),
     messageId: varchar('messageId', { length: 255 }), // Gupshup message ID
+    automationKey: varchar('automationKey', { length: 255 }).unique(),
     status: varchar('status', { length: 50 }), // submitted, delivered, read, failed
     leadId: uuid('leadId').references(() => leads.id, { onDelete: 'set null' }),
     campaignId: uuid('campaignId').references(() => campaigns.id, { onDelete: 'set null' }),
@@ -453,3 +456,12 @@ export const ivrWebhookEvents = pgTable('IvrWebhookEvent', {
   processedAt: timestamp('processedAt', { withTimezone: true }),
   nextAttemptAt: timestamp('nextAttemptAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('IvrWebhookEvent_pending_idx').on(table.status, table.nextAttemptAt)]);
+
+
+export const gupshupTemplates = pgTable('GupshupTemplate', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  appId: varchar('appId', { length: 255 }).notNull(),
+  templateId: varchar('templateId', { length: 255 }).notNull(),
+  content: json('content').notNull().$type<ApprovedTemplate>(),
+  syncedAt: timestamp('syncedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('GupshupTemplate_app_template_key').on(table.appId, table.templateId)]);

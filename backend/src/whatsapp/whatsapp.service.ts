@@ -1,3 +1,4 @@
+import { GupshupTemplatesService } from '../integrations/templates/gupshup-templates.service';
 import { normalizeWhatsAppPhone, whatsappPhoneSql } from './phone';
 import { AllocationTransaction } from '../common/services/round-robin.service';
 import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
@@ -26,6 +27,7 @@ export class WhatsAppService {
     private database: DatabaseService,
     private settingsService: SettingsService,
     private roundRobinService: RoundRobinService,
+    private templates: GupshupTemplatesService,
   ) {}
 
   // ─── Config Resolution ────────────────────────────────────────────────────
@@ -305,48 +307,7 @@ export class WhatsAppService {
   // ─── Template Messages ────────────────────────────────────────────────────
 
   async sendTemplate(phone: string, templateId: string, params?: string[], mediaType?: string, mediaUrl?: string, opts?: { leadId?: string; campaignId?: string; userId?: string }) {
-    const cfg = await this.getConfig();
-    const dest = this.normalizePhone(phone);
-
-    const paramsArr = params || [];
-
-    const url = this.TEMPLATE_MSG_URL;
-    const formPayload: Record<string, string> = {
-      source: cfg.source,
-      destination: dest,
-      'src.name': cfg.appName,
-      template: JSON.stringify({ id: templateId, params: paramsArr }),
-    };
-
-    if (mediaType && mediaUrl) {
-      const messageObj: any = { type: mediaType };
-      messageObj[mediaType] = { link: mediaUrl };
-      formPayload.message = JSON.stringify(messageObj);
-    }
-
-    try {
-      const params_ = new URLSearchParams(formPayload);
-      const response: AxiosResponse = await firstValueFrom(
-        this.http.post(url, params_.toString(), {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded', apikey: cfg.apiKey },
-          timeout: 30000,
-        }),
-      );
-
-      const body = response.data as any;
-      const result: GupshupMessageResponse = {
-        status: body.status || 'submitted',
-        messageId: body.messageId || '',
-      };
-
-      const name = await this.getContactName(dest);
-      await this.logMessage(dest, `[Template] ${templateId}`, 'out', 'template', mediaUrl, result, { ...opts, name });
-      return result;
-    } catch (error: any) {
-      const status = error.response?.status || 'Unknown';
-      this.logger.error(`Template send failed [${status}]: ${error.message}`);
-      throw new BadRequestException(`Failed to send template: ${error.message}`);
-    }
+    return this.templates.send(phone, templateId, params || [], mediaUrl, opts);
   }
 
   // ─── Broadcast ────────────────────────────────────────────────────────────
@@ -520,41 +481,7 @@ export class WhatsAppService {
 
   // ─── Template Sync ────────────────────────────────────────────────────────
 
-  async syncTemplates() {
-    const cfg = await this.getConfig();
-    if (!cfg.appId) throw new BadRequestException('Gupshup App ID required for template sync');
-
-    const url = `https://api.gupshup.io/wa/app/${encodeURIComponent(cfg.appId)}/template?pageNo=0&pageSize=100`;
-
-    try {
-      const response: AxiosResponse = await firstValueFrom(
-        this.http.get(url, {
-          headers: { 'Content-Type': 'application/json', apikey: cfg.apiKey },
-          timeout: 30000,
-        }),
-      );
-
-      const body = response.data as any;
-      const list = body.templates || body.data || body.payload || body.templateList || [];
-      const templates = Array.isArray(list)
-        ? list.map((t: any) => ({
-            id: t.id || t.templateId || '',
-            name: t.elementName || t.name || t.templateName || t.id || '',
-            language: t.languageCode || t.language || '',
-            category: t.category || t.templateCategory || '',
-            type: t.templateType || t.type || '',
-            status: t.status || t.templateStatus || '',
-            body: t.data || t.body || t.content || '',
-          }))
-        : [];
-
-      return { success: true, templates };
-    } catch (error: any) {
-      const status = error.response?.status;
-      const body = error.response?.data;
-      return { success: false, templates: [], error: `[${status}] ${body?.message || error.message}` };
-    }
-  }
+  async syncTemplates() { return this.templates.sync(); }
 
   // ─── Delivery Status Update ───────────────────────────────────────────────
 

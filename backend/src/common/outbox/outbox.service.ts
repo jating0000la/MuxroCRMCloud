@@ -1,11 +1,27 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { eq, and, lt, sql, desc } from 'drizzle-orm';
+import { JOB_TYPES } from '../../jobs/job.types';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { eq, and, lt, sql, desc, or } from 'drizzle-orm';
 import { DatabaseService } from '../../db/database.service';
 import { outboxEvents } from '../../db/schema';
 import { JobService } from '../../jobs/job.service';
 
 @Injectable()
-export class OutboxService {
+export class OutboxService implements OnModuleDestroy {
+  private timer?: NodeJS.Timeout;
+  private publishing?: Promise<number>;
+
+  startFormGreetingPublisher() {
+    if (this.timer) return;
+    this.timer = setInterval(() => { void this.publishFormGreetings().catch(() => {}); }, 3000);
+    this.timer.unref();
+  }
+
+  async onModuleDestroy() { if (this.timer) clearInterval(this.timer); await this.publishing?.catch(() => {}); }
+
+  publishFormGreetings() {
+    if (!this.publishing) this.publishing = this.processPendingEvents(50, JOB_TYPES.WHATSAPP_FORM_GREETING).finally(() => { this.publishing = undefined; });
+    return this.publishing;
+  }
   private logger = new Logger('OutboxService');
 
   constructor(
@@ -38,53 +54,23 @@ export class OutboxService {
     return event.id;
   }
 
-  async processPendingEvents(batchSize: number = 50): Promise<number> {
-    const events = await this.database.db
-      .select()
-      .from(outboxEvents)
-      .where(
-        and(
-          eq(outboxEvents.published, false),
-          lt(outboxEvents.retryCount, outboxEvents.maxRetries),
-        ),
-      )
-      .orderBy(outboxEvents.createdAt)
-      .limit(batchSize);
-
-    if (events.length === 0) return 0;
-
-    let processed = 0;
-    for (const event of events) {
-      try {
-        await this.jobService.addJob(event.eventType, event.payload, {
-          retryLimit: 2,
-          idempotencyKey: event.id,
-        });
-
-        await this.database.db
-          .update(outboxEvents)
-          .set({
-            published: true,
-            publishedAt: new Date(),
-          })
-          .where(eq(outboxEvents.id, event.id));
-
-        processed++;
-      } catch (error: any) {
-        await this.database.db
-          .update(outboxEvents)
-          .set({
-            retryCount: event.retryCount + 1,
-            lastError: error.message,
-          })
-          .where(eq(outboxEvents.id, event.id));
-
-        this.logger.warn(`Failed to process outbox event ${event.id}: ${error.message}`);
+  async processPendingEvents(batchSize: number = 50, eventType?: string): Promise<number> {
+    return this.database.db.transaction(async tx => {
+      const events = await tx.select().from(outboxEvents)
+        .where(and(eq(outboxEvents.published, false), or(eq(outboxEvents.eventType, JOB_TYPES.WHATSAPP_FORM_GREETING), lt(outboxEvents.retryCount, outboxEvents.maxRetries)), eventType ? eq(outboxEvents.eventType, eventType) : undefined))
+        .orderBy(outboxEvents.createdAt).limit(Math.max(1, Math.min(100, batchSize))).for('update', { skipLocked: true });
+      let processed = 0;
+      for (const event of events) {
+        try {
+          await this.jobService.addJob(event.eventType, event.payload, { retryLimit: 3, idempotencyKey: event.id });
+          await tx.update(outboxEvents).set({ published: true, publishedAt: new Date() }).where(eq(outboxEvents.id, event.id));
+          ++processed;
+        } catch (error: any) {
+          await tx.update(outboxEvents).set({ retryCount: event.retryCount + 1, lastError: 'Could not queue message; check worker/database availability.' }).where(eq(outboxEvents.id, event.id));
+        }
       }
-    }
-
-    this.logger.debug(`Processed ${processed}/${events.length} outbox events`);
-    return processed;
+      return processed;
+    });
   }
 
   async getFailedEvents(limit: number = 20) {

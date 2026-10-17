@@ -1,3 +1,4 @@
+import { normalizeTemplate, ApprovedTemplate } from './templates/template.types';
 import { Injectable, Logger, BadRequestException, HttpException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { AxiosResponse } from 'axios';
@@ -118,16 +119,13 @@ export class GupshupService {
 
     this.logger.log(`Sending session ${mediaType} to ${normalizedDestination}`);
 
-    const messagePayload: any = { type: mediaType };
-    messagePayload[mediaType] = { link: mediaUrl };
-
-    if (caption && (mediaType === 'image' || mediaType === 'video' || mediaType === 'document')) {
-      messagePayload[mediaType].caption = caption;
-    }
-
-    if (mediaType === 'document') {
-      messagePayload[mediaType].filename = caption || 'document';
-    }
+    const messagePayload: any = mediaType === 'image'
+      ? { type: 'image', originalUrl: mediaUrl, ...(caption ? { caption } : {}) }
+      : mediaType === 'document'
+        ? { type: 'file', url: mediaUrl, ...(caption ? { caption } : {}) }
+        : mediaType === 'video' || mediaType === 'audio'
+          ? { type: mediaType, url: mediaUrl, ...(caption ? { caption } : {}) }
+          : { type: mediaType, [mediaType]: { link: mediaUrl } };
 
     const formParams: Record<string, string> = {
       channel: 'whatsapp',
@@ -162,16 +160,14 @@ export class GupshupService {
 
     this.logger.log(`Sending template to ${normalizedDestination}`);
 
-    const templateObj: any = { id: templateId };
-    if (templateParams && templateParams.length > 0) {
-      templateObj.params = templateParams;
-    }
+    const templateObj = { id: templateId, params: templateParams || [] };
 
     const formParams: Record<string, string> = {
       source: normalizedSource,
       destination: normalizedDestination,
       'src.name': appName,
       template: JSON.stringify(templateObj),
+      message: JSON.stringify({ type: 'text' }),
     };
 
     if (mediaMessage?.type && mediaMessage?.link) {
@@ -272,12 +268,12 @@ export class GupshupService {
   async syncTemplates(
     apiKey: string,
     appId: string,
-  ): Promise<{ success: boolean; templates: any[]; error?: string }> {
+  ): Promise<{ success: boolean; templates: ApprovedTemplate[]; error?: string }> {
     if (!apiKey) throw new BadRequestException('Gupshup API key not configured');
     if (!appId) throw new BadRequestException('Gupshup App ID required for template sync');
 
     try {
-      const url = `https://api.gupshup.io/wa/app/${encodeURIComponent(appId)}/template?pageNo=0&pageSize=100`;
+      const url = `https://api.gupshup.io/wa/app/${encodeURIComponent(appId)}/template`;
       this.logger.log(`Syncing templates from: ${url}`);
       const response: AxiosResponse = await firstValueFrom(
         this.http.get(url, {
@@ -287,18 +283,9 @@ export class GupshupService {
       );
 
       const body = response.data as any;
-      const list = body.templates || body.data || body.payload || body.templateList || [];
-      const templates = Array.isArray(list)
-        ? list.map((t: any) => ({
-            id: t.id || t.templateId || '',
-            name: t.elementName || t.name || t.templateName || t.id || '',
-            language: t.languageCode || t.language || '',
-            category: t.category || t.templateCategory || '',
-            type: t.templateType || t.type || '',
-            status: t.status || t.templateStatus || '',
-            body: t.data || t.body || t.content || '',
-          }))
-        : [];
+      const list = body.templates || body.data?.templates || body.data || body.payload || body.templateList;
+      if (!Array.isArray(list)) throw new BadRequestException('Gupshup returned an unexpected template list');
+      const templates = list.map(t => normalizeTemplate(t, appId)).filter(t => t.id);
 
       this.logger.log(`Synced ${templates.length} Gupshup templates`);
       return { success: true, templates };
@@ -336,12 +323,16 @@ export class GupshupService {
       );
 
       const body = response.data as any;
+      if (!body?.messageId || ['error', 'failed', 'failure'].includes(String(body.status).toLowerCase())) {
+        throw new BadRequestException(body?.message || 'Gupshup did not accept the message');
+      }
       this.logger.log(`Gupshup message sent: ${body.messageId}`);
       return {
         status: body.status || 'submitted',
         messageId: body.messageId || '',
       };
     } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
       const status = error.response?.status;
       const errBody = error.response?.data;
 

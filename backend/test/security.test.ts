@@ -56,7 +56,7 @@ before(async () => {
   delete process.env.CRM_PROCESS_ROLE;
   const init = new Pool({ connectionString: url.toString() });
   try {
-    for (const file of ['0000_acoustic_tarot.sql', '0001_whatsapp_tables.sql', '0002_performance_indexes.sql', '0003_round_robin_cursor.sql', '0004_open_titanium_man.sql', '0005_clumsy_sunspot.sql']) {
+    for (const file of ['0000_acoustic_tarot.sql', '0001_whatsapp_tables.sql', '0002_performance_indexes.sql', '0003_round_robin_cursor.sql', '0004_open_titanium_man.sql', '0005_clumsy_sunspot.sql', '0006_famous_cardiac.sql']) {
       await init.query(readFileSync(join(__dirname, '../drizzle', file), 'utf8'));
     }
   } finally { await init.end(); }

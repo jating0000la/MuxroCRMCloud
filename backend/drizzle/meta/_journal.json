@@ -43,6 +43,13 @@
       "when": 1792144328402,
       "tag": "0005_clumsy_sunspot",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792231881852,
+      "tag": "0006_famous_cardiac",
+      "breakpoints": true
     }
   ]
 }

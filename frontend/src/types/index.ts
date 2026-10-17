@@ -1,3 +1,4 @@
+import type { TemplateMessageConfig } from '../services/gupshupTemplates';
 export interface User {
   id: string;
   username: string;
@@ -38,6 +39,7 @@ export interface CampaignStatus {
   color: string;
   order: number;
   whatsappMessage?: string;
+  whatsappTemplate?: TemplateMessageConfig | null;
 }
 
 export interface Lead {

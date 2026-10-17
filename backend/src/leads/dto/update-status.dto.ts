@@ -28,4 +28,9 @@ export class UpdateStatusDto {
   @IsBoolean()
   @Transform(({ obj }) => obj.dnd)
   dnd?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ obj }) => obj.sendWhatsapp)
+  sendWhatsapp?: boolean;
 }

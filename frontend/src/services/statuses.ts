@@ -1,3 +1,4 @@
+import type { TemplateMessageConfig } from './gupshupTemplates';
 import api from './api';
 import { CampaignStatus } from '../types';
 
@@ -7,12 +8,12 @@ export const statusService = {
     return data;
   },
 
-  create: async (campaignId: string, statusData: { label: string; color?: string; whatsappMessage?: string }): Promise<CampaignStatus> => {
+  create: async (campaignId: string, statusData: { label: string; color?: string; whatsappMessage?: string; whatsappTemplate?: TemplateMessageConfig | null }): Promise<CampaignStatus> => {
     const { data } = await api.post(`/campaigns/${campaignId}/statuses`, statusData);
     return data;
   },
 
-  update: async (campaignId: string, id: string, statusData: { label?: string; color?: string; order?: number; whatsappMessage?: string }): Promise<CampaignStatus> => {
+  update: async (campaignId: string, id: string, statusData: { label?: string; color?: string; order?: number; whatsappMessage?: string; whatsappTemplate?: TemplateMessageConfig | null }): Promise<CampaignStatus> => {
     const { data } = await api.put(`/campaigns/${campaignId}/statuses/${id}`, statusData);
     return data;
   },

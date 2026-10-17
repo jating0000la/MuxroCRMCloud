@@ -57,9 +57,12 @@ export interface WhatsAppTemplateJobPayload {
 
 export interface WhatsAppGreetingJobPayload {
   phone: string;
-  name: string;
-  formComm: Record<string, any>;
-  formData: Record<string, any>;
+  templateId: string;
+  params: string[];
+  mediaUrl?: string;
+  leadId: string;
+  campaignId: string;
+  automationKey: string;
 }
 
 export interface IndiaMartFetchJobPayload {

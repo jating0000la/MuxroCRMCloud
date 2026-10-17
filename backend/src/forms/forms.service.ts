@@ -1,13 +1,14 @@
+import { GupshupTemplatesService } from '../integrations/templates/gupshup-templates.service';
+import { OutboxService } from '../common/outbox/outbox.service';
+import { JOB_TYPES } from '../jobs/job.types';
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { sql, eq, and, desc, asc, inArray } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
-import { forms, enquiries, leads, campaignStatuses, followups, campaigns } from '../db/schema';
+import { forms, enquiries, leads, campaignStatuses, followups, campaigns, outboxEvents } from '../db/schema';
 import { PaginationDto, createPaginatedResponse } from '../common/pagination.dto';
 import { RoundRobinService } from '../common/services/round-robin.service';
 import { CreateFormDto } from './dto/create-form.dto';
 import { UpdateFormDto } from './dto/update-form.dto';
-import { GupshupService } from '../integrations/gupshup.service';
-import { SettingsService } from '../settings/settings.service';
 import { v4 as uuidv4 } from 'uuid';
 
 type PublicFormField = {
@@ -26,12 +27,13 @@ export class FormsService {
 
   constructor(
     private database: DatabaseService,
-    private gupshup: GupshupService,
-    private settingsService: SettingsService,
+    private templates: GupshupTemplatesService,
+    private outbox: OutboxService,
     private roundRobinService: RoundRobinService,
   ) {}
 
   async create(campaignId: string, dto: CreateFormDto) {
+    await this.validateCommunication(dto.fields || []);
     const [existingForm] = await this.database.db
       .select()
       .from(forms)
@@ -118,7 +120,9 @@ export class FormsService {
 
       const name = data.name || data.Name || 'Unknown';
       const email = data.email || data.Email || null;
-      const phone = data.phone || data.Phone || null;
+      const actualFields = available.fields || [];
+      const communication = (actualFields.find((f: any) => f.type === '__design_meta' || f.name === '__form_meta') as any)?.meta?.communication || {};
+      const phone = data[communication.recipientField || 'phone'] || data.phone || data.Phone || null;
 
       const doerId = await this.roundRobinService.getNextRoundRobinUser(form.campaignId, tx);
 
@@ -153,15 +157,16 @@ export class FormsService {
         remarks: 'Form submitted',
       });
 
+      if (communication.whatsappEnabled === true && communication.templateId && phone) {
+        const request = this.templates.resolve(communication, { ...data, name, email, phone });
+        await tx.insert(outboxEvents).values({ aggregateType: 'lead', aggregateId: lead.id, eventType: JOB_TYPES.WHATSAPP_FORM_GREETING,
+          payload: { ...request, phone: String(phone), leadId: lead.id, campaignId: form.campaignId, automationKey: `form-submission:${submission.id}` } });
+      }
       return { submission, lead, phone, name, data, doerId };
     });
 
-    // Send greeting outside transaction (non-blocking)
-    const metaField = fields.find((f: any) => f.type === '__design_meta' || f.name === '__form_meta');
-    const formComm = (metaField as any)?.meta?.communication || {};
-    this.sendFormGreeting(result.phone, result.name, formComm, result.data).catch((err) => {
-      this.logger.warn(`Form greeting failed: ${err.message}`);
-    });
+    // The worker retries delivery; a queue outage never loses a committed form greeting.
+    void this.outbox.publishFormGreetings().catch(() => this.logger.warn('Greeting remains in the outbox for worker recovery'));
 
     return { submission: result.submission, lead: result.lead };
   }
@@ -170,6 +175,7 @@ export class FormsService {
     await this.findOne(id);
     const updateData: any = { ...dto };
     if (dto.fields) {
+      await this.validateCommunication(dto.fields);
       updateData.fields = dto.fields as any;
     }
     const [updated] = await this.database.db
@@ -181,7 +187,8 @@ export class FormsService {
   }
 
   async publish(id: string) {
-    await this.findOne(id);
+    const form = await this.findOne(id);
+    await this.validateCommunication(form.fields || []);
     const [updated] = await this.database.db
       .update(forms)
       .set({ isPublished: true })
@@ -239,72 +246,12 @@ export class FormsService {
     return createPaginatedResponse(rows, total, pagination?.page || 1, take);
   }
 
-  private async sendFormGreeting(
-    phone: string | null,
-    name: string,
-    formComm: Record<string, any> = {},
-    formData: Record<string, any> = {},
-  ): Promise<void> {
-    if (!phone) return;
-
-    try {
-      const formEnabled = formComm.whatsappEnabled === true;
-      const rawMessage = formComm.greetingMessage || '';
-
-      if (!formEnabled || !rawMessage) return;
-
-      const apiKey = await this.getSettingValue('gupshupApiKey');
-      const source = await this.getSettingValue('gupshupSource');
-      const appName = await this.getSettingValue('gupshupAppName');
-
-      const normalizedPhone = String(phone).replace(/\D/g, '');
-      if (!normalizedPhone) {
-        this.logger.warn('Form greeting skipped: submitted phone number is invalid');
-        return;
-      }
-
-      if (!apiKey || !source || !appName) {
-        this.logger.warn('Form greeting skipped: missing Gupshup global config');
-        return;
-      }
-
-      const message = rawMessage.replace(/\{\{(\w+)\}\}/g, (_, field) => {
-        const value = formData[field];
-        if (value === undefined || value === null) return '';
-        return String(value);
-      });
-
-      if (!message.trim()) return;
-
-      const result = await this.gupshup.sendSessionMessage(apiKey, source, appName, normalizedPhone, message);
-      this.logger.log(`Form greeting sent to ${normalizedPhone}: ${result.messageId}`);
-    } catch (error: any) {
-      this.logger.error(`Form greeting failed: ${this.getErrorMessage(error)}`);
+  private async validateCommunication(fields: any[]) {
+    const meta = fields.find(f => f.type === '__design_meta' || f.name === '__form_meta');
+    const config = meta?.meta?.communication;
+    if (config?.whatsappEnabled === true) {
+      await this.templates.validateConfig(config, fields.filter(f => f !== meta).map(f => f.name));
     }
-  }
-
-  private async getSettingValue(key: string): Promise<string> {
-    try {
-      return await this.settingsService.getSettingForUse(key);
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        return '';
-      }
-      throw error;
-    }
-  }
-
-  private getErrorMessage(error: any): string {
-    if (error?.response?.data) {
-      if (typeof error.response.data === 'string') {
-        return error.response.data;
-      }
-
-      const apiMessage = error.response.data.message || error.response.data.status || JSON.stringify(error.response.data);
-      return `${error.response.status || 'Gupshup error'} - ${apiMessage}`;
-    }
-
-    return error?.message || 'Unknown error';
   }
 
   private validateSubmissionData(fields: PublicFormField[], data: Record<string, any>) {

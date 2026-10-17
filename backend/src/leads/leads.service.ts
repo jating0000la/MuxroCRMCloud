@@ -1,7 +1,10 @@
+import { GupshupTemplatesService } from '../integrations/templates/gupshup-templates.service';
+import { OutboxService } from '../common/outbox/outbox.service';
+import { JOB_TYPES } from '../jobs/job.types';
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { eq, and, ne, inArray, desc, asc, sql } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
-import { leads, followups, campaignStatuses, campaignUsers, users, campaigns, notifications } from '../db/schema';
+import { leads, followups, campaignStatuses, campaignUsers, users, campaigns, notifications, outboxEvents } from '../db/schema';
 import { PaginationDto } from '../common/pagination.dto';
 import { RoundRobinService } from '../common/services/round-robin.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -14,6 +17,8 @@ import { getTransferUpdatePayload } from './transfer.utils';
 export class LeadsService {
   constructor(
     private database: DatabaseService,
+    private templates: GupshupTemplatesService,
+    private outbox: OutboxService,
     private roundRobinService: RoundRobinService,
     private notificationsService: NotificationsService,
   ) {}
@@ -292,6 +297,9 @@ export class LeadsService {
   }
 
   async updateStatus(id: string, dto: UpdateStatusDto, userId: string, role?: string) {
+    if (dto.sendWhatsapp && role !== 'ADMIN') {
+      throw new ForbiddenException('Only administrators can send WhatsApp messages');
+    }
     const lead = await this.findOne(id, userId, role);
     if (role === 'USER' && lead.doerId !== userId) {
       throw new ForbiddenException('You can only update status for leads assigned to you');
@@ -300,6 +308,7 @@ export class LeadsService {
     // Wrap followup insert + lead status update in a transaction for atomicity
     const [followup] = await this.database.db.transaction(async (tx) => {
       if (dto.statusId) await this.ensureStatusCampaign(dto.statusId, lead.campaignId, tx);
+      if (dto.sendWhatsapp && (dto.dnd === true || lead.dnd || !lead.phone)) throw new BadRequestException('WhatsApp requires a phone number and a lead that is not DND');
       const [newFollowup] = await tx
         .insert(followups)
         .values({
@@ -311,6 +320,13 @@ export class LeadsService {
         })
         .returning();
 
+      if (dto.sendWhatsapp && dto.statusId) {
+        const [status] = await tx.select().from(campaignStatuses).where(eq(campaignStatuses.id, dto.statusId)).limit(1);
+        if (!status?.whatsappTemplate) throw new BadRequestException('No approved template is configured for this status');
+        const message = this.templates.resolve(status.whatsappTemplate, { ...(lead.customData as any || {}), name: lead.name, phone: lead.phone, email: lead.email, source: lead.source });
+        await tx.insert(outboxEvents).values({ aggregateType: 'lead', aggregateId: lead.id, eventType: JOB_TYPES.WHATSAPP_FORM_GREETING,
+          payload: { ...message, phone: lead.phone, leadId: lead.id, campaignId: lead.campaignId, automationKey: `status-followup:${newFollowup.id}` } });
+      }
       const leadUpdate: any = { updatedAt: new Date() };
       if (dto.statusId) leadUpdate.statusId = dto.statusId;
       if (dto.dnd !== undefined) leadUpdate.dnd = dto.dnd;
@@ -323,6 +339,7 @@ export class LeadsService {
     // Create notification after transaction commits (best-effort, non-critical)
     await this.notificationsService.createNotificationForFollowup(userId, followup.id, followup.nextCallDate);
 
+    if (dto.sendWhatsapp) void this.outbox.publishFormGreetings().catch(() => {});
     return followup;
   }
 

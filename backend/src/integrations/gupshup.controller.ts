@@ -1,3 +1,4 @@
+import { GupshupTemplatesService } from './templates/gupshup-templates.service';
 import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus, Logger, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -18,6 +19,7 @@ export class GupshupController {
   constructor(
     private gupshup: GupshupService,
     private settingsService: SettingsService,
+    private templates: GupshupTemplatesService,
   ) {}
 
   @Post('send-message')
@@ -104,14 +106,12 @@ export class GupshupController {
   }
 
   @Post('sync-templates')
-  @Roles('ADMIN', 'USER')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Fetch approved WhatsApp templates from Gupshup' })
   async syncTemplates(@CurrentUser() user: { role?: string }) {
     this.logger.log('Syncing Gupshup templates');
-    const apiKey = await this.resolveConfigValue('gupshupApiKey', undefined, user);
-    const appId = await this.resolveConfigValue('gupshupAppId', undefined, user);
-    return this.gupshup.syncTemplates(apiKey, appId);
+    return this.templates.sync();
   }
 
   private async resolveConfigValue(

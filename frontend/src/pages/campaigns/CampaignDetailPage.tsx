@@ -1,3 +1,5 @@
+import GupshupTemplateEditor from '../../components/communication/GupshupTemplateEditor';
+import { templateError, type TemplateMessageConfig } from '../../services/gupshupTemplates';
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -68,9 +70,16 @@ export default function CampaignDetailPage() {
   const [newStatusLabel, setNewStatusLabel] = useState('');
   const [newStatusColor, setNewStatusColor] = useState(STATUS_COLORS[0]);
   const [newStatusWhatsapp, setNewStatusWhatsapp] = useState('');
+  const [newStatusTemplate, setNewStatusTemplate] = useState<TemplateMessageConfig | null>(null);
   const [addingStatus, setAddingStatus] = useState(false);
   const [editingStatusId, setEditingStatusId] = useState<string | null>(null);
   const [editStatusWhatsapp, setEditStatusWhatsapp] = useState('');
+  const [editStatusTemplate, setEditStatusTemplate] = useState<TemplateMessageConfig | null>(null);
+  const templateFields = useMemo(() => {
+    const fields = new Map([['name', 'Name'], ['phone', 'Phone'], ['email', 'Email'], ['source', 'Source']]);
+    for (const form of forms) for (const field of form.fields || []) if (!field.name.startsWith('__') && field.type !== 'file') fields.set(field.name, field.label);
+    return [...fields].map(([tag, label]) => ({ tag, label }));
+  }, [forms]);
 
   // Campaign edit
   const [editingCampaign, setEditingCampaign] = useState(false);
@@ -988,15 +997,17 @@ export default function CampaignDetailPage() {
                         await statusService.create(id!, {
                           label: newStatusLabel.trim(),
                           color: newStatusColor,
-                          whatsappMessage: newStatusWhatsapp.trim() || undefined,
+                          whatsappMessage: newStatusTemplate ? '' : newStatusWhatsapp.trim() || undefined,
+                          whatsappTemplate: newStatusTemplate,
                         });
                         toast.success('Status added');
                         setNewStatusLabel('');
                         setNewStatusColor(STATUS_COLORS[0]);
                         setNewStatusWhatsapp('');
+                        setNewStatusTemplate(null);
                         loadData();
                       } catch (error) {
-                        toast.error('Failed to add status');
+                        toast.error(templateError(error, 'Failed to add status'));
                       } finally {
                         setAddingStatus(false);
                       }
@@ -1008,14 +1019,15 @@ export default function CampaignDetailPage() {
                   </button>
                 </div>
                 <div className="mt-3">
-                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">WhatsApp Message (optional)</label>
+                  <div className="mb-4"><GupshupTemplateEditor value={newStatusTemplate} onChange={setNewStatusTemplate} fields={templateFields} /></div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Legacy session text (optional; used only when no template is selected)</label>
                   <textarea
                     value={newStatusWhatsapp}
                     onChange={(e) => setNewStatusWhatsapp(e.target.value)}
                     placeholder="e.g., Hi {{name}}, we tried reaching you. Please call us back."
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 h-16"
                   />
-                  <p className="text-[11px] text-gray-400 mt-1">Auto-send when a lead is moved to this status. Use {'{{name}}'}, {'{{phone}}'}, {'{{email}}'} for field values.</p>
+                  <p className="text-[11px] text-gray-400 mt-1">Select sending in the lead status dialog to queue this status’s approved template. Legacy text requires an existing WhatsApp session. Use {'{{name}}'}, {'{{phone}}'}, {'{{email}}'} for field values.</p>
                 </div>
               </div>
 
@@ -1039,7 +1051,7 @@ export default function CampaignDetailPage() {
                             />
                             <span className="font-medium text-gray-900 dark:text-gray-100">{status.label}</span>
                             <span className="text-sm text-gray-500 dark:text-gray-400">({leadCount} leads)</span>
-                            {status.whatsappMessage && (
+                            {(status.whatsappMessage || status.whatsappTemplate) && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">WA</span>
                             )}
                           </div>
@@ -1051,6 +1063,7 @@ export default function CampaignDetailPage() {
                                 } else {
                                   setEditingStatusId(status.id);
                                   setEditStatusWhatsapp(status.whatsappMessage || '');
+                                  setEditStatusTemplate(status.whatsappTemplate || null);
                                 }
                               }}
                               className="p-1.5 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
@@ -1084,7 +1097,8 @@ export default function CampaignDetailPage() {
                         </div>
                         {isEditing && (
                           <div className="mt-3 pl-7">
-                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">WhatsApp Message for "{status.label}"</label>
+                            <div className="mb-4"><GupshupTemplateEditor value={editStatusTemplate} onChange={setEditStatusTemplate} fields={templateFields} /></div>
+                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Legacy session text for "{status.label}" (within an existing customer session)</label>
                             <textarea
                               value={editStatusWhatsapp}
                               onChange={(e) => setEditStatusWhatsapp(e.target.value)}
@@ -1096,13 +1110,14 @@ export default function CampaignDetailPage() {
                                 onClick={async () => {
                                   try {
                                     await statusService.update(id!, status.id, {
-                                      whatsappMessage: editStatusWhatsapp.trim() || undefined,
+                                      whatsappMessage: editStatusTemplate ? '' : editStatusWhatsapp.trim(),
+                                      whatsappTemplate: editStatusTemplate,
                                     });
                                     toast.success('WhatsApp message saved');
                                     setEditingStatusId(null);
                                     loadData();
                                   } catch (error) {
-                                    toast.error('Failed to save');
+                                    toast.error(templateError(error, 'Failed to save'));
                                   }
                                 }}
                                 className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700"
@@ -1119,7 +1134,8 @@ export default function CampaignDetailPage() {
                             <p className="text-[11px] text-gray-400 mt-1">Use {'{{name}}'}, {'{{phone}}'}, {'{{email}}'} for field values</p>
                           </div>
                         )}
-                        {!isEditing && status.whatsappMessage && (
+                        {!isEditing && status.whatsappTemplate && <p className="mt-1 pl-7 text-xs text-green-600 dark:text-green-400">Approved WhatsApp template configured</p>}
+                        {!isEditing && !status.whatsappTemplate && status.whatsappMessage && (
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-7 truncate">{status.whatsappMessage}</p>
                         )}
                       </div>

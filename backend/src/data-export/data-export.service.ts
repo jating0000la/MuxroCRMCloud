@@ -11,6 +11,7 @@ import {
   users,
   whatsappMessages,
   whatsappContacts,
+  outboxEvents,
   ivrCalls,
   ivrWebhookEvents,
 } from '../db/schema';
@@ -326,6 +327,8 @@ export class DataExportService {
       }
       // Remove durable callbacks before their leads so no queued intake remains
       // to recreate data after this deletion commits.
+      await tx.update(outboxEvents).set({ published: true, publishedAt: new Date(), lastError: 'Cancelled by campaign data deletion' })
+        .where(eq(outboxEvents.eventType, 'whatsapp-form-greeting'));
       const deletedIvrEvents = (await tx.delete(ivrWebhookEvents)).rowCount || 0;
       const deletedIvrCalls = (await tx.delete(ivrCalls)).rowCount || 0;
       const deletedMessages = (await tx.delete(whatsappMessages)).rowCount || 0;

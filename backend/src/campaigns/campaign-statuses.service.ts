@@ -1,3 +1,5 @@
+import { TemplateMessageConfig } from '../integrations/templates/template.types';
+import { GupshupTemplatesService } from '../integrations/templates/gupshup-templates.service';
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { eq, and, desc, asc, sql } from 'drizzle-orm';
 import { DatabaseService } from '../db/database.service';
@@ -5,7 +7,7 @@ import { campaignStatuses, leads } from '../db/schema';
 
 @Injectable()
 export class CampaignStatusesService {
-  constructor(private database: DatabaseService) {}
+  constructor(private database: DatabaseService, private templates: GupshupTemplatesService) {}
 
   async findAll(campaignId: string) {
     return this.database.db
@@ -15,7 +17,8 @@ export class CampaignStatusesService {
       .orderBy(asc(campaignStatuses.order));
   }
 
-  async create(campaignId: string, data: { label: string; color?: string; whatsappMessage?: string }) {
+  async create(campaignId: string, data: { label: string; color?: string; whatsappMessage?: string; whatsappTemplate?: TemplateMessageConfig | null }) {
+    if (data.whatsappTemplate) await this.templates.validateConfig(data.whatsappTemplate);
     const [maxOrder] = await this.database.db
       .select({ order: campaignStatuses.order })
       .from(campaignStatuses)
@@ -30,6 +33,7 @@ export class CampaignStatusesService {
         label: data.label,
         color: data.color || '#3B82F6',
         whatsappMessage: data.whatsappMessage || null,
+        whatsappTemplate: data.whatsappTemplate || null,
         order: (maxOrder?.order ?? -1) + 1,
       })
       .returning();
@@ -37,13 +41,14 @@ export class CampaignStatusesService {
     return created;
   }
 
-  async update(campaignId: string, id: string, data: { label?: string; color?: string; order?: number; whatsappMessage?: string }) {
+  async update(campaignId: string, id: string, data: { label?: string; color?: string; order?: number; whatsappMessage?: string; whatsappTemplate?: TemplateMessageConfig | null }) {
     const current = await this.findOne(campaignId, id);
+    if (data.whatsappTemplate) await this.templates.validateConfig(data.whatsappTemplate);
     if (Object.values(data).every(value => value === undefined)) return current;
     const [updated] = await this.database.db
       .update(campaignStatuses)
       .set({
-        label: data.label, color: data.color, order: data.order, whatsappMessage: data.whatsappMessage,
+        label: data.label, color: data.color, order: data.order, whatsappMessage: data.whatsappMessage, whatsappTemplate: data.whatsappTemplate,
       })
       .where(and(eq(campaignStatuses.id, id), eq(campaignStatuses.campaignId, campaignId)))
       .returning();

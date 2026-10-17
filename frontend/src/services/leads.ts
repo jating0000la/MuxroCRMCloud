@@ -33,7 +33,7 @@ export const leadService = {
       statusId?: string;
       remarks?: string;
       nextCallDate?: string;
-      dnd?: boolean;
+      dnd?: boolean; sendWhatsapp?: boolean;
     }
   ) => {
     const { data } = await api.put(`/leads/${id}/status`, statusData);

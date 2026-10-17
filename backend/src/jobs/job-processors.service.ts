@@ -1,3 +1,4 @@
+import { GupshupTemplatesService } from '../integrations/templates/gupshup-templates.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { JobService } from './job.service';
 import { JOB_TYPES } from './job.types';
@@ -21,6 +22,7 @@ export class JobProcessors {
   constructor(
     private jobService: JobService,
     private gupshupService: GupshupService,
+    private templates: GupshupTemplatesService,
     private indiamartService: IndiamartService,
     private bulkImportService: BulkImportService,
     private roundRobinService: RoundRobinService,
@@ -66,9 +68,9 @@ export class JobProcessors {
         return { success: true };
       }},
       { type: JOB_TYPES.WHATSAPP_FORM_GREETING, handler: async (data: any) => {
-        const config = await this.resolveGupshupConfig();
-        await this.gupshupService.sendSessionMessage(config.apiKey, config.source, config.appName, data.phone, data.message);
-        return { success: true };
+        if (!data.templateId || !data.leadId || !data.automationKey) throw new Error('Automated WhatsApp requires an approved template; update the form or campaign status communication settings.');
+        return this.templates.send(data.phone, data.templateId, data.params || [], data.mediaUrl,
+          { leadId: data.leadId, campaignId: data.campaignId, automationKey: data.automationKey });
       }},
       { type: JOB_TYPES.INDIAMART_FETCH, handler: async (data: any) => {
         const config = await this.resolveIndiaMartConfig();
@@ -112,6 +114,7 @@ export class JobProcessors {
       }
     }
     this.logger.log(`Registered ${registered}/${processors.length} job processors`);
+    this.outboxService.startFormGreetingPublisher();
   }
 
   private async logJob(

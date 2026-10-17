@@ -1,3 +1,4 @@
+import GupshupTemplateEditor from '../../components/communication/GupshupTemplateEditor';
 import WhatsAppWebhookSetup from '../../components/settings/WhatsAppWebhookSetup';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
@@ -594,6 +595,7 @@ export default function SettingsPage() {
                   </div>
                   <p className={hintCls}>API key, source number, and app name are required for sending. App ID is only needed for template sync APIs.</p>
                   <WhatsAppWebhookSetup />
+                  <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-600"><GupshupTemplateEditor catalogOnly value={null} onChange={() => {}} fields={[]} /></div>
                   <button onClick={handleTestGupshup} disabled={testingGupshup || !gupshupApiKey || !gupshupSource || !gupshupAppName || !gupshupTestPhone} className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium">
                     {testingGupshup ? <><svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Testing...</> : 'Test Connection'}
                   </button>

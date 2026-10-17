@@ -43,7 +43,7 @@ export default function MessageBubble({ msg }: MessageBubbleProps) {
     if (!msg.mediaUrl) return null;
     try { return ['http:', 'https:'].includes(new URL(msg.mediaUrl).protocol) ? msg.mediaUrl : null; } catch { return null; }
   })();
-  const isImage = msg.type === 'image' || msg.type === 'sticker';
+  const isImage = msg.type === 'image' || msg.type === 'sticker' || (msg.type === 'template' && msg.raw?.templateMediaType === 'image');
   const attachmentTypes = ['image', 'sticker', 'document', 'file', 'audio', 'video'];
   useEffect(() => { setImageFailed(false); }, [attachmentUrl]);
 
@@ -114,6 +114,7 @@ export default function MessageBubble({ msg }: MessageBubbleProps) {
             )}
           </div>
 
+          {msg.type === 'template' && msg.raw?.templateButtons?.map((button, index) => <div key={index} className="mt-1 rounded-lg border border-blue-100 p-2 text-center text-xs text-blue-600 dark:border-gray-600 dark:text-blue-400">{button.text}</div>)}
           {/* Time + Status */}
           <div className="mt-1 flex items-center justify-end gap-1">
             <span className="text-[10px] text-slate-500/80 dark:text-gray-400/80">
