@@ -362,6 +362,68 @@ The MuxroCRM backend stores only **4 Gupshup settings** (from `getConfig()`):
 5. **Frontend**: Show business about/description in CRMInfoPanel.
 
 ---
+## 🏢 Gupshup Business Profile Update Audit (PUT /business/profile)
+
+Reference: https://docs.gupshup.io/reference/set-profile-details
+
+### Set Profile Details API Endpoint:
+
+```
+PUT https://api.gupshup.io/wa/app/{appId}/business/profile
+Headers: apikey: {API_KEY}, Content-Type: application/x-www-form-urlencoded
+```
+
+### Updatable Profile Fields:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `addLine1` / `addressLine1` | string | No | First line of address |
+| `addLine2` / `addressLine2` | string | No | Second line of address |
+| `city` | string | No | City where business is situated |
+| `state` | string | No | State where business is situated |
+| `country` | string | No | Country where business is situated |
+| `pinCode` / `pincode` | string | No | Postal code |
+| `desc` | string | No | Description of the business |
+| `vertical` | string | **Yes** | Business vertical/category (cannot be empty) |
+| `website1` | string (uri) | No | Primary website URL (must be valid) |
+| `website2` | string (uri) | No | Secondary website URL (must be valid) |
+| `profileEmail` / `ProfileEmail` | string | No | Business email |
+
+### Error Codes:
+| Code | Meaning |
+|------|---------|
+| `200` | Success - Profile updated |
+| `400` | Invalid app id / app is not live / Docker auth / Facebook error / vertical empty / Invalid website URL |
+| `401` | Authentication Failed |
+| `429` | Too Many Requests (rate limit) |
+| `500` | Unable to update profile details |
+
+### Current MuxroCRM Gap:
+
+- **No backend endpoint** for updating business profile (PUT /business/profile)
+- **No frontend UI** for editing business profile fields
+- **No validation** of vertical/category values before sending to Gupshup
+- **No feedback loop** - after updating, no automatic refresh of GET /business to verify changes
+
+### Recommended Implementation:
+
+1. **Backend**: Add `PUT /integrations/gupshup/business/profile` endpoint that:
+   - Validates `vertical` is not empty (required field)
+   - Validates website URLs format
+   - Calls Gupshup PUT /business/profile API
+   - Returns updated profile from Gupshup response
+
+2. **Frontend**: Add "Edit Business Profile" modal in SettingsPage with:
+   - Address fields (Line 1, Line 2, City, State, Country, Pincode)
+   - Description textarea
+   - Vertical dropdown (valid values from Gupshup)
+   - Website 1 & 2 URL inputs with validation
+   - Profile email input
+   - Save button calling backend PUT endpoint
+
+3. **Integration**: After successful update, refresh business details via GET /business to show current state.
+
+---
 
 ## 🚀 Gupshup-Specific Implementation Priorities
 

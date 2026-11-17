@@ -5,6 +5,7 @@ Based on official Gupshup documentation:
 - Message API: https://docs.gupshup.io/reference/msg
 - Template Creation: https://docs.gupshup.io/reference/createtemplate
 - Business Details: https://docs.gupshup.io/reference/get-business-details
+- Set Profile Details: https://docs.gupshup.io/reference/set-profile-details
 
 **Last Updated:** 2026-11-17  
 **API Base URL:** https://api.gupshup.io/wa/api/v1  
@@ -18,10 +19,14 @@ Based on official Gupshup documentation:
 2. [Send Message API](#2-send-message-api)
 3. [Message Types](#3-message-types)
 4. [Template Messaging](#4-template-messaging)
-5. [Business Details API](#5-business-details-api)
-6. [Error Codes](#6-error-codes)
-7. [Supported Content Types](#7-supported-content-types)
-8. [Integration Guide](#8-integration-guide)
+5. [Business Profile & Catalog Configuration](#5-business-profile--catalog-configuration)
+6. [Set Business Profile Details (PUT)](#6-set-business-profile-details-put)
+7. [Error Codes](#7-error-codes)
+8. [Supported Content Types](#8-supported-content-types)
+9. [Integration Guide](#9-integration-guide)
+10. [Quick Reference: Message Type Selection Guide](#10-quick-reference-message-type-selection-guide)
+11. [Implementation Notes for MuxroCRM](#11-implementation-notes-for-muxrocrm)
+12. [Support & Resources](#12-support--resources)
 
 ---
 
@@ -667,9 +672,11 @@ curl --location --request POST 'https://api.gupshup.io/wa/api/v1/template/msg' \
 
 ---
 
-## 5. Business Details API
+## 5. Business Profile & Catalog Configuration
 
-### Overview
+### 5.1 Business Details API (GET)
+
+#### Overview
 Retrieve business profile details from your Gupshup account. This includes address, contact information, business vertical, and compliance status.
 
 ### API Endpoint
@@ -765,10 +772,141 @@ curl --location 'https://api.gupshup.io/wa/app/1b73dad6-xxxx-xxxx-xxxx-60981da19
 ```
 
 ---
+### 5.3 Catalog Configuration
 
-## 6. Error Codes
+#### Overview
+WhatsApp Business Catalog allows businesses to showcase products and services directly in WhatsApp. The catalog is managed through the **Meta Commerce Manager** or **Facebook Business Manager**, not directly via Gupshup API.
 
-### Session Messaging Errors
+#### Catalog Features
+- **Products**: Individual items with images, descriptions, prices
+- **Collections**: Grouped products (e.g., "New Arrivals", "Best Sellers")
+- **Categories**: Organize products by type
+- **Currency & Pricing**: Set prices in local currency
+
+#### Gupshup Integration with Catalog
+Gupshup does **not** provide direct catalog management APIs. Catalog operations are handled through:
+
+1. **Meta Commerce Manager**: https://business.facebook.com/commerce
+2. **Facebook Business Manager**: Business settings → Catalogs
+3. **WhatsApp Manager**: Business settings → Catalog
+
+#### Sending Catalog Items via Gupshup
+Once catalog is created in Meta, you can send catalog messages using Gupshup's **List Message** or **Template Message** with product references:
+
+```json
+{
+  "type": "list",
+  "title": "Our Products",
+  "body": "Check out our latest offerings",
+  "msgid": "catalog1",
+  "globalButtons": [
+    { "type": "text", "title": "View All" }
+  ],
+  "items": [
+    {
+      "title": "Product 1",
+      "subtitle": "₹999",
+      "options": [
+        { "type": "text", "title": "View Details", "postbackText": "prod_1" }
+      ]
+    }
+  ]
+}
+```
+
+#### Catalog Template Messages
+Create templates with catalog integration for automated product showcasing.
+
+---
+## 6. Set Business Profile Details (PUT)
+
+### Overview
+Create or update business profile details for your WhatsApp Business account. This endpoint allows you to set address, city, state, country, pincode, description, vertical, email, and website information.
+
+### API Endpoint
+```
+PUT https://api.gupshup.io/wa/app/{appId}/business/profile
+```
+
+### Required Headers
+| Header | Value |
+|--------|-------|
+| `apikey` | Your Gupshup account API key |
+| `Content-Type` | `application/x-www-form-urlencoded` |
+
+### Path Parameters
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `appId` | string | Unique identifier for the app | `1b73dad6-xxxx-xxxx-xxxx-60981da19f70` |
+
+### Form Parameters (All Optional)
+| Parameter | Type | Description | Constraints |
+|-----------|------|-------------|-------------|
+| `addLine1` / `addressLine1` | string | First line of address | - |
+| `addLine2` / `addressLine2` | string | Second line of address | - |
+| `city` | string | City where business is situated | - |
+| `state` | string | State where business is situated | - |
+| `country` | string | Country where business is situated | - |
+| `pinCode` / `pincode` | string | Postal code | - |
+| `desc` | string | Description of the business | - |
+| `vertical` | string | Business vertical/category | **Required** - cannot be empty |
+| `website1` | string (uri) | Primary website URL | Must be valid URL |
+| `website2` | string (uri) | Secondary website URL | Must be valid URL |
+| `profileEmail` / `ProfileEmail` | string | Business email | - |
+
+### Response Format (Success 200)
+```json
+{
+    "profile": {
+        "addressLine1": "<business_address>",
+        "addressLine2": "<business_address>",
+        "city": "<city>",
+        "country": "<country>",
+        "desc": "<business_description>",
+        "pinCode": "<city_pincode>",
+        "profileEmail": "<business_email>",
+        "state": "<state>",
+        "vertical": "<business_type>",
+        "website1": "<business_website>",
+        "website2": "<business_website>"
+    },
+    "status": "success"
+}
+```
+
+### Status Codes
+| Code | Response | Comments |
+|------|----------|----------|
+| `200` | Success | Profile updated successfully |
+| `400` | Error | `"Invalid app id provided"` |
+| `400` | Error | `"app is not live"` - App must be live to update profile |
+| `400` | Error | `"Unable to Authenticate Docker"` |
+| `400` | Error | Facebook error response from Meta API |
+| `400` | Error | `"vertical can't be empty"` - Vertical is required |
+| `400` | Error | `"Invalid Website URL"` |
+| `401` | Error | `"Authentication Failed"` |
+| `429` | Error | `"Too Many Requests"` - Rate limit exceeded |
+| `500` | Error | `"unable to update profile details"` - Server error |
+
+### cURL Example
+```bash
+curl --location --request PUT 'https://api.gupshup.io/wa/app/1b73dad6-xxxx-xxxx-xxxx-60981da19f70/business/profile' \
+--header 'apikey: 2xxc4x4xx2c94xxxc2f9xx9d43xxxx8a' \
+--header 'Content-Type: application/x-www-form-urlencoded' \
+--data-urlencode 'addLine1=123 Business Street' \
+--data-urlencode 'addLine2=Suite 400' \
+--data-urlencode 'city=Mumbai' \
+--data-urlencode 'state=Maharashtra' \
+--data-urlencode 'country=IN' \
+--data-urlencode 'pinCode=400001' \
+--data-urlencode 'desc=Leading CRM solutions provider' \
+--data-urlencode 'vertical=RETAIL' \
+--data-urlencode 'website1=https://muxrocrm.com' \
+--data-urlencode 'website2=https://support.muxrocrm.com' \
+--data-urlencode 'profileEmail=business@muxrocrm.com'
+```
+
+## 7. Error Codes
 
 | Code | Meaning |
 |------|---------|
@@ -800,7 +938,7 @@ curl --location 'https://api.gupshup.io/wa/app/1b73dad6-xxxx-xxxx-xxxx-60981da19
 
 ---
 
-## 7. Supported Content Types
+## 8. Supported Content Types
 
 ### Media Specifications
 
@@ -846,7 +984,7 @@ curl --location 'https://api.gupshup.io/wa/app/1b73dad6-xxxx-xxxx-xxxx-60981da19
 
 ---
 
-## 8. Integration Guide
+## 9. Integration Guide
 
 ### Prerequisites
 
@@ -934,7 +1072,7 @@ When messages are sent, Gupshup sends events to your webhook/callback URL with s
 
 ---
 
-## 📋 Quick Reference: Message Type Selection Guide
+## 10. Quick Reference: Message Type Selection Guide
 
 | Use Case | Recommended Message Type | API Endpoint |
 |----------|------------------------|--------------|
@@ -953,7 +1091,7 @@ When messages are sent, Gupshup sends events to your webhook/callback URL with s
 
 ---
 
-## 🔧 Implementation Notes for MuxroCRM
+## 11. Implementation Notes for MuxroCRM
 
 ### Current Backend Support (MuxroCRM)
 
@@ -978,6 +1116,24 @@ Based on the MuxroCRM codebase analysis:
 **⚠️ Business Profile:**
 - Business details API available but 0/27 fields implemented
 - Only 4 Gupshup settings stored (apiKey, source, appName, appId)
+- Profile update API (PUT /business/profile) not implemented in backend
+- Catalog management handled via Meta Commerce Manager (no Gupshup API)
+
+### Recommended Backend Endpoints
+
+```
+GET  /integrations/gupshup/business          # Fetch current business profile
+PUT  /integrations/gupshup/business/profile  # Update business profile fields
+```
+
+### Recommended Frontend UI
+
+Add a "Business Profile" tab in WhatsApp Settings allowing admins to edit:
+- Address (addLine1, addLine2, city, state, country, pinCode)
+- Description (desc)
+- Vertical (required - dropdown of valid values)
+- Website URLs (website1, website2)
+- Profile email (profileEmail)
 
 ### Priority Integration Items
 
@@ -985,11 +1141,13 @@ Based on the MuxroCRM codebase analysis:
 2. **High**: Add sticker sending support (Gupshup API available, backend missing)
 3. **Medium**: Implement template creation via backend API
 4. **Medium**: Fetch and display business profile in chat UI
-5. **Low**: Template edit/delete (must use Gupshup dashboard only)
+5. **Medium**: Implement Business Profile edit UI (PUT /business/profile)
+6. **Low**: Template edit/delete (must use Gupshup dashboard only)
+7. **Low**: Catalog management (handled via Meta Commerce Manager, not Gupshup)
 
 ---
 
-## 📞 Support & Resources
+## 12. Support & Resources
 
 - **Gupshup Documentation**: https://docs.gupshup.io
 - **WhatsApp Business API**: https://console-docs.gupshup.io/docs/whatsapp-business-api
