@@ -1,0 +1,182 @@
+{
+  "date": "2026-10-16",
+  "backendTests": {
+    "passed": 66,
+    "failed": 0
+  },
+  "builds": {
+    "backend": "passed",
+    "frontend": "passed"
+  },
+  "routes": [
+    {
+      "role": "admin",
+      "page": "login",
+      "destination": "/dashboard",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "admin",
+      "page": "/dashboard",
+      "destination": "/dashboard",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "admin",
+      "page": "/campaigns",
+      "destination": "/campaigns",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "admin",
+      "page": "/campaigns/e32160f3-65a5-4ccd-9c5c-68281edddaa8",
+      "destination": "/campaigns/e32160f3-65a5-4ccd-9c5c-68281edddaa8",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "admin",
+      "page": "/followups",
+      "destination": "/followups",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "admin",
+      "page": "/dnd",
+      "destination": "/dnd",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "admin",
+      "page": "/admin/users",
+      "destination": "/admin/users",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "admin",
+      "page": "/admin/backups",
+      "destination": "/admin/backups",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "admin",
+      "page": "/admin/data-management",
+      "destination": "/admin/data-management",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "admin",
+      "page": "/settings",
+      "destination": "/settings",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "admin",
+      "page": "/whatsapp",
+      "destination": "/whatsapp",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "user",
+      "page": "login",
+      "destination": "/dashboard",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "user",
+      "page": "/dashboard",
+      "destination": "/dashboard",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "user",
+      "page": "/campaigns",
+      "destination": "/dashboard",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "user",
+      "page": "/campaigns/e32160f3-65a5-4ccd-9c5c-68281edddaa8",
+      "destination": "/dashboard",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "user",
+      "page": "/followups",
+      "destination": "/followups",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "user",
+      "page": "/dnd",
+      "destination": "/dnd",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "user",
+      "page": "/admin/users",
+      "destination": "/dashboard",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "user",
+      "page": "/admin/backups",
+      "destination": "/dashboard",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "user",
+      "page": "/admin/data-management",
+      "destination": "/dashboard",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "user",
+      "page": "/settings",
+      "destination": "/dashboard",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "user",
+      "page": "/whatsapp",
+      "destination": "/whatsapp",
+      "browserErrors": [],
+      "failedApiRequests": []
+    },
+    {
+      "role": "anonymous",
+      "page": "public form",
+      "destination": null,
+      "browserErrors": [],
+      "failedApiRequests": []
+    }
+  ],
+  "interactionChecks": [
+    "F06 campaign-only action creates and displays campaign",
+    "F04 mobile composer and send fit viewport",
+    "F13 contact panel loads real CRM lead and opens details",
+    "F07 status filter survives background refresh; F18 USER layout has no forbidden settings request",
+    "F08: settings persist with empty optional values and surface a simulated HTTP 503 save failure",
+    "F19: logo chooser excludes SVG"
+  ]
+}

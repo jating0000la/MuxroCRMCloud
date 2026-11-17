@@ -1,0 +1,3600 @@
+{
+  "date": "2026-10-16",
+  "commit": "32c7e760fc2f6068804a6aa0b051215f485641c6",
+  "scope": "All 12 frontend routes, admin/USER/anonymous roles, isolated disposable database, Chromium 154.0.8037.57",
+  "baseline": {
+    "backendTests": 51,
+    "passed": 51,
+    "failed": 0,
+    "skipped": 0,
+    "backendBuild": "passed",
+    "frontendBuild": "passed"
+  },
+  "pages": [
+    {
+      "role": "admin",
+      "page": "login",
+      "url": "/dashboard",
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/login",
+          "status": 201,
+          "method": "POST"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "page": "/dashboard",
+      "url": "/dashboard",
+      "headings": [
+        "Dashboard",
+        "Dashboard"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "page": "/campaigns",
+      "url": "/campaigns",
+      "headings": [
+        "Campaigns"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "page": "/campaigns/d328b7dd-6850-446d-9aba-1084f3f1bdfe",
+      "url": "/campaigns/d328b7dd-6850-446d-9aba-1084f3f1bdfe",
+      "headings": [
+        "Workspace",
+        "Audit Campaign"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/leads/campaign/d328b7dd-6850-446d-9aba-1084f3f1bdfe?page=1&limit=500",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns/d328b7dd-6850-446d-9aba-1084f3f1bdfe/forms",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns/d328b7dd-6850-446d-9aba-1084f3f1bdfe",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns/d328b7dd-6850-446d-9aba-1084f3f1bdfe/users",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns/d328b7dd-6850-446d-9aba-1084f3f1bdfe",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/leads/campaign/d328b7dd-6850-446d-9aba-1084f3f1bdfe?page=1&limit=500",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns/d328b7dd-6850-446d-9aba-1084f3f1bdfe/forms",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns/d328b7dd-6850-446d-9aba-1084f3f1bdfe/users",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/users",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/users",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "page": "/followups",
+      "url": "/followups",
+      "headings": [
+        "Follow-ups",
+        "Follow-ups"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "page": "/dnd",
+      "url": "/dnd",
+      "headings": [
+        "DND"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/leads/dnd?page=1&limit=500",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/leads/dnd?page=1&limit=500",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "page": "/admin/users",
+      "url": "/admin/users",
+      "headings": [
+        "Users"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/users",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/users",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "page": "/admin/backups",
+      "url": "/admin/backups",
+      "headings": [
+        "Workspace",
+        "Database Backups"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/admin/backups",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/admin/backups",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/admin/backups/status",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/admin/backups/status",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "page": "/admin/data-management",
+      "url": "/admin/data-management",
+      "headings": [
+        "Workspace",
+        "Data Management",
+        "Download All Campaign Data",
+        "Delete All Campaign Data"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "page": "/settings",
+      "url": "/settings",
+      "headings": [
+        "Workspace",
+        "Company Profile"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/integrations/indiamart/last-fetch",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "page": "/whatsapp",
+      "url": "/whatsapp",
+      "headings": [
+        "WhatsApp",
+        "WhatsApp",
+        "Select a conversation"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/whatsapp/chats?limit=200&offset=0",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/whatsapp/stats",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/whatsapp/chats?limit=200&offset=0",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/whatsapp/stats",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "page": "login",
+      "url": "/dashboard",
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/login",
+          "status": 201,
+          "method": "POST"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "page": "/dashboard",
+      "url": "/dashboard",
+      "headings": [
+        "Dashboard",
+        "Dashboard"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "page": "/campaigns",
+      "url": "/dashboard",
+      "headings": [
+        "Dashboard",
+        "Dashboard"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "page": "/campaigns/d328b7dd-6850-446d-9aba-1084f3f1bdfe",
+      "url": "/dashboard",
+      "headings": [
+        "Dashboard",
+        "Dashboard"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "page": "/followups",
+      "url": "/followups",
+      "headings": [
+        "Follow-ups",
+        "Follow-ups"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "page": "/dnd",
+      "url": "/dnd",
+      "headings": [
+        "DND"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/leads/dnd?page=1&limit=500",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/leads/dnd?page=1&limit=500",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "page": "/admin/users",
+      "url": "/dashboard",
+      "headings": [
+        "Dashboard",
+        "Dashboard"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "page": "/admin/backups",
+      "url": "/dashboard",
+      "headings": [
+        "Dashboard",
+        "Dashboard"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "page": "/admin/data-management",
+      "url": "/dashboard",
+      "headings": [
+        "Dashboard",
+        "Dashboard"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "page": "/settings",
+      "url": "/dashboard",
+      "headings": [
+        "Dashboard",
+        "Dashboard"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/campaigns",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/sales-funnel",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/status-report",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/alerts",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/kpi?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/campaign-report?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/user-conversion?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/missed-by-user",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/daily-trend?startDate=2026-10-01&endDate=2026-10-16",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/followups?limit=20000",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/dashboard/leads?limit=20000",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "page": "/whatsapp",
+      "url": "/whatsapp",
+      "headings": [
+        "WhatsApp",
+        "WhatsApp",
+        "Select a conversation"
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/auth/profile",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/settings?masked=true",
+          "status": 403,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/whatsapp/chats?limit=200&offset=0",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/whatsapp/stats",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/whatsapp/chats?limit=200&offset=0",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/sync",
+          "status": 200,
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/v1/whatsapp/stats",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending-count",
+          "status": 200,
+          "method": "GET"
+        },
+        {
+          "path": "/api/v1/notifications/pending",
+          "status": 200,
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "role": "anonymous",
+      "page": "public form"
+    }
+  ],
+  "apiObservations": [
+    {
+      "page": "login",
+      "label": "anonymous profile rejected",
+      "path": "/auth/profile",
+      "method": "GET",
+      "status": 401,
+      "expected": 401,
+      "pass": true,
+      "detail": {
+        "message": "Unauthorized",
+        "statusCode": 401
+      }
+    },
+    {
+      "page": "login",
+      "label": "authenticated profile",
+      "path": "/auth/profile",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "permissions",
+      "label": "user admin endpoint denied",
+      "path": "/users",
+      "method": "GET",
+      "status": 403,
+      "expected": 403,
+      "pass": true,
+      "detail": {
+        "message": "Forbidden resource",
+        "error": "Forbidden",
+        "statusCode": 403
+      }
+    },
+    {
+      "page": "permissions",
+      "label": "user admin endpoint denied",
+      "path": "/settings?masked=true",
+      "method": "GET",
+      "status": 403,
+      "expected": 403,
+      "pass": true,
+      "detail": {
+        "message": "Forbidden resource",
+        "error": "Forbidden",
+        "statusCode": 403
+      }
+    },
+    {
+      "page": "permissions",
+      "label": "user admin endpoint denied",
+      "path": "/admin/backups",
+      "method": "GET",
+      "status": 403,
+      "expected": 403,
+      "pass": true,
+      "detail": {
+        "message": "Forbidden resource",
+        "error": "Forbidden",
+        "statusCode": 403
+      }
+    },
+    {
+      "page": "dashboard",
+      "label": "user dashboard query",
+      "path": "/dashboard/overview",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "dashboard",
+      "label": "user dashboard query",
+      "path": "/dashboard/kpi",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "dashboard",
+      "label": "user dashboard query",
+      "path": "/dashboard/sales-funnel",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "dashboard",
+      "label": "user dashboard query",
+      "path": "/dashboard/user-conversion",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "dashboard",
+      "label": "user dashboard query",
+      "path": "/dashboard/alerts",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "dashboard",
+      "label": "user dashboard query",
+      "path": "/dashboard/campaign-report",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "dashboard",
+      "label": "user dashboard query",
+      "path": "/dashboard/status-report",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "dashboard",
+      "label": "user dashboard query",
+      "path": "/dashboard/daily-trend",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "dashboard",
+      "label": "user dashboard query",
+      "path": "/dashboard/missed-by-user",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "dashboard",
+      "label": "user dashboard query",
+      "path": "/dashboard/leads?limit=50",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "dashboard",
+      "label": "user dashboard query",
+      "path": "/dashboard/followups?limit=50",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "dashboard",
+      "label": "invalid campaign date",
+      "path": "/dashboard/daily-trend?startDate=invalid-date",
+      "method": "GET",
+      "status": 500,
+      "expected": 400,
+      "pass": false,
+      "detail": {
+        "statusCode": 500,
+        "message": "Internal server error"
+      }
+    },
+    {
+      "page": "campaigns",
+      "label": "create campaign",
+      "path": "/campaigns",
+      "method": "POST",
+      "status": 201,
+      "expected": 201,
+      "pass": true
+    },
+    {
+      "page": "campaigns",
+      "label": "update campaign",
+      "path": "/campaigns/6d2740f7-cca9-4a41-a104-187ef081e645",
+      "method": "PUT",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "campaigns",
+      "label": "assign team",
+      "path": "/campaigns/6d2740f7-cca9-4a41-a104-187ef081e645/users",
+      "method": "POST",
+      "status": 201,
+      "expected": 201,
+      "pass": true
+    },
+    {
+      "page": "campaigns",
+      "label": "read team",
+      "path": "/campaigns/6d2740f7-cca9-4a41-a104-187ef081e645/users",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "campaigns",
+      "label": "remove member",
+      "path": "/campaigns/6d2740f7-cca9-4a41-a104-187ef081e645/users/359d4902-ddf4-4ba2-85af-1e33c408236d",
+      "method": "DELETE",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "campaigns",
+      "label": "foreign campaign inaccessible",
+      "path": "/campaigns/126478a9-a452-4e2d-b663-c1f8625bd338",
+      "method": "GET",
+      "status": 403,
+      "expected": 403,
+      "pass": true,
+      "detail": {
+        "message": "You are not assigned to this campaign",
+        "error": "Forbidden",
+        "statusCode": 403
+      }
+    },
+    {
+      "page": "campaign detail/forms",
+      "label": "create form",
+      "path": "/campaigns/6d2740f7-cca9-4a41-a104-187ef081e645/forms",
+      "method": "POST",
+      "status": 201,
+      "expected": 201,
+      "pass": true
+    },
+    {
+      "page": "public form",
+      "label": "unpublished form hidden",
+      "path": "/forms/public/b33bf916",
+      "method": "GET",
+      "status": 404,
+      "expected": 404,
+      "pass": true,
+      "detail": {
+        "message": "Form not found",
+        "error": "Not Found",
+        "statusCode": 404
+      }
+    },
+    {
+      "page": "campaign detail/forms",
+      "label": "publish form",
+      "path": "/campaigns/6d2740f7-cca9-4a41-a104-187ef081e645/forms/c636b44d-a8ad-4feb-b122-b4ed650b4308/publish",
+      "method": "POST",
+      "status": 201,
+      "expected": 201,
+      "pass": true
+    },
+    {
+      "page": "public form",
+      "label": "published form visible",
+      "path": "/forms/public/b33bf916",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "public form",
+      "label": "required fields rejected",
+      "path": "/forms/public/b33bf916/submit",
+      "method": "POST",
+      "status": 400,
+      "expected": 400,
+      "pass": true,
+      "detail": {
+        "message": "Name is required",
+        "error": "Bad Request",
+        "statusCode": 400
+      }
+    },
+    {
+      "page": "public form",
+      "label": "valid submission creates assigned lead",
+      "path": "/forms/public/b33bf916/submit",
+      "method": "POST",
+      "status": 201,
+      "expected": 201,
+      "pass": true,
+      "detail": {
+        "leadCreated": true,
+        "assigned": true
+      }
+    },
+    {
+      "page": "campaign detail/forms",
+      "label": "submissions returned",
+      "path": "/campaigns/6d2740f7-cca9-4a41-a104-187ef081e645/forms/c636b44d-a8ad-4feb-b122-b4ed650b4308/submissions",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "campaign detail/forms",
+      "label": "foreign campaign URL uses actual form id",
+      "path": "/campaigns/126478a9-a452-4e2d-b663-c1f8625bd338/forms/c636b44d-a8ad-4feb-b122-b4ed650b4308",
+      "method": "GET",
+      "status": 200,
+      "expected": 404,
+      "pass": false,
+      "detail": {
+        "returnedFormCampaign": "6d2740f7-cca9-4a41-a104-187ef081e645"
+      }
+    },
+    {
+      "page": "campaign detail/forms",
+      "label": "delete form preserving lead",
+      "path": "/campaigns/6d2740f7-cca9-4a41-a104-187ef081e645/forms/c636b44d-a8ad-4feb-b122-b4ed650b4308",
+      "method": "DELETE",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "campaign detail/leads",
+      "label": "created lead remains",
+      "path": "/leads/584da719-1ea5-4b3f-afb9-eea8ec4fabcc",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "campaign detail/leads",
+      "label": "create manual lead",
+      "path": "/leads",
+      "method": "POST",
+      "status": 201,
+      "expected": 201,
+      "pass": true
+    },
+    {
+      "page": "campaign detail/leads",
+      "label": "edit lead name",
+      "path": "/leads/3968fe37-2a95-48ae-830c-1623c5558933",
+      "method": "PUT",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "campaign detail/leads",
+      "label": "foreign owner forbidden",
+      "path": "/leads/9e31be75-acb9-4218-b925-d1707b55c2db",
+      "method": "PUT",
+      "status": 403,
+      "expected": 403,
+      "pass": true,
+      "detail": {
+        "message": "You can only view leads assigned to you",
+        "error": "Forbidden",
+        "statusCode": 403
+      }
+    },
+    {
+      "page": "followups",
+      "label": "status-only followup",
+      "path": "/leads/285e7930-c720-4d06-807c-ef62573f7c07/status",
+      "method": "PUT",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "followups",
+      "label": "campaign-filtered my followups",
+      "path": "/followups/my?campaignId=d328b7dd-6850-446d-9aba-1084f3f1bdfe",
+      "method": "GET",
+      "status": 400,
+      "expected": 200,
+      "pass": false,
+      "detail": {
+        "message": [
+          "property campaignId should not exist"
+        ],
+        "error": "Bad Request",
+        "statusCode": 400
+      }
+    },
+    {
+      "page": "followups",
+      "label": "cursor query supported",
+      "path": "/followups/my?cursor=2026-10-16T08%3A55%3A08.002Z",
+      "method": "GET",
+      "status": 400,
+      "expected": 200,
+      "pass": false,
+      "detail": {
+        "message": [
+          "property cursor should not exist"
+        ],
+        "error": "Bad Request",
+        "statusCode": 400
+      }
+    },
+    {
+      "page": "followups",
+      "label": "upcoming campaign query supported",
+      "path": "/followups/upcoming?campaignId=d328b7dd-6850-446d-9aba-1084f3f1bdfe",
+      "method": "GET",
+      "status": 400,
+      "expected": 200,
+      "pass": false,
+      "detail": {
+        "message": [
+          "property campaignId should not exist"
+        ],
+        "error": "Bad Request",
+        "statusCode": 400
+      }
+    },
+    {
+      "page": "dnd",
+      "label": "string false must not become true",
+      "path": "/leads/285e7930-c720-4d06-807c-ef62573f7c07/status",
+      "method": "PUT",
+      "status": 200,
+      "expected": 400,
+      "pass": false,
+      "detail": {
+        "dndInput": "false"
+      }
+    },
+    {
+      "page": "dnd",
+      "label": "read resulting DND",
+      "path": "/leads/285e7930-c720-4d06-807c-ef62573f7c07",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true,
+      "detail": {
+        "dnd": true
+      }
+    },
+    {
+      "page": "dnd",
+      "label": "clear DND with boolean",
+      "path": "/leads/285e7930-c720-4d06-807c-ef62573f7c07/status",
+      "method": "PUT",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "admin users",
+      "label": "create user",
+      "path": "/users",
+      "method": "POST",
+      "status": 201,
+      "expected": 201,
+      "pass": true
+    },
+    {
+      "page": "admin users",
+      "label": "edit user",
+      "path": "/users/8e2c5692-f937-409c-88d0-6c401d3a55b6",
+      "method": "PUT",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "admin users",
+      "label": "reset password",
+      "path": "/users/8e2c5692-f937-409c-88d0-6c401d3a55b6/reset-password",
+      "method": "PATCH",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "admin users",
+      "label": "new password login works",
+      "pass": true
+    },
+    {
+      "page": "admin users",
+      "label": "deactivate",
+      "path": "/users/8e2c5692-f937-409c-88d0-6c401d3a55b6",
+      "method": "DELETE",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "admin users",
+      "label": "reactivate",
+      "path": "/users/8e2c5692-f937-409c-88d0-6c401d3a55b6",
+      "method": "PUT",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "admin users",
+      "label": "delete unused user",
+      "path": "/users/8e2c5692-f937-409c-88d0-6c401d3a55b6/permanent",
+      "method": "DELETE",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "settings",
+      "label": "save nonsecret branding",
+      "path": "/settings",
+      "method": "POST",
+      "status": 201,
+      "expected": 201,
+      "pass": true
+    },
+    {
+      "page": "settings",
+      "label": "read branding",
+      "path": "/settings/companyName",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "settings",
+      "label": "unsupported setting delete",
+      "path": "/settings/companyName",
+      "method": "DELETE",
+      "status": 405,
+      "expected": 405,
+      "pass": true,
+      "detail": {
+        "message": "Setting deletion not implemented. Use archive instead.",
+        "error": "Method Not Allowed",
+        "statusCode": 405
+      }
+    },
+    {
+      "page": "settings",
+      "label": "setting audit log",
+      "path": "/settings/companyName/audit-log",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "whatsapp",
+      "label": "user inbox query",
+      "path": "/whatsapp/chats",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "whatsapp",
+      "label": "user inbox query",
+      "path": "/whatsapp/stats",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true,
+      "detail": {
+        "keys": [
+          "totalMessages",
+          "incoming",
+          "outgoing",
+          "uniqueChats"
+        ]
+      }
+    },
+    {
+      "page": "whatsapp",
+      "label": "user inbox query",
+      "path": "/whatsapp/contacts",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "whatsapp",
+      "label": "user inbox query",
+      "path": "/whatsapp/chats/919000000001/messages",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true
+    },
+    {
+      "page": "whatsapp",
+      "label": "Location DTO accepts numeric coordinates; provider configuration absent",
+      "path": "/whatsapp/send/location",
+      "method": "POST",
+      "status": 404,
+      "expected": null,
+      "pass": null,
+      "detail": {
+        "message": "Setting with key \"gupshupApiKey\" not found",
+        "error": "Not Found",
+        "statusCode": 404
+      },
+      "outcome": "blocked by missing integration configuration; no provider request"
+    },
+    {
+      "page": "whatsapp",
+      "label": "quick-reply payload matches frontend",
+      "path": "/whatsapp/send/quick-reply",
+      "method": "POST",
+      "status": 400,
+      "expected": 400,
+      "pass": true,
+      "detail": {
+        "message": [
+          "buttons must be a string"
+        ],
+        "error": "Bad Request",
+        "statusCode": 400
+      }
+    },
+    {
+      "page": "whatsapp",
+      "label": "list payload matches frontend",
+      "path": "/whatsapp/send/list",
+      "method": "POST",
+      "status": 400,
+      "expected": 400,
+      "pass": true,
+      "detail": {
+        "message": [
+          "header should not be empty",
+          "header must be a string",
+          "items must be a string"
+        ],
+        "error": "Bad Request",
+        "statusCode": 400
+      }
+    },
+    {
+      "page": "backups",
+      "label": "backup capabilities",
+      "path": "/admin/backups/status",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "pass": true,
+      "detail": {
+        "creationAvailable": true,
+        "restoreAvailable": true
+      }
+    }
+  ],
+  "browserInteractions": [
+    {
+      "name": "dashboard broken leads navigation",
+      "status": "completed",
+      "detail": {
+        "href": "/leads",
+        "actualRoute": "/dashboard",
+        "expected": "a leads listing"
+      },
+      "errors": []
+    },
+    {
+      "name": "campaign wizard Skip All",
+      "status": "completed",
+      "detail": {
+        "countBefore": 3,
+        "countAfter": 3,
+        "successToast": true
+      },
+      "errors": []
+    },
+    {
+      "name": "campaign wizard create and publish",
+      "status": "completed",
+      "detail": {
+        "formPublished": true,
+        "buttons": [
+          "Compact",
+          "Comfortable",
+          "",
+          "",
+          "AauditadminADMIN",
+          "",
+          "",
+          "New",
+          "Active",
+          "Active",
+          "Active",
+          "",
+          "\u2190 Back",
+          "Finish"
+        ]
+      },
+      "errors": []
+    },
+    {
+      "name": "campaign form builder update",
+      "status": "completed",
+      "detail": {
+        "text": "Form updated\nA\n\nAUDIT COMPANY\n\nWorkspace\nCompact\nComfortable\nA\nauditadmin\nADMIN\nCampaigns\n/\nAudit Campaign\nAudit Campaign\nEdit\nImport CSV\nAssign Users\n\nTotal Leads\n\n3\n\nActive Leads\n\n3\n\nForms\n\n1\n\nTeam Members\n\n2\n\nLeads3\nForms1\nTeam Members2\nSettings\nPublished\nAudit Public Form\n\n0 submissions \u00b7 4 fields\n\nEdit\nPublic Link\nCopyright by Muxro Technologies 2026\nDashboard\nCampaigns\nFollow-ups\nDND\nWhatsApp\nUsers"
+      },
+      "errors": []
+    },
+    {
+      "name": "user followup filter auto refresh",
+      "status": "completed",
+      "detail": {
+        "selects": [
+          {
+            "value": "",
+            "options": [
+              {
+                "text": "All Campaigns",
+                "value": ""
+              },
+              {
+                "text": "Audit CRUD Campaign Updated",
+                "value": "6d2740f7-cca9-4a41-a104-187ef081e645"
+              },
+              {
+                "text": "Audit Campaign",
+                "value": "d328b7dd-6850-446d-9aba-1084f3f1bdfe"
+              }
+            ]
+          },
+          {
+            "value": "",
+            "options": [
+              {
+                "text": "All Sources",
+                "value": ""
+              },
+              {
+                "text": "manual",
+                "value": "manual"
+              },
+              {
+                "text": "form",
+                "value": "form"
+              }
+            ]
+          },
+          {
+            "value": "all",
+            "options": [
+              {
+                "text": "All",
+                "value": "all"
+              },
+              {
+                "text": "Non-DND",
+                "value": "no_dnd"
+              },
+              {
+                "text": "DND",
+                "value": "dnd"
+              }
+            ]
+          },
+          {
+            "value": "",
+            "options": [
+              {
+                "text": "All Status",
+                "value": ""
+              },
+              {
+                "text": "New",
+                "value": "New"
+              },
+              {
+                "text": "New",
+                "value": "New"
+              }
+            ]
+          },
+          {
+            "value": "50",
+            "options": [
+              {
+                "text": "25",
+                "value": "25"
+              },
+              {
+                "text": "50",
+                "value": "50"
+              },
+              {
+                "text": "100",
+                "value": "100"
+              }
+            ]
+          }
+        ],
+        "selected": "New",
+        "afterRefresh": ""
+      },
+      "errors": []
+    },
+    {
+      "name": "user lead dialog update status",
+      "status": "completed",
+      "detail": {
+        "status": 200,
+        "persistedStatus": "Converted"
+      },
+      "errors": []
+    },
+    {
+      "name": "user DND removal",
+      "status": "completed",
+      "detail": {
+        "status": 200,
+        "rowStillVisible": 0
+      },
+      "errors": []
+    },
+    {
+      "name": "admin user creation form",
+      "status": "completed",
+      "detail": {
+        "status": 201,
+        "listed": 1
+      },
+      "errors": []
+    },
+    {
+      "name": "settings profile persistence",
+      "status": "completed",
+      "detail": {
+        "persistedValue": "Browser Audit Branding"
+      },
+      "errors": []
+    },
+    {
+      "name": "WhatsApp read and contact actions",
+      "status": "check failed",
+      "error": "locator.click: Timeout 5000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Open Lead', exact: true })\u001b[22m\n",
+      "errors": [],
+      "interpretation": "Confirmed separately: Contact Info panel is commented out; final-browser check records panelVisible=0."
+    },
+    {
+      "name": "data management browser ZIP export",
+      "status": "check failed",
+      "error": "page.waitForEvent: Timeout 5000ms exceeded while waiting for event \"download\"\n=========================== logs ===========================\nwaiting for event \"download\"\n============================================================",
+      "errors": [],
+      "interpretation": "Application defect: export endpoint returned 500; backend log confirms TypeError: archiver is not a function."
+    },
+    {
+      "name": "backups browser creation and download",
+      "status": "completed",
+      "detail": {
+        "status": 201,
+        "archiveSize": 58454,
+        "listed": true,
+        "file": "crm_db_2026-10-16T08-55-48-000Z-c450e2f3-e76e-4e47-a2d1-d3684f7b3874.dump"
+      },
+      "errors": []
+    },
+    {
+      "name": "public form browser validation and submission",
+      "status": "completed",
+      "detail": {
+        "emptyRejected": true,
+        "status": 201,
+        "successText": "Thank You!\n\nYour submission has been received. We will get back to you shortly.\n\nSubmit Another Response\n\n\u00a9 2026 Muxro CRM"
+      },
+      "errors": []
+    },
+    {
+      "name": "mobile page layouts",
+      "status": "completed",
+      "detail": [
+        {
+          "route": "/dashboard",
+          "viewport": 390,
+          "documentWidth": 375,
+          "bodyWidth": 375
+        },
+        {
+          "route": "/campaigns",
+          "viewport": 390,
+          "documentWidth": 375,
+          "bodyWidth": 375
+        },
+        {
+          "route": "/followups",
+          "viewport": 390,
+          "documentWidth": 375,
+          "bodyWidth": 375
+        },
+        {
+          "route": "/dnd",
+          "viewport": 390,
+          "documentWidth": 375,
+          "bodyWidth": 375
+        },
+        {
+          "route": "/admin/users",
+          "viewport": 390,
+          "documentWidth": 375,
+          "bodyWidth": 375
+        },
+        {
+          "route": "/admin/backups",
+          "viewport": 390,
+          "documentWidth": 375,
+          "bodyWidth": 375
+        },
+        {
+          "route": "/admin/data-management",
+          "viewport": 390,
+          "documentWidth": 375,
+          "bodyWidth": 375
+        },
+        {
+          "route": "/settings",
+          "viewport": 390,
+          "documentWidth": 375,
+          "bodyWidth": 375
+        },
+        {
+          "route": "/whatsapp",
+          "viewport": 390,
+          "documentWidth": 375,
+          "bodyWidth": 375
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "additionalBrowserChecks": [
+    {
+      "label": "Invalid login rejected",
+      "status": 401,
+      "stayedOnLogin": true
+    },
+    {
+      "label": "Login survives browser reload",
+      "route": "/dashboard"
+    },
+    {
+      "label": "Settings reports success despite failed saves",
+      "successToast": true,
+      "failedRequests": [
+        {
+          "path": "/api/v1/settings/appLogoUrl",
+          "status": 404
+        },
+        {
+          "path": "/api/v1/settings",
+          "status": 400
+        },
+        {
+          "path": "/api/v1/settings/appLogoUrl",
+          "status": 404
+        },
+        {
+          "path": "/api/v1/settings/companyEmail",
+          "status": 404
+        },
+        {
+          "path": "/api/v1/settings",
+          "status": 400
+        },
+        {
+          "path": "/api/v1/settings/companyEmail",
+          "status": 404
+        },
+        {
+          "path": "/api/v1/settings/companyPhone",
+          "status": 404
+        },
+        {
+          "path": "/api/v1/settings",
+          "status": 400
+        },
+        {
+          "path": "/api/v1/settings/companyPhone",
+          "status": 404
+        },
+        {
+          "path": "/api/v1/settings/companyAddress",
+          "status": 404
+        },
+        {
+          "path": "/api/v1/settings",
+          "status": 400
+        },
+        {
+          "path": "/api/v1/settings/companyAddress",
+          "status": 404
+        }
+      ],
+      "missingOptionalPhoneStatus": 404
+    },
+    {
+      "label": "Full campaign wizard create/publish/assign",
+      "status": 201
+    },
+    {
+      "label": "Contact Info button does not render its panel",
+      "panelVisible": 0,
+      "messagesVisible": 5
+    },
+    {
+      "label": "Expired/missing access cookie refresh",
+      "refreshStatuses": [
+        201
+      ],
+      "route": "/dashboard"
+    },
+    {
+      "label": "Logout not located by harness",
+      "buttons": [
+        "Compact",
+        "Comfortable",
+        "",
+        "",
+        "AauditadminADMIN",
+        "Sign out",
+        "Refresh"
+      ]
+    }
+  ],
+  "targetedChecks": [
+    {
+      "label": "Campaign member can read another owners form submission",
+      "status": 200,
+      "containsOtherOwnerSubmission": true,
+      "sameLeadAccessStatus": 403
+    },
+    {
+      "label": "Transferred lead remains in old owners notifications",
+      "status": 200,
+      "leaked": true,
+      "currentLeadAccessStatus": 403
+    },
+    {
+      "label": "Notification sync retains transferred lead",
+      "leakedAfterSync": true
+    },
+    {
+      "label": "Public form accepts 1.2MB file but submission rejected",
+      "status": 413,
+      "uiMaxBytes": 4194304,
+      "rawFileBytes": 1228800,
+      "submitMessage": "{\"statusCode\":413,\"message\":\"request entity too large\"}"
+    },
+    {
+      "label": "Inactive campaigns still accept published public forms",
+      "readStatus": 200,
+      "submitStatus": 201,
+      "leadCreated": true
+    },
+    {
+      "label": "String false DND coercion",
+      "status": 200,
+      "persistedDnd": true
+    },
+    {
+      "label": "Form submissions pagination ignored",
+      "databaseCount": 54,
+      "firstPageRows": 50,
+      "secondPageRows": 50,
+      "sameRows": true
+    },
+    {
+      "label": "Campaign form count missing",
+      "apiCountField": null,
+      "actualSubmissions": 54
+    },
+    {
+      "label": "User cannot access data management /admin/data-export/download",
+      "status": 403
+    },
+    {
+      "label": "User cannot access data management /admin/data-export/all",
+      "status": 403
+    }
+  ],
+  "destructiveChecks": [
+    {
+      "label": "Fresh audit backup",
+      "status": 201,
+      "size": 61140
+    },
+    {
+      "label": "Backup download",
+      "status": 200,
+      "size": 61140,
+      "matchesCatalogSize": true,
+      "customArchiveMagic": true
+    },
+    {
+      "label": "Restore requires explicit confirmation",
+      "status": 400
+    },
+    {
+      "label": "Delete all works without confirmation but retains WhatsApp",
+      "status": 200,
+      "countsBefore": {
+        "campaigns": 5,
+        "leads": 11,
+        "messages": 4,
+        "contacts": 4
+      },
+      "countsAfter": {
+        "campaigns": 0,
+        "leads": 0,
+        "messages": 4,
+        "contacts": 4
+      },
+      "declaredCounts": {
+        "deletedFollowups": 18,
+        "deletedLeads": 11,
+        "deletedEnquiries": 55,
+        "deletedForms": 3,
+        "deletedStatuses": 19,
+        "deletedCampaignUsers": 7,
+        "deletedCampaigns": 5
+      }
+    },
+    {
+      "label": "Restore recovers audit data",
+      "status": 201,
+      "requiresLogin": true,
+      "countsRestored": {
+        "campaigns": 5,
+        "leads": 11,
+        "messages": 4,
+        "contacts": 4
+      },
+      "sameCounts": true
+    },
+    {
+      "label": "Restore invalidates old auth session",
+      "status": 401
+    }
+  ],
+  "loginAndDates": [
+    {
+      "label": "Explicit daily trend start date shifted back 30 days",
+      "status": 200,
+      "firstReturnedDate": "2026-09-01",
+      "lastReturnedDate": "2026-10-16",
+      "rowCount": 46,
+      "expectedFirst": "2026-10-01",
+      "expectedCount": 16
+    },
+    {
+      "label": "Browser sign out",
+      "route": "/login",
+      "profileStatus": 401
+    }
+  ],
+  "mobileAndLogo": [
+    {
+      "label": "Mobile WhatsApp composer viewport",
+      "viewport": 390,
+      "composer": {
+        "x": 398,
+        "y": 624,
+        "width": 177,
+        "height": 24
+      },
+      "sendButton": {
+        "x": 596,
+        "y": 617,
+        "width": 16,
+        "height": 40
+      },
+      "composerOutsideViewport": true
+    },
+    {
+      "label": "Settings advertises SVG but rejects it",
+      "advertised": 1,
+      "status": 400,
+      "message": {
+        "message": "Upload a PNG, JPEG, or WebP image up to 2 MB with a matching file extension",
+        "error": "Bad Request",
+        "statusCode": 400
+      }
+    }
+  ],
+  "methodologyNotes": [
+    "The initial Vite audit server had the wrong working directory; it was corrected and page sweeps/interactions repeated. Only corrected runs are included.",
+    "Two exploratory requests targeted nonexistent /admin/data-export/stats. Those harness-only observations are omitted; actual download/delete authorization was verified separately.",
+    "Initial selectors for Create Form, Edit Form and Log out did not match Next, Edit and Sign out. They were corrected and relevant workflows rerun.",
+    "External delivery and IndiaMART/Process Sutra were not exercised. HTTP 404 missing provider settings is classified as unconfigured, not a location DTO failure.",
+    "Auth storage, cookies, environment files, credential values and request headers are excluded. Persisted business data is synthetic."
+  ],
+  "cleanup": {
+    "auditServices": "stopped",
+    "disposableDatabasesRemoved": 2,
+    "authStateFiles": "removed",
+    "existingDevelopmentServices": "health checked"
+  }
+}

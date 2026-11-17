@@ -1,0 +1,1 @@
+ALTER TABLE "Setting" ALTER COLUMN "encryptedValue" SET DATA TYPE text;

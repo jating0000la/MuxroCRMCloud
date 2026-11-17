@@ -1,0 +1,1468 @@
+import GupshupTemplateEditor from '../../components/communication/GupshupTemplateEditor';
+import { templateError, type TemplateMessageConfig } from '../../services/gupshupTemplates';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationContext';
+import { campaignService } from '../../services/campaigns';
+import { leadService } from '../../services/leads';
+import { formService } from '../../services/forms';
+import { bulkImportService } from '../../services/bulkImport';
+import { statusService } from '../../services/statuses';
+import { userService } from '../../services/users';
+import { Campaign, Lead, Form, User } from '../../types';
+import Layout from '../../components/layout/Layout';
+import Pagination from '../../components/common/Pagination';
+import toast from 'react-hot-toast';
+import LeadDetailDialog from '../../components/leads/LeadDetailDialog';
+import FormBuilder from '../../components/forms/FormBuilder';
+
+const STATUS_COLORS = [
+  '#3B82F6', '#F59E0B', '#10B981', '#059669', '#EF4444',
+  '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#F97316',
+];
+
+const DEFAULT_LEAD_PAGE_SIZE = 50;
+
+export default function CampaignDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { syncWithDelay } = useNotifications();
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [forms, setForms] = useState<Form[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'leads' | 'forms' | 'users' | 'settings'>('leads');
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showFormBuilder, setShowFormBuilder] = useState(false);
+  const [showAssignUsers, setShowAssignUsers] = useState(false);
+  const [showTransferLead, setShowTransferLead] = useState(false);
+  const [transferLead, setTransferLead] = useState<Lead | null>(null);
+  const [transferCampaignId, setTransferCampaignId] = useState('');
+  const [transferDoerId, setTransferDoerId] = useState('');
+  const [transferringLead, setTransferringLead] = useState(false);
+  const [assignUserIds, setAssignUserIds] = useState<string[]>([]);
+  const [assigningUsers, setAssigningUsers] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [editingForm, setEditingForm] = useState<Form | null>(null);
+  const [leadSearch, setLeadSearch] = useState('');
+  const [leadStatusFilter, setLeadStatusFilter] = useState('');
+    const [leadUserFilter, setLeadUserFilter] = useState('');
+  const [leadPage, setLeadPage] = useState(1);
+  const [leadPageSize, setLeadPageSize] = useState(DEFAULT_LEAD_PAGE_SIZE);
+  const [file, setFile] = useState<File | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Bulk selection
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [bulkAction, setBulkAction] = useState<'status' | 'assign' | 'delete' | null>(null);
+  const [bulkStatusId, setBulkStatusId] = useState('');
+  const [bulkDoerId, setBulkDoerId] = useState('');
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+
+  // Status management
+  const [newStatusLabel, setNewStatusLabel] = useState('');
+  const [newStatusColor, setNewStatusColor] = useState(STATUS_COLORS[0]);
+  const [newStatusWhatsapp, setNewStatusWhatsapp] = useState('');
+  const [newStatusTemplate, setNewStatusTemplate] = useState<TemplateMessageConfig | null>(null);
+  const [addingStatus, setAddingStatus] = useState(false);
+  const [editingStatusId, setEditingStatusId] = useState<string | null>(null);
+  const [editStatusWhatsapp, setEditStatusWhatsapp] = useState('');
+  const [editStatusTemplate, setEditStatusTemplate] = useState<TemplateMessageConfig | null>(null);
+  const templateFields = useMemo(() => {
+    const fields = new Map([['name', 'Name'], ['phone', 'Phone'], ['email', 'Email'], ['source', 'Source']]);
+    for (const form of forms) for (const field of form.fields || []) if (!field.name.startsWith('__') && field.type !== 'file') fields.set(field.name, field.label);
+    return [...fields].map(([tag, label]) => ({ tag, label }));
+  }, [forms]);
+
+  // Campaign edit
+  const [editingCampaign, setEditingCampaign] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [savingCampaign, setSavingCampaign] = useState(false);
+
+  const canManage = user?.role === 'ADMIN';
+
+  // Escape key to close modals — uses refs to avoid stale closures from dependency array
+  const modalsRef = useRef({ showFormBuilder, showBulkImport, showAssignUsers, editingCampaign, selectedLead });
+  modalsRef.current = { showFormBuilder, showBulkImport, showAssignUsers, editingCampaign, selectedLead };
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        const m = modalsRef.current;
+        if (m.showFormBuilder) { setShowFormBuilder(false); setEditingForm(null); }
+        else if (m.showBulkImport) { setShowBulkImport(false); setFile(null); }
+        else if (m.showAssignUsers) setShowAssignUsers(false);
+        else if (m.editingCampaign) setEditingCampaign(false);
+        else if (m.selectedLead) setSelectedLead(null);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
+
+  // Bulk actions
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeadIds((prev) =>
+      prev.includes(leadId) ? prev.filter((id) => id !== leadId) : [...prev, leadId]
+    );
+  };
+
+  const toggleSelectAllLeads = () => {
+    if (selectedLeadIds.length === paginatedLeads.length) {
+      setSelectedLeadIds([]);
+    } else {
+      setSelectedLeadIds(paginatedLeads.map((l) => l.id));
+    }
+  };
+
+  const handleBulkAction = async () => {
+    if (selectedLeadIds.length === 0 || !bulkAction) return;
+    setBulkProcessing(true);
+    try {
+      if (bulkAction === 'status' && bulkStatusId) {
+        const BATCH = 25;
+        for (let i = 0; i < selectedLeadIds.length; i += BATCH) {
+          await Promise.all(
+            selectedLeadIds.slice(i, i + BATCH).map((leadId) =>
+              leadService.updateStatus(leadId, { status: bulkStatusId, statusId: bulkStatusId })
+            )
+          );
+        }
+        toast.success(`Updated ${selectedLeadIds.length} lead(s)`);
+      } else if (bulkAction === 'assign' && bulkDoerId) {
+        const BATCH = 25;
+        for (let i = 0; i < selectedLeadIds.length; i += BATCH) {
+          await Promise.all(
+            selectedLeadIds.slice(i, i + BATCH).map((leadId) =>
+              leadService.update(leadId, { doerId: bulkDoerId } as any)
+            )
+          );
+        }
+        toast.success(`Assigned ${selectedLeadIds.length} lead(s)`);
+      } else if (bulkAction === 'delete') {
+        if (!confirm(`Delete ${selectedLeadIds.length} selected lead(s)? This cannot be undone.`)) {
+          setBulkProcessing(false);
+          return;
+        }
+        const BATCH = 25;
+        for (let i = 0; i < selectedLeadIds.length; i += BATCH) {
+          await Promise.all(
+            selectedLeadIds.slice(i, i + BATCH).map((leadId) => leadService.remove(leadId))
+          );
+        }
+        toast.success(`Deleted ${selectedLeadIds.length} lead(s)`);
+      }
+      setSelectedLeadIds([]);
+      setBulkAction(null);
+      setBulkStatusId('');
+      setBulkDoerId('');
+      loadData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Bulk action failed');
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      const [campaignData, leadsData, formsData, assignedUsers, allCampaigns] = await Promise.all([
+        campaignService.getOne(id!),
+        leadService.getByCampaign(id!),
+        formService.getByCampaign(id!),
+        campaignService.getAssignedUsers(id!),
+        campaignService.getAll(),
+      ]);
+      setCampaign(campaignData);
+      setCampaigns(allCampaigns);
+      setLeads(leadsData);
+      setForms(formsData);
+      setUsers(assignedUsers.map((au: any) => au.user!).filter(Boolean));
+
+      if (canManage) {
+        const allUsersData = await userService.getAll();
+        const filteredUsers = allUsersData.filter((u: User) => u.role === 'USER');
+        setAllUsers(filteredUsers);
+      }
+    } catch (error: any) {
+      if (error.response?.status === 403) {
+        toast.error('You do not have access to this campaign');
+      } else {
+        toast.error('Failed to load campaign data');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+
+    loadData();
+    return () => { cancelled = true; };
+  }, [id, canManage]);
+
+  const handleSaveCampaign = async () => {
+    if (!editName.trim()) {
+      toast.error('Campaign name is required');
+      return;
+    }
+    setSavingCampaign(true);
+    try {
+      const updated = await campaignService.update(id!, {
+        name: editName.trim(),
+        description: editDescription.trim() || undefined,
+        isActive: editIsActive,
+      });
+      setCampaign(updated);
+      setEditingCampaign(false);
+      toast.success('Campaign updated');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to update campaign');
+    } finally {
+      setSavingCampaign(false);
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleBulkImport = async () => {
+    if (!file) return;
+    setImporting(true);
+    try {
+      const result = await bulkImportService.importCSV(id!, file);
+      toast.success(`Successfully imported ${result.imported} leads`);
+      setShowBulkImport(false);
+      setFile(null);
+      loadData();
+    } catch (error: any) {
+      if (error.response?.status === 403) {
+        toast.error('You do not have permission to import leads');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to import leads');
+      }
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleAssignUsers = async (userIds: string[]) => {
+    if (userIds.length === 0 && !confirm('Remove all users from this campaign? New leads cannot be assigned until a telecaller is added.')) {
+      return;
+    }
+    setAssigningUsers(true);
+    try {
+      await campaignService.assignUsers(id!, userIds);
+      toast.success('Users assigned successfully');
+      setShowAssignUsers(false);
+      loadData();
+      syncWithDelay(500); // Sync notifications after users assigned
+    } catch (error: any) {
+      if (error.response?.status === 403) {
+        toast.error('You do not have permission to assign users');
+      } else {
+        toast.error('Failed to assign users');
+      }
+    } finally {
+      setAssigningUsers(false);
+    }
+  };
+
+  const openAssignUsers = () => {
+    setAssignUserIds(users.map((assignedUser) => assignedUser.id));
+    setShowAssignUsers(true);
+  };
+
+  const openTransferLead = (lead: Lead) => {
+    setTransferLead(lead);
+    setTransferCampaignId('');
+    setTransferDoerId('');
+    setShowTransferLead(true);
+  };
+
+  const handleTransferLead = async () => {
+    if (!transferLead || !transferCampaignId || !transferDoerId) return;
+    setTransferringLead(true);
+    try {
+      await leadService.update(transferLead.id, { campaignId: transferCampaignId, doerId: transferDoerId } as any);
+      toast.success(`Lead transferred to ${campaign?.name || 'selected campaign'}`);
+      setShowTransferLead(false);
+      setTransferLead(null);
+      setTransferCampaignId('');
+      setTransferDoerId('');
+      loadData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to transfer lead');
+    } finally {
+      setTransferringLead(false);
+    }
+  };
+
+  const toggleAssignUser = (userId: string) => {
+      setAssignUserIds((prev) =>
+        prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+      );
+    };
+
+  const handleCreateForm = async (title: string, fields: any[]) => {
+    try {
+      const form = await formService.create(id!, { title, fields });
+      await formService.publish(id!, form.id);
+      toast.success('Form created and published');
+      setShowFormBuilder(false);
+      loadData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to create form');
+    }
+  };
+
+  const handleUpdateForm = async (title: string, fields: any[]) => {
+    if (!editingForm) return;
+    try {
+      await formService.update(id!, editingForm.id, { title, fields } as any);
+      toast.success('Form updated');
+      setEditingForm(null);
+      setShowFormBuilder(false);
+      loadData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to update form');
+    }
+  };
+
+  const filteredLeads = useMemo(() => leads.filter((lead) => {
+    const matchSearch =
+      !leadSearch ||
+      lead.name.toLowerCase().includes(leadSearch.toLowerCase()) ||
+      lead.email?.toLowerCase().includes(leadSearch.toLowerCase()) ||
+      lead.phone?.includes(leadSearch);
+    const matchStatus = !leadStatusFilter || lead.statusId === leadStatusFilter;
+    const matchUser = !leadUserFilter || lead.doerId === leadUserFilter;
+    return matchSearch && matchStatus && matchUser;
+  }), [leads, leadSearch, leadStatusFilter, leadUserFilter]);
+
+  const totalLeadPages = Math.max(1, Math.ceil(filteredLeads.length / leadPageSize));
+  const currentLeadPage = Math.min(leadPage, totalLeadPages);
+  const paginatedLeads = filteredLeads.slice((currentLeadPage - 1) * leadPageSize, currentLeadPage * leadPageSize);
+
+  useEffect(() => {
+    setLeadPage(1);
+    }, [leadSearch, leadStatusFilter, leadPageSize, leadUserFilter]);
+
+  const clearLeadFilters = () => {
+    setLeadSearch('');
+    setLeadStatusFilter('');
+      setLeadUserFilter('');
+    };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="p-8 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!campaign) {
+    return (
+      <Layout>
+        <div className="p-8 text-center">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Campaign not found</h2>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <div className="sleek-page p-3 lg:p-4">
+        {/* Header */}
+        <div className="mb-3">
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              onClick={() => navigate('/campaigns')}
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
+              title="Back to campaigns"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
+              <span>Campaigns</span>
+              <span>/</span>
+              <span className="text-gray-900 dark:text-gray-100">{campaign.name}</span>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{campaign.name}</h1>
+              {campaign.description && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{campaign.description}</p>
+              )}
+            </div>
+            {canManage && (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    setEditName(campaign.name);
+                    setEditDescription(campaign.description || '');
+                    setEditIsActive(campaign.isActive);
+                    setEditingCampaign(true);
+                  }}
+                  className="inline-flex items-center px-2.5 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/50 text-xs font-semibold"
+                >
+                  <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Edit
+                </button>
+                <button
+                  onClick={() => setShowBulkImport(true)}
+                  className="inline-flex items-center px-2.5 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 text-xs font-semibold"
+                >
+                  <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Import CSV
+                </button>
+                {forms.length === 0 && (
+                  <button
+                    onClick={() => setShowFormBuilder(true)}
+                    className="inline-flex items-center px-2.5 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-xs font-semibold"
+                  >
+                    <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    New Form
+                  </button>
+                )}
+                <button
+                  onClick={openAssignUsers}
+                  className="inline-flex items-center px-2.5 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-xs font-semibold"
+                >
+                  <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                  </svg>
+                  Assign Users
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Stats Bar */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+          {[
+            { label: 'Total Leads', value: leads.length, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+            { label: 'Active Leads', value: leads.filter((l) => l.statusId).length, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/20' },
+            { label: 'Forms', value: forms.length, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/20' },
+            { label: 'Team Members', value: users.length, color: 'text-primary-600 dark:text-primary-400', bg: 'bg-primary-50 dark:bg-primary-900/20' },
+          ].map((stat) => (
+            <div key={stat.label} className={`${stat.bg} rounded-lg px-3 py-2`}>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{stat.label}</p>
+              <p className={`text-lg font-bold ${stat.color}`}>{stat.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Tabs */}
+        <div className="border-b border-gray-200 dark:border-b dark:border-gray-700 mb-3">
+          <nav className="flex space-x-8">
+            {([
+              { key: 'leads' as const, label: 'Leads', count: leads.length },
+              { key: 'forms' as const, label: 'Forms', count: forms.length },
+              { key: 'users' as const, label: 'Team Members', count: users.length },
+              ...(canManage ? [{ key: 'settings' as const, label: 'Settings', count: 0 }] : []),
+            ]).map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === tab.key
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
+              >
+                {tab.label}
+                {tab.key !== 'settings' && (
+                  <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
+                    activeTab === tab.key ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* Leads Tab */}
+        {activeTab === 'leads' && (
+          <div>
+            {/* Leads Table */}
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden dark:bg-gray-800 dark:border-gray-700">
+              <div className="border-b border-gray-200 bg-gray-50/80 px-3 py-2 dark:border-b dark:border-gray-700 dark:bg-gray-900/50">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
+                                  <div className="lg:col-span-4 relative">
+                    <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search leads"
+                      value={leadSearch}
+                      onChange={(e) => setLeadSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                    />
+                  </div>
+                  <select
+                    value={leadStatusFilter}
+                    onChange={(e) => setLeadStatusFilter(e.target.value)}
+                    className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                  >
+                    <option value="">All status</option>
+                    {campaign.statuses?.map((s) => (
+                      <option key={s.id} value={s.id}>{s.label}</option>
+                    ))}
+                  </select>
+                                  <select
+                                    value={leadUserFilter}
+                                    onChange={(e) => setLeadUserFilter(e.target.value)}
+                                    className="lg:col-span-2 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                                  >
+                                    <option value="">All users</option>
+                                    {users.map((u) => (
+                                      <option key={u.id} value={u.id}>{u.name || u.username}</option>
+                                    ))}
+                                  </select>
+                                  <div className="lg:col-span-4 flex items-center justify-end gap-2 flex-wrap">
+                    <select
+                      value={leadPageSize}
+                      onChange={(e) => setLeadPageSize(Number(e.target.value))}
+                      className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <button
+                      onClick={clearLeadFilters}
+                      className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      onClick={loadData}
+                      className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Showing {paginatedLeads.length} of {filteredLeads.length} filtered leads ({leads.length} total)
+                </div>
+              </div>
+
+              {/* Bulk Action Bar */}
+              {selectedLeadIds.length > 0 && (
+                <div className="bg-primary-50 dark:bg-primary-900/20 border-b border-primary-200 dark:border-primary-800 px-3 py-2 flex items-center gap-3 flex-wrap">
+                  <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
+                    {selectedLeadIds.length} selected
+                  </span>
+                  <select
+                    value={bulkAction || ''}
+                    onChange={(e) => setBulkAction(e.target.value as 'status' | 'assign' | 'delete' || null)}
+                    className="px-2 py-1 text-sm border border-primary-300 rounded-md dark:bg-gray-700 dark:border-primary-700 dark:text-gray-100"
+                  >
+                    <option value="">Bulk action...</option>
+                    <option value="status">Change Status</option>
+                    <option value="assign">Assign To</option>
+                    <option value="delete">Delete</option>
+                  </select>
+                  {bulkAction === 'status' && (
+                    <select
+                      value={bulkStatusId}
+                      onChange={(e) => setBulkStatusId(e.target.value)}
+                      className="px-2 py-1 text-sm border border-primary-300 rounded-md dark:bg-gray-700 dark:border-primary-700 dark:text-gray-100"
+                    >
+                      <option value="">Select status</option>
+                      {campaign.statuses?.map((s) => (
+                        <option key={s.id} value={s.id}>{s.label}</option>
+                      ))}
+                    </select>
+                  )}
+                  {bulkAction === 'assign' && (
+                    <select
+                      value={bulkDoerId}
+                      onChange={(e) => setBulkDoerId(e.target.value)}
+                      className="px-2 py-1 text-sm border border-primary-300 rounded-md dark:bg-gray-700 dark:border-primary-700 dark:text-gray-100"
+                    >
+                      <option value="">Select user</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    onClick={handleBulkAction}
+                    disabled={bulkProcessing || !bulkAction || (bulkAction === 'status' && !bulkStatusId) || (bulkAction === 'assign' && !bulkDoerId)}
+                    className={`px-3 py-1 rounded-md text-sm font-medium disabled:opacity-50 ${
+                      bulkAction === 'delete'
+                        ? 'bg-red-600 text-white hover:bg-red-700'
+                        : 'bg-primary-600 text-white hover:bg-primary-700'
+                    }`}
+                  >
+                    {bulkProcessing ? 'Processing...' : 'Apply'}
+                  </button>
+                  <button
+                    onClick={() => { setSelectedLeadIds([]); setBulkAction(null); setBulkStatusId(''); setBulkDoerId(''); }}
+                    className="px-2 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-900/50">
+                    <tr>
+                      <th className="px-3 py-2 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedLeadIds.length === paginatedLeads.length && paginatedLeads.length > 0}
+                          onChange={toggleSelectAllLeads}
+                          className="w-4 h-4 text-primary-600 rounded"
+                        />
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Contact</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Doer</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Source</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {paginatedLeads.map((lead) => (
+                      <tr key={lead.id} className={`transition-colors ${selectedLeadIds.includes(lead.id) ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
+                        <td className="px-3 py-2.5">
+                          <input
+                            type="checkbox"
+                            checked={selectedLeadIds.includes(lead.id)}
+                            onChange={() => toggleLeadSelection(lead.id)}
+                            className="w-4 h-4 text-primary-600 rounded"
+                          />
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center">
+                            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center dark:bg-primary-900/30">
+                              <span className="text-sm font-medium text-primary-700 dark:text-primary-300">{lead.name.charAt(0)}</span>
+                            </div>
+                            <span className="ml-2.5 font-medium text-gray-900 dark:text-gray-100 text-sm">{lead.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <div className="text-sm text-gray-900 dark:text-gray-100 leading-tight">{lead.email || '-'}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">{lead.phone || '-'}</div>
+                        </td>
+                        <td className="px-3 py-2.5 text-sm text-gray-500 dark:text-gray-400">
+                          {lead.doer?.name || <span className="text-gray-400 italic">Unassigned</span>}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {lead.status ? (
+                            <span
+                              className="inline-flex max-w-[120px] truncate rounded-full px-2 py-1 text-xs font-medium"
+                              style={{
+                                backgroundColor: (lead.status.color || '#9CA3AF') + '20',
+                                color: lead.status.color || '#9CA3AF',
+                              }}
+                              title={lead.status.label}
+                            >
+                              {lead.status.label}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400 dark:text-gray-500">No status</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                            lead.source === 'form' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                            lead.source === 'bulk' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                            lead.source === 'indiamart' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                            'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                          }`}>
+                            {lead.source}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setSelectedLead(lead)}
+                              className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                            >
+                              View Details
+                            </button>
+                            {canManage && (
+                              <>
+                                <button
+                                  onClick={() => openTransferLead(lead)}
+                                  className="text-sm font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                                >
+                                  Transfer
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm(`Delete lead "${lead.name}"?`)) return;
+                                    try {
+                                      await leadService.remove(lead.id);
+                                      toast.success('Lead deleted');
+                                      loadData();
+                                    } catch (error: any) {
+                                      toast.error(error.response?.data?.message || 'Failed to delete lead');
+                                    }
+                                  }}
+                                  className="text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                                >
+                                  Delete
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                page={currentLeadPage}
+                pageSize={leadPageSize}
+                totalItems={filteredLeads.length}
+                onPageChange={setLeadPage}
+              />
+              {filteredLeads.length === 0 && (
+                <div className="text-center py-12">
+                  <svg className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No leads found</h3>
+                  <p className="text-gray-500 dark:text-gray-400 mt-1">
+                    {leadSearch || leadStatusFilter ? 'Try adjusting your filters' : 'Import leads or create a form to get started'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Forms Tab */}
+        {activeTab === 'forms' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {forms.map((form) => (
+              <div key={form.id} className="bg-white rounded-xl shadow-sm border p-5 dark:bg-gray-800 dark:border-gray-700">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center dark:bg-purple-900/30">
+                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
+                    form.isPublished ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                  }`}>
+                    {form.isPublished ? 'Published' : 'Draft'}
+                  </span>
+                </div>
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">{form.title}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                  {form._count?.submissions || 0} submissions · {form.fields?.length || 0} fields
+                </p>
+                {canManage && (
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      onClick={() => {
+                        setEditingForm(form);
+                        setShowFormBuilder(true);
+                      }}
+                      className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/50 text-sm font-medium"
+                    >
+                      <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      Edit
+                    </button>
+                    {form.isPublished && (
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Unpublish form "${form.title}"?`)) return;
+                          try {
+                            await formService.unpublish(id!, form.id);
+                            toast.success('Form unpublished');
+                            loadData();
+                          } catch (error: any) {
+                            toast.error(error.response?.data?.message || 'Failed to unpublish');
+                          }
+                        }}
+                        className="px-3 py-2 border border-amber-200 text-amber-600 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 text-sm font-medium"
+                        title="Unpublish form"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                      </button>
+                    )}
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`Delete form "${form.title}"?`)) return;
+                        try {
+                          await formService.remove(id!, form.id);
+                          toast.success('Form deleted');
+                          loadData();
+                        } catch (error: any) {
+                          toast.error(error.response?.data?.message || 'Failed to delete');
+                        }
+                      }}
+                      aria-label="Delete form"
+                      className="px-3 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {form.isPublished && (
+                  <div className="bg-gray-50 rounded-lg p-3 dark:bg-gray-900/50">
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1">Public Link</label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={`${window.location.origin}/form/${form.publicSlug}`}
+                        className="flex-1 text-xs text-primary-600 bg-transparent border-none p-0"
+                      />
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}/form/${form.publicSlug}`);
+                          toast.success('Link copied!');
+                        }}
+                        aria-label="Copy link"
+                        className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                      >
+                        <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {forms.length === 0 && (
+              <div className="col-span-full text-center py-12 bg-white rounded-xl border dark:bg-gray-800 dark:border-gray-700">
+                <svg className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No form yet</h3>
+                <p className="text-gray-500 dark:text-gray-400 mt-1 mb-4">Create a form to collect enquiries. Each campaign can have one form.</p>
+            {canManage && (
+                  <button
+                    onClick={() => setShowFormBuilder(true)}
+                    className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  >
+                    Create Form
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <div className="bg-white rounded-xl shadow-sm border overflow-hidden dark:bg-gray-800 dark:border-gray-700">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+              {users.map((u) => (
+                <div key={u.id} className="flex items-center p-4 bg-gray-50 rounded-xl dark:bg-gray-900/50">
+                  <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center dark:bg-primary-900/30">
+                    <span className="text-sm font-medium text-primary-700 dark:text-primary-300">{u.name.charAt(0)}</span>
+                  </div>
+                  <div className="ml-3">
+                    <p className="font-medium text-gray-900 dark:text-gray-100">{u.name}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{u.username}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {users.length === 0 && (
+              <div className="text-center py-12">
+                <svg className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No team members</h3>
+                <p className="text-gray-500 dark:text-gray-400 mt-1">Assign users to this campaign</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && canManage && (
+          <div className="space-y-6">
+            {/* Status Management */}
+            <div className="bg-white rounded-xl shadow-sm border p-6 dark:bg-gray-800 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Lead Statuses</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Customize the status options for leads in this campaign</p>
+                </div>
+              </div>
+
+              {/* Add New Status */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6 dark:bg-gray-900/50">
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Add New Status</h4>
+                <div className="flex items-end gap-3">
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Status Label</label>
+                    <input
+                      type="text"
+                      value={newStatusLabel}
+                      onChange={(e) => setNewStatusLabel(e.target.value)}
+                      placeholder="e.g., Qualified, Proposal Sent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={newStatusColor}
+                        onChange={(e) => setNewStatusColor(e.target.value)}
+                        className="w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer"
+                      />
+                      <div className="flex flex-wrap gap-1">
+                        {STATUS_COLORS.slice(0, 5).map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => setNewStatusColor(color)}
+                            className={`w-6 h-6 rounded-full border-2 ${
+                              newStatusColor === color ? 'border-gray-600' : 'border-transparent'
+                            }`}
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!newStatusLabel.trim()) {
+                        toast.error('Please enter a status label');
+                        return;
+                      }
+                      setAddingStatus(true);
+                      try {
+                        await statusService.create(id!, {
+                          label: newStatusLabel.trim(),
+                          color: newStatusColor,
+                          whatsappMessage: newStatusTemplate ? '' : newStatusWhatsapp.trim() || undefined,
+                          whatsappTemplate: newStatusTemplate,
+                        });
+                        toast.success('Status added');
+                        setNewStatusLabel('');
+                        setNewStatusColor(STATUS_COLORS[0]);
+                        setNewStatusWhatsapp('');
+                        setNewStatusTemplate(null);
+                        loadData();
+                      } catch (error) {
+                        toast.error(templateError(error, 'Failed to add status'));
+                      } finally {
+                        setAddingStatus(false);
+                      }
+                    }}
+                    disabled={addingStatus || !newStatusLabel.trim()}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {addingStatus ? 'Adding...' : 'Add Status'}
+                  </button>
+                </div>
+                <div className="mt-3">
+                  <div className="mb-4"><GupshupTemplateEditor value={newStatusTemplate} onChange={setNewStatusTemplate} fields={templateFields} /></div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Legacy session text (optional; used only when no template is selected)</label>
+                  <textarea
+                    value={newStatusWhatsapp}
+                    onChange={(e) => setNewStatusWhatsapp(e.target.value)}
+                    placeholder="e.g., Hi {{name}}, we tried reaching you. Please call us back."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 h-16"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">Select sending in the lead status dialog to queue this status’s approved template. Legacy text requires an existing WhatsApp session. Use {'{{name}}'}, {'{{phone}}'}, {'{{email}}'} for field values.</p>
+                </div>
+              </div>
+
+              {/* Current Statuses */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Current Statuses</h4>
+                <div className="space-y-2">
+                  {campaign.statuses?.map((status) => {
+                    const leadCount = leads.filter((l) => l.statusId === status.id).length;
+                    const isEditing = editingStatusId === status.id;
+                    return (
+                      <div
+                        key={status.id}
+                        className="p-3 bg-gray-50 rounded-lg dark:bg-gray-900/50"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-4 h-4 rounded-full"
+                              style={{ backgroundColor: status.color }}
+                            />
+                            <span className="font-medium text-gray-900 dark:text-gray-100">{status.label}</span>
+                            <span className="text-sm text-gray-500 dark:text-gray-400">({leadCount} leads)</span>
+                            {(status.whatsappMessage || status.whatsappTemplate) && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">WA</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                if (isEditing) {
+                                  setEditingStatusId(null);
+                                } else {
+                                  setEditingStatusId(status.id);
+                                  setEditStatusWhatsapp(status.whatsappMessage || '');
+                                  setEditStatusTemplate(status.whatsappTemplate || null);
+                                }
+                              }}
+                              className="p-1.5 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
+                              title="Edit WhatsApp message"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (leadCount > 0) {
+                                  toast.error(`Cannot delete "${status.label}" - ${leadCount} lead(s) are using it`);
+                                  return;
+                                }
+                                if (!confirm(`Delete status "${status.label}"?`)) return;
+                                try {
+                                  await statusService.remove(id!, status.id);
+                                  toast.success('Status deleted');
+                                  loadData();
+                                } catch (error: any) {
+                                  toast.error(error.response?.data?.message || 'Failed to delete status');
+                                }
+                              }}
+                              aria-label="Delete status"
+                              className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        {isEditing && (
+                          <div className="mt-3 pl-7">
+                            <div className="mb-4"><GupshupTemplateEditor value={editStatusTemplate} onChange={setEditStatusTemplate} fields={templateFields} /></div>
+                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Legacy session text for "{status.label}" (within an existing customer session)</label>
+                            <textarea
+                              value={editStatusWhatsapp}
+                              onChange={(e) => setEditStatusWhatsapp(e.target.value)}
+                              placeholder="e.g., Hi {{name}}, we tried reaching you. Please call us back."
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 h-16"
+                            />
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await statusService.update(id!, status.id, {
+                                      whatsappMessage: editStatusTemplate ? '' : editStatusWhatsapp.trim(),
+                                      whatsappTemplate: editStatusTemplate,
+                                    });
+                                    toast.success('WhatsApp message saved');
+                                    setEditingStatusId(null);
+                                    loadData();
+                                  } catch (error) {
+                                    toast.error(templateError(error, 'Failed to save'));
+                                  }
+                                }}
+                                className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setEditingStatusId(null)}
+                                className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                            <p className="text-[11px] text-gray-400 mt-1">Use {'{{name}}'}, {'{{phone}}'}, {'{{email}}'} for field values</p>
+                          </div>
+                        )}
+                        {!isEditing && status.whatsappTemplate && <p className="mt-1 pl-7 text-xs text-green-600 dark:text-green-400">Approved WhatsApp template configured</p>}
+                        {!isEditing && !status.whatsappTemplate && status.whatsappMessage && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-7 truncate">{status.whatsappMessage}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {(!campaign.statuses || campaign.statuses.length === 0) && (
+                    <p className="text-gray-500 dark:text-gray-400 text-sm py-4">No statuses defined</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Campaign Modal */}
+        {editingCampaign && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl dark:bg-gray-800">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Edit Campaign</h2>
+                  <button onClick={() => setEditingCampaign(false)} aria-label="Close" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Campaign Name *</label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                      placeholder="Enter campaign name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                      placeholder="Enter campaign description (optional)"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg dark:bg-gray-900/50">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Active Status</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Inactive campaigns hide leads from telecallers</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditIsActive(!editIsActive)}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        editIsActive ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-100 shadow ring-0 transition duration-200 ease-in-out ${
+                          editIsActive ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => setEditingCampaign(false)}
+                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveCampaign}
+                    disabled={savingCampaign || !editName.trim()}
+                    className="px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {savingCampaign ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Import Modal */}
+        {showBulkImport && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl dark:bg-gray-800">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Import Leads</h2>
+                  <button onClick={() => { setShowBulkImport(false); setFile(null); }} aria-label="Close" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                  className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+                    dragActive ? 'border-primary-500 bg-primary-50' : 'border-gray-300 dark:border-gray-600'
+                  }`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                    className="hidden"
+                  />
+                  <svg className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  {file ? (
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{file.name}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{(file.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">Drag & drop a CSV file here, or</p>
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
+                      >
+                        browse files
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+                  CSV should have columns: name, email, phone
+                </p>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => { setShowBulkImport(false); setFile(null); }}
+                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBulkImport}
+                    disabled={!file || importing}
+                    className="px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {importing ? 'Importing...' : 'Import Leads'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Form Builder Modal */}
+        {showFormBuilder && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
+            <div className="bg-white rounded-2xl w-full max-w-7xl h-[95vh] overflow-hidden shadow-xl dark:bg-gray-800">
+              <FormBuilder
+                initialForm={editingForm || undefined}
+                onSubmit={editingForm ? handleUpdateForm : handleCreateForm}
+                onCancel={() => { setShowFormBuilder(false); setEditingForm(null); }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Transfer Lead Modal */}
+        {showTransferLead && transferLead && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl dark:bg-gray-800">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Transfer Lead</h2>
+                  <button onClick={() => { setShowTransferLead(false); setTransferLead(null); setTransferCampaignId(''); setTransferDoerId(''); }} aria-label="Close" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Lead</label>
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-300">
+                      {transferLead.name}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Destination Campaign</label>
+                    <select
+                      value={transferCampaignId}
+                      onChange={(e) => setTransferCampaignId(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                    >
+                      <option value="">Select campaign</option>
+                      {campaigns.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Assigned User</label>
+                    <select
+                      value={transferDoerId}
+                      onChange={(e) => setTransferDoerId(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                    >
+                      <option value="">Select user</option>
+                      {allUsers.map((u) => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => { setShowTransferLead(false); setTransferLead(null); setTransferCampaignId(''); setTransferDoerId(''); }}
+                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleTransferLead}
+                    disabled={transferringLead || !transferCampaignId || !transferDoerId}
+                    className="px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {transferringLead ? 'Transferring...' : 'Transfer Lead'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Assign Users Modal */}
+        {showAssignUsers && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl dark:bg-gray-800">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Assign Users</h2>
+                  <button onClick={() => setShowAssignUsers(false)} aria-label="Close" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {allUsers.filter((u) => u.isActive).map((u) => {
+                    const isAssigned = assignUserIds.includes(u.id);
+                    return (
+                      <label
+                        key={u.id}
+                        className={`flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                          isAssigned ? 'bg-primary-50 dark:bg-primary-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isAssigned}
+                          onChange={() => toggleAssignUser(u.id)}
+                          className="user-checkbox w-4 h-4 text-primary-600 rounded"
+                        />
+                        <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center dark:bg-gray-700">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{u.name.charAt(0)}</span>
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-gray-100">{u.name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{u.role}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                  {allUsers.filter((u) => u.isActive).length === 0 && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-6">No active users available.</p>
+                  )}
+                </div>
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => setShowAssignUsers(false)}
+                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleAssignUsers(assignUserIds)}
+                    disabled={assigningUsers}
+                    className="px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {assigningUsers ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Lead Detail Dialog */}
+        {selectedLead && campaign && (
+          <LeadDetailDialog
+            leadId={selectedLead.id}
+            statuses={campaign.statuses || []}
+            onClose={() => setSelectedLead(null)}
+            onUpdate={() => {
+              setSelectedLead(null);
+              loadData();
+            }}
+          />
+        )}
+      </div>
+    </Layout>
+  );
+}
