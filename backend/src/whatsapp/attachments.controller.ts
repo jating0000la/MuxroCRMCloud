@@ -100,7 +100,9 @@ export class AttachmentsController {
     if (!stats?.isFile() || stats.isSymbolicLink()) throw new NotFoundException('Attachment unavailable.');
     res.set({ 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
       'Content-Security-Policy': "default-src 'none'; sandbox" });
-    res.download(filepath, path.basename(filename), (error) => {
+    // Use sendFile instead of download to avoid Content-Disposition: attachment header
+    // This allows WhatsApp/Gupshup to fetch the media inline
+    res.sendFile(filepath, (error) => {
       if (error && !res.headersSent) res.status(404).end();
     });
   }
