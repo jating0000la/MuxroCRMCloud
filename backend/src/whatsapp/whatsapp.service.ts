@@ -502,6 +502,93 @@ export class WhatsAppService {
 
   async syncTemplates() { return this.templates.sync(); }
 
+  // ─── Business Profile ─────────────────────────────────────────────────────
+
+  async getBusinessProfile(): Promise<{ profile: any; status: string }> {
+    const cfg = await this.getConfig();
+    if (!cfg.apiKey) throw new BadRequestException('Gupshup API key not configured');
+    if (!cfg.appId) throw new BadRequestException('Gupshup app ID not configured');
+
+    const url = `https://api.gupshup.io/wa/app/${cfg.appId}/business`;
+    try {
+      const response: AxiosResponse = await firstValueFrom(
+        this.http.get(url, { headers: { apikey: cfg.apiKey }, timeout: 30000 }),
+      );
+      const body = response.data as any;
+      return { profile: body, status: body?.status || 'success' };
+    } catch (error: any) {
+      const status = error.response?.status || 'Unknown';
+      const errBody = error.response?.data;
+      this.logger.error(`Gupshup profile fetch error [${status}]: ${JSON.stringify(errBody || error.message)}`);
+      throw new BadRequestException(`Failed to fetch business profile: ${errBody?.message || errBody?.error?.message || error.message}`);
+    }
+  }
+
+  async updateBusinessProfile(dto: {
+    city?: string;
+    state?: string;
+    country?: string;
+    pinCode?: string;
+    desc?: string;
+    vertical?: string;
+    website1?: string;
+    website2?: string;
+    profileEmail?: string;
+  }): Promise<{ success: boolean; profile?: any; error?: string }> {
+    const cfg = await this.getConfig();
+    if (!cfg.apiKey) throw new BadRequestException('Gupshup API key not configured');
+    if (!cfg.appId) throw new BadRequestException('Gupshup app ID not configured');
+    if (!dto.vertical || !dto.vertical.trim()) throw new BadRequestException('vertical is required');
+
+    for (const field of ['website1', 'website2'] as const) {
+      const value = dto[field];
+      if (value === undefined || value === null || value === '') continue;
+      try {
+        const parsed = new URL(value);
+        if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('unsupported protocol');
+      } catch {
+        throw new BadRequestException(`${field} must be a valid http(s) URL`);
+      }
+    }
+
+    const params = new URLSearchParams();
+    const fields: Array<[string, string | undefined]> = [
+      ['city', dto.city],
+      ['state', dto.state],
+      ['country', dto.country],
+      ['pinCode', dto.pinCode],
+      ['desc', dto.desc],
+      ['vertical', dto.vertical],
+      ['website1', dto.website1],
+      ['website2', dto.website2],
+      ['profileEmail', dto.profileEmail],
+    ];
+    for (const [key, value] of fields) {
+      if (value !== undefined && value !== null && value !== '') params.append(key, value);
+    }
+
+    const url = `https://api.gupshup.io/wa/app/${cfg.appId}/business/profile`;
+    try {
+      const response: AxiosResponse = await firstValueFrom(
+        this.http.put(url, params.toString(), {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', apikey: cfg.apiKey },
+          timeout: 30000,
+        }),
+      );
+      const body = response.data as any;
+      const status = body?.status;
+      if (status && status !== 'success') {
+        return { success: false, error: body?.message || body?.error?.message || status };
+      }
+      return { success: true, profile: body };
+    } catch (error: any) {
+      const status = error.response?.status || 'Unknown';
+      const errBody = error.response?.data;
+      this.logger.error(`Gupshup profile update error [${status}]: ${JSON.stringify(errBody || error.message)}`);
+      return { success: false, error: errBody?.message || errBody?.error?.message || error.message };
+    }
+  }
+
   // ─── Delivery Status Update ───────────────────────────────────────────────
 
   async updateMessageStatus(

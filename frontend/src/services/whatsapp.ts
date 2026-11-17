@@ -173,6 +173,48 @@ export interface WhatsAppTemplate {
   components: any;
 }
 
+export interface BusinessProfile {
+  id?: string;
+  name?: string;
+  about?: string;
+  description?: string;
+  desc?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  displayAddress?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  pinCode?: string;
+  preferredCountry?: string;
+  hqRegion?: string;
+  vertical?: string;
+  website?: string;
+  altWebsite?: string;
+  website1?: string;
+  website2?: string;
+  email?: string;
+  profileEmail?: string;
+  contactName?: string;
+  contactNumber?: string;
+  tncAccepted?: boolean;
+  emailVerified?: boolean;
+  createdOn?: number;
+  modifiedOn?: number;
+}
+
+export interface UpdateBusinessProfilePayload {
+  city?: string;
+  state?: string;
+  country?: string;
+  pinCode?: string;
+  desc?: string;
+  vertical: string;
+  website1?: string;
+  website2?: string;
+  profileEmail?: string;
+}
+
 // ─── API Service ────────────────────────────────────────────────────────────
 
 const whatsappService = {
@@ -273,6 +315,17 @@ const whatsappService = {
   // Templates
   async syncTemplates(): Promise<any> {
     const res = await api.post('/whatsapp/sync-templates');
+    return res.data;
+  },
+
+  // Business Profile
+  async getBusinessProfile(): Promise<{ status: string; profile: BusinessProfile }> {
+    const res = await api.get('/whatsapp/business/profile');
+    return res.data;
+  },
+
+  async updateBusinessProfile(payload: UpdateBusinessProfilePayload): Promise<{ success: boolean; profile: BusinessProfile; error?: string }> {
+    const res = await api.post('/whatsapp/business/profile/update', payload);
     return res.data;
   },
 };

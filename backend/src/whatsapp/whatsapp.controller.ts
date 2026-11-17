@@ -18,6 +18,7 @@ import {
   SendListDto,
   SendWhatsAppTemplateDto,
   SendBroadcastDto,
+  UpdateBusinessProfileDto,
 } from './dto/whatsapp.dto';
 
 @ApiTags('WhatsApp Chat')
@@ -224,5 +225,25 @@ export class WhatsAppController {
   @ApiOperation({ summary: 'Sync approved templates from Gupshup' })
   async syncTemplates() {
     return this.whatsapp.syncTemplates();
+  }
+
+  // ─── Business Profile ──────────────────────────────────────────────────────
+
+  @Get('business/profile')
+  @ApiOperation({ summary: 'Get WhatsApp Business profile from Gupshup' })
+  @ApiResponse({ status: 200, description: 'Business profile retrieved successfully' })
+  @ApiResponse({ status: 400, description: 'Gupshup configuration missing or API error' })
+  async getBusinessProfile() {
+    return this.whatsapp.getBusinessProfile();
+  }
+
+  @Post('business/profile/update')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update WhatsApp Business profile in Gupshup' })
+  @ApiResponse({ status: 200, description: 'Business profile updated successfully' })
+  @ApiResponse({ status: 400, description: 'Validation error or Gupshup API error' })
+  async updateBusinessProfile(@Body() dto: UpdateBusinessProfileDto) {
+    return this.whatsapp.updateBusinessProfile(dto);
   }
 }

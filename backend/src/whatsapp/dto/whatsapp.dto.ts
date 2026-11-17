@@ -392,6 +392,55 @@ export class SendBroadcastDto {
   items: BroadcastItemDto[];
 }
 
+// ─── Business Profile DTO ──────────────────────────────────────────────────
+
+export class UpdateBusinessProfileDto {
+  @ApiPropertyOptional({ example: 'Mumbai' })
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @ApiPropertyOptional({ example: 'Maharashtra' })
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @ApiPropertyOptional({ example: 'IN' })
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+  @ApiPropertyOptional({ example: '400001' })
+  @IsOptional()
+  @IsString()
+  pinCode?: string;
+
+  @ApiPropertyOptional({ example: 'We provide CRM solutions' })
+  @IsOptional()
+  @IsString()
+  desc?: string;
+
+  @ApiProperty({ description: 'Business vertical/category (required)', example: 'PROF_SERVICES' })
+  @IsString()
+  @IsNotEmpty()
+  vertical: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com' })
+  @IsOptional()
+  @IsString()
+  website1?: string;
+
+  @ApiPropertyOptional({ example: 'https://example.org' })
+  @IsOptional()
+  @IsString()
+  website2?: string;
+
+  @ApiPropertyOptional({ example: 'support@example.com' })
+  @IsOptional()
+  @IsString()
+  profileEmail?: string;
+}
+
 // ─── Chat Query DTO ────────────────────────────────────────────────────────
 
 export class ChatQueryDto {
