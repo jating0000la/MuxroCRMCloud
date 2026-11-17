@@ -172,6 +172,197 @@ The backend supports these Gupshup message types but **frontend has no UI**:
 
 ---
 
+## 📝 Gupshup Template Management Audit
+
+### Gupshup Template API Capabilities (from official docs):
+
+| Operation | Gupshup API | Endpoint | Backend Implementation |
+|-----------|-------------|----------|------------------------|
+| **List Templates** | ✅ Available | `GET /v1/template/list/{appname}` | ✅ `GupshupTemplatesService.list()` |
+| **Sync Templates** | ✅ Available | Via Gupshup dashboard/API | ✅ `GupshupTemplatesService.sync()` |
+| **Create Template** | ✅ Available | `POST /{appId}/template` | ❌ **Not implemented** |
+| **Edit Template** | ❌ **Not available** | N/A | N/A |
+| **Delete Template** | ❌ **Not available** | N/A | N/A |
+| **Submit for Approval** | ❌ **Not available** | N/A | ❌ **Not implemented** |
+
+### Complete Message Type Support Analysis:
+
+Based on the Gupshup **OpenAPI definition** from https://docs.gupshup.io/reference/msg:
+
+| Message Type | OpenAPI Schema | Gupshup Docs Supported | Max Size | Backend Implemented |
+|--------------|----------------|------------------------|----------|---------------------|
+| **text** | ✅ `text` schema | ✅ 4096 chars | ✅ | ✅ `sendText()` |
+| **image** | ✅ `image` schema | ✅ 5 MB | ✅ | ✅ `sendImage()` |
+| **video** | ✅ `video` schema | ✅ 16 MB (H.264) | ✅ | ✅ `sendVideo()` |
+| **audio** | ✅ `audio` schema | ✅ 16 MB (AAC) | ✅ | ✅ `sendAudio()` |
+| **file/document** | ✅ `document` schema | ✅ 100 MB | ✅ | ✅ `sendFile()` |
+| **sticker** | ✅ `sticker` schema | ✅ 100 KB (webp) | ✅ | ❌ **Not implemented** |
+| **location** | ✅ `Locationmessage` schema | ✅ | ✅ | ✅ `sendLocation()` |
+| **contact** | ✅ `contact` schema | ✅ | ✅ | ✅ `sendContact()` |
+| **quick_reply** | ✅ `Quickreply` schema | ✅ 3 options | ✅ | ✅ `sendQuickReply()` |
+| **list_message** | ✅ `listmessage` schema | ✅ 10 items | ✅ | ✅ `sendList()` |
+
+### Key Gupshup API Insights:
+
+1. **Sticker Support**: Gupshup **does support stickers** via `.webp` format (max 100 KB, 512x512 pixels). The backend does **not implement** sticker sending.
+
+2. **Template Management Limitation**: Template creation via API (`POST /{appId}/template`) is available but not implemented. Template editing and deletion are **not supported via API** — must use Gupshup dashboard.
+
+3. **Template Approval Workflow**: Templates created via dashboard/API go through PENDING → APPROVED/REJECTED status. The backend validates template approval before sending.
+
+4. **Enhanced Quick Reply**: The Gupshup OpenAPI shows **3 variations** of quick reply:
+   - `Quickreply` - text only
+   - `quickreplyimage` - with image preview
+   - `quickReplyFile` - with file attachment
+
+5. **Location Message Format**: Complex location object with `longitude`, `latitude`, `name`, and `address` fields.
+
+### Implementation Gap Analysis:
+
+| Category | Supported by Gupshup | Implemented in Backend | Implemented in Frontend | Gap |
+|----------|---------------------|------------------------|--------------------------|-----|
+| **Core Messaging** | ✅ 11 types | ✅ 9 types | ✅ 4 types | **7 types missing UI** |
+| **Interactive Elements** | ✅ Quick Reply, List | ✅ Quick Reply, List | ❌ Quick Reply, List | **2 interactive types missing UI** |
+| **Template Management** | ✅ Partial | ❌ Partial | ❌ | **Template creation missing** |
+| **Advanced Features** | ✅ Stickers | ❌ | ❌ | **Stickers missing** |
+
+### Updated Prioritized Recommendations:
+
+| Priority | Issue | Impact |
+|----------|-------|--------|
+| 🔴 High | Wire up video/location/contact send UI | Backend already supports |
+| 🔴 High | Wire up quick reply/list UI | Backend already supports |
+| 🔴 High | Implement sticker support | Gupshup supports, backend missing |
+| 🟡 Medium | Implement template creation via API | Gupshup API available but unused |
+| 🟡 Medium | Add message edit/delete | Core WhatsApp feature |
+| 🟡 Medium | Add typing indicator | User expectation |
+| 🟡 Medium | Add optimistic updates | Performance |
+| 🟢 Low | Add virtual scrolling | Performance |
+| 🟢 Low | Add chat pinning | Organization |
+| 🟢 Low | Add starred messages | Important messages |
+
+### Critical Path:
+
+1. **Phase 1**: Video/Location/Contact/Quick Reply/List message UI (wire up existing backend capabilities)
+2. **Phase 2**: Sticker support (implement missing backend feature)
+3. **Phase 3**: Template creation API (implement missing backend feature)
+4. **Phase 4**: Advanced features (edit/delete, typing, reactions, etc.)
+
+### Key Findings:
+
+1. **Template Creation**: Gupshup provides a `POST /{appId}/template` endpoint for creating templates programmatically. The backend does **not** implement this.
+
+2. **Template Editing**: Gupshup **does NOT provide** an edit template API. Templates must be edited via the Gupshup dashboard and resubmitted for approval.
+
+3. **Template Deletion**: Gupshup **does NOT provide** a delete template API. Templates can only be managed via the Gupshup dashboard.
+
+4. **Current Backend Status**: The backend only supports **listing** and **syncing** templates. It does not support creating, editing, or deleting templates programmatically.
+
+### Gupshup Template Creation Endpoint Details:
+
+```
+POST https://api.gupshup.io/wa/app/{appId}/template
+```
+
+**Required parameters:**
+- `elementName` - Template name
+- `languageCode` - Language code (e.g., "en")
+- `category` - Template category (AUTHENTICATION, UTILITY, MARKETING)
+- `templateType` - Template type (TEXT, IMAGE, VIDEO, DOCUMENT)
+- `buttons` - Optional interactive buttons (for AUTHENTICATION templates)
+- `vertical` - Optional template label
+
+**Response includes:**
+- `template.id` - Template ID
+- `template.status` - PENDING/APPROVED/REJECTED
+- `template.createdOn` - Creation timestamp
+- `template.modifiedOn` - Last modification timestamp
+
+---
+
+## 🏢 Gupshup Business Configuration Audit
+
+Reference: https://docs.gupshup.io/reference/get-business-details
+
+### Business Details API Endpoint:
+
+```
+GET https://api.gupshup.io/wa/app/{appId}/business
+Headers: apikey: {API_KEY}
+```
+
+### Business Profile Fields Available from Gupshup:
+
+| Field | Type | Description | Current MuxroCRM Usage |
+|-------|------|-------------|------------------------|
+| `id` | string | Unique identifier for the business (APP_ID) | ✅ Stored as `gupshupAppId` |
+| `name` | string | Business name | ❌ Not displayed in chat UI |
+| `about` | string | Description about the business | ❌ Not stored |
+| `description` | string | Business profile description | ❌ Not stored |
+| `vertical` | string | Business vertical | ❌ Not stored |
+| `website` | string (uri) | Business website URL | ❌ Not stored |
+| `altWebsite` | string (uri) | Alternate website URL | ❌ Not stored |
+| `email` | string (email) | Business email address | ❌ Not stored |
+| `profileEmail` | string | Profile email | ❌ Not stored |
+| `emailVerified` | boolean | Email verification status | ❌ Not tracked |
+| `contactName` | string | Name of contact person | ❌ Not stored |
+| `contactNumber` | string | Business contact number | ❌ Not stored |
+| `addressLine1` | string | First line of address | ❌ Not stored |
+| `addressLine2` | string | Second line of address | ❌ Not stored |
+| `displayAddress` | string | Multi-line display address | ❌ Not stored |
+| `city` | string | City | ❌ Not stored |
+| `state` | string | State | ❌ Not stored |
+| `country` | string | Country code | ❌ Not stored |
+| `pinCode` | string | Postal code | ❌ Not stored |
+| `hqRegion` | string | Headquarters region | ❌ Not stored |
+| `preferredCountry` | string | Preferred country | ❌ Not stored |
+| `tncAccepted` | boolean | Terms & conditions acceptance | ❌ Not tracked |
+| `createdOn` | integer (int64) | Creation timestamp | ❌ Not stored |
+| `modifiedOn` | integer (int64) | Last modification timestamp | ❌ Not stored |
+
+### Current Backend Business Configuration:
+
+The MuxroCRM backend stores only **4 Gupshup settings** (from `getConfig()`):
+- `gupshupApiKey` - Account API key
+- `gupshupSource` - Registered WhatsApp Business phone number
+- `gupshupAppName` - Gupshup app name
+- `gupshupAppId` - App identifier (used for template sync)
+
+### Business Configuration Gaps:
+
+1. **No Business Profile UI** - Business name, about, description, website, email are not displayed anywhere in the WhatsApp chat interface or settings.
+
+2. **No Business Verification Status** - `emailVerified` and `tncAccepted` flags are not tracked; no way to know if business profile is complete.
+
+3. **No Business Address Display** - Address fields (addressLine1/2, city, state, country, pinCode) are not stored, so the chat UI cannot show business location.
+
+4. **No Contact Person Info** - `contactName` and `contactNumber` are not stored; customers cannot see who they're chatting with.
+
+5. **No Business Metadata** - `createdOn`, `modifiedOn`, `hqRegion`, `preferredCountry`, `vertical` are not stored for analytics or compliance.
+
+6. **No Business Profile Sync** - The backend does not call `GET /wa/app/{appId}/business` to fetch and cache business details; every message sent does not verify business profile completeness.
+
+### Recommended Business Configuration Additions:
+
+| Priority | Field | Purpose |
+|----------|-------|---------|
+| 🔴 High | `name`, `about`, `website`, `email` | Display business identity in chat header |
+| 🔴 High | `emailVerified`, `tncAccepted` | Show verification status |
+| 🟡 Medium | `contactName`, `contactNumber` | Support contact info in chat |
+| 🟡 Medium | `addressLine1/2`, `city`, `state`, `country`, `pinCode` | Business address for location messages |
+| 🟢 Low | `vertical`, `hqRegion`, `preferredCountry` | Analytics and reporting |
+| 🟢 Low | `createdOn`, `modifiedOn` | Audit trail |
+
+### Implementation Plan:
+
+1. **Backend**: Add `GET /integrations/gupshup/business` endpoint that calls Gupshup's business API and caches the result.
+2. **Backend**: Add `businessProfile` column to settings or a dedicated `whatsapp_business_profiles` table.
+3. **Frontend**: Display business name and verification badge in ChatHeader next to contact name.
+4. **Frontend**: Add Business Profile section in SettingsPage (Communication Setup).
+5. **Frontend**: Show business about/description in CRMInfoPanel.
+
+---
+
 ## 🚀 Gupshup-Specific Implementation Priorities
 
 Based on Gupshup WhatsApp Business API capabilities:
@@ -232,6 +423,17 @@ Based on Gupshup WhatsApp Business API capabilities:
 | `1010` | Invalid Media URL (sandbox only) |
 | `1011` | Invalid Media Size |
 
+### Gupshup Template Management Summary:
+
+| Feature | Available via API | Backend Implemented | Notes |
+|---------|-------------------|---------------------|-------|
+| **List Templates** | ✅ | ✅ | `GupshupTemplatesService.list()` |
+| **Sync Templates** | ✅ | ✅ | `GupshupTemplatesService.sync()` |
+| **Create Template** | ✅ | ❌ | `POST /{appId}/template` |
+| **Edit Template** | ❌ | N/A | Must use Gupshup dashboard |
+| **Delete Template** | ❌ | N/A | Must use Gupshup dashboard |
+| **Submit for Review** | ❌ | N/A | Must use Gupshup dashboard |
+
 ---
 
 ## 🔧 Quick Wins (Low Effort, High Impact)
@@ -276,4 +478,16 @@ Based on Gupshup WhatsApp Business API capabilities:
 
 The WhatsApp UI is **functional and well-structured** but needs enhancement to match full WhatsApp feature parity. The most critical missing features are **message edit/delete**, **typing indicators**, and **optimistic updates**. 
 
-**Key insight from Gupshup docs**: The backend already supports **11 message types** (text, image, video, audio, file, location, contact, quick_reply, list, template, broadcast) but the **frontend only exposes 4** (text, image, audio, file). Priority should be given to wiring up the existing backend capabilities to the UI before building new backend features.
+**Key insights from Gupshup docs**:
+
+1. **Message Types**: The backend already supports **9 message types** (text, image, video, audio, file, location, contact, quick_reply, list) but the **frontend only exposes 4** (text, image, audio, file). Priority should be given to wiring up the existing backend capabilities to the UI before building new backend features.
+
+2. **Template Management**: Gupshup provides **limited template management** via API. The backend currently only supports listing and syncing templates. Template creation is available via `POST /{appId}/template` but is **not implemented**. Template editing and deletion are **not available via API** at all — these must be done through the Gupshup dashboard.
+
+3. **Template Approval Workflow**: Templates created via API go through a **PENDING → APPROVED/REJECTED** workflow. The backend validates that templates are APPROVED before sending, which is correct behavior.
+
+4. **Sticker Support**: Gupshup supports stickers via `.webp` format (max 100 KB, 512x512 pixels) but the backend does **not implement** sticker sending.
+
+5. **Quick Reply Variations**: Gupshup OpenAPI shows **3 variations** of quick reply (text, image, file) but the backend only implements text quick reply.
+
+6. **Critical Gap**: **7 message types** are supported by the backend but **not exposed in the frontend UI**. This is the highest priority for implementation.
