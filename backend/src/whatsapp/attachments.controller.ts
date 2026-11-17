@@ -13,6 +13,27 @@ import { Roles } from '../auth/decorators/roles.decorator';
 const retentionMs = 24 * 60 * 60 * 1000;
 const tokenPattern = /^(\d{13})-[0-9a-f-]{36}$/;
 const attachmentDirectory = () => path.resolve(process.env.WHATSAPP_UPLOAD_DIR || 'uploads/whatsapp');
+
+// MIME types browsers can render inline (preview) instead of forcing a download.
+const inlineMimeTypes: Record<string, string> = {
+  '.pdf': 'application/pdf',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.svg': 'image/svg+xml',
+  '.avif': 'image/avif',
+  '.txt': 'text/plain; charset=utf-8',
+  '.csv': 'text/csv; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg',
+  '.wav': 'audio/wav',
+};
 const storage = diskStorage({
   destination: (_req, _file, callback) => {
     try {
@@ -98,10 +119,16 @@ export class AttachmentsController {
     const filepath = path.join(attachmentDirectory(), token);
     const stats = await fs.promises.lstat(filepath).catch(() => null);
     if (!stats?.isFile() || stats.isSymbolicLink()) throw new NotFoundException('Attachment unavailable.');
-    res.set({ 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
-      'Content-Security-Policy': "default-src 'none'; sandbox" });
-    // Use sendFile instead of download to avoid Content-Disposition: attachment header
-    // This allows WhatsApp/Gupshup to fetch the media inline
+    const ext = path.extname(filename).toLowerCase();
+    const mimeType = inlineMimeTypes[ext] || 'application/octet-stream';
+    // Set Content-Type and Content-Disposition: inline so browsers/Gupshup render in preview
+    // instead of forcing a download, enabling inline preview for PDF/images/etc.
+    res.set({ 'Content-Type': mimeType, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'Content-Disposition': `inline; filename="${path.basename(filename)}"` });
+    // Use sendFile instead of download to avoid the default Content-Disposition: attachment header
+    // This allows WhatsApp/Gupshup to fetch the media inline, and the explicit inline directive
+    // above takes precedence for supported file types
     res.sendFile(filepath, (error) => {
       if (error && !res.headersSent) res.status(404).end();
     });
