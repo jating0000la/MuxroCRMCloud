@@ -114,7 +114,7 @@ export default function ComposeBar({
                 setFile(selected);
               }} />
           </label>
-          <p className="text-xs text-slate-500 dark:text-gray-400">Uploads send a public download link that expires in 24 hours. Maximum 25 MiB.</p>
+          <p className="text-xs text-slate-500 dark:text-gray-400">Files are uploaded and sent as a WhatsApp attachment. Maximum 25 MiB.</p>
           {!file && (
           <input
             type="text"
@@ -139,7 +139,7 @@ export default function ComposeBar({
           disabled={sending || (!file && !mediaUrl.trim())}
           className="mt-2 w-full rounded-lg bg-primary-500 py-2 text-xs font-semibold text-white transition-colors hover:bg-primary-600 disabled:opacity-50"
         >
-          {sending ? 'Sending...' : file ? 'Upload and send link' : `Send ${attachType.charAt(0).toUpperCase() + attachType.slice(1)}`}
+          {sending ? 'Sending...' : file ? 'Upload and send attachment' : `Send ${attachType.charAt(0).toUpperCase() + attachType.slice(1)}`}
         </button>
       </div>
     );

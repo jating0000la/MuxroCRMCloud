@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../../components/layout/Layout';
 import { useRef } from 'react';
 import whatsappService, {
@@ -147,9 +147,31 @@ export default function WhatsAppPage() {
     setSending(true);
     try {
       const uploaded = await whatsappService.uploadAttachment(file);
-      await whatsappService.sendText({
-        phone, text: [caption, uploaded.filename, uploaded.url, 'Download available for 24 hours.'].filter(Boolean).join('\n'),
-      });
+      
+      // Determine file type and send as proper WhatsApp attachment
+      const mimeType = file.type;
+      let mediaType: 'image' | 'video' | 'audio' | 'document' = 'document';
+      
+      if (mimeType.startsWith('image/')) mediaType = 'image';
+      else if (mimeType.startsWith('video/')) mediaType = 'video';
+      else if (mimeType.startsWith('audio/')) mediaType = 'audio';
+      
+      switch (mediaType) {
+        case 'image':
+          await whatsappService.sendImage({ phone, url: uploaded.url, caption });
+          break;
+        case 'video':
+          await whatsappService.sendVideo({ phone, url: uploaded.url, caption });
+          break;
+        case 'audio':
+          await whatsappService.sendAudio({ phone, url: uploaded.url });
+          break;
+        case 'document':
+        default:
+          await whatsappService.sendFile({ phone, url: uploaded.url, filename: uploaded.filename, caption });
+          break;
+      }
+      
       await loadMessages(phone);
       await loadChats();
     } catch (error: any) {
